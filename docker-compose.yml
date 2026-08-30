@@ -20,6 +20,8 @@ services:
   api:
     build: .
     env_file: .env
+    volumes:
+      - ./data:/app/data
     ports:
       - "${API_PORT:-8400}:8400"
     depends_on:
