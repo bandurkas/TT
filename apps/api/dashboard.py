@@ -123,7 +123,7 @@ def trends(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     events = [{"date": d["date"], "type": "ad_deduction", "amount": d["amount"],
                "label": f"GMV Max deduction {d['amount']}"}
               for d in L.ad_deductions(c.session, c.shop.id, c.period.start, c.period.end, c.tz)]
-    _, meta = L.videos_with_metrics(c.session, c.shop.id, c.period.start, c.period.end)
+    _, meta = _video_rows(c)
     for v in meta.values():
         pday = C._pub_date(v, c.tz)
         if pday and c.period.start <= pday <= c.period.end:
@@ -150,8 +150,13 @@ def products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
                "ad_cost_note": "BLENDED estimate (shop-level deductions split by revenue)"})
 
 
+def _video_rows(c: Ctx):
+    return c.memo(("video_rows", c.period.start, c.period.end),
+                  lambda: L.videos_with_metrics(c.session, c.shop.id, c.period.start, c.period.end))
+
+
 def _videos(c: Ctx) -> list[dict[str, Any]]:
-    daily, meta = L.videos_with_metrics(c.session, c.shop.id, c.period.start, c.period.end)
+    daily, meta = _video_rows(c)
     cfg = ScoringConfig(minimum_net_margin=c.floor, minimum_sample_orders=c.min_orders,
                         minimum_sample_impressions=int(c.cfg.minimum_sample_impressions) if c.cfg else 1000,
                         minimum_sample_clicks=int(c.cfg.minimum_sample_clicks) if c.cfg else 30)
@@ -174,7 +179,7 @@ def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     pf = L.product_funnel(c.session, c.shop.id, c.period.start, c.period.end)
     pmeta = L.products(c.session, c.shop.id)
     prows = C.product_rows(pd, pmeta, c.period, pf, c.floor, c.min_orders)
-    daily, vmeta = L.videos_with_metrics(c.session, c.shop.id, c.period.start, c.period.end)
+    daily, vmeta = _video_rows(c)
     cards = _videos(c)
     views = {vid: sum(int(r.views or 0) for r in rows) for vid, rows in daily.items()}
     vclass = {cd["video_id"]: cd["classification"] for cd in cards}

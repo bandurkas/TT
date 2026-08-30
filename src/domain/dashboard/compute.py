@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -354,7 +354,9 @@ def _pub_date(meta: Any, tz: str | None) -> date | None:
     pub = getattr(meta, "published_at", None)
     if pub is None:
         return None
-    if tz and pub.tzinfo is not None:
+    if pub.tzinfo is None:
+        pub = pub.replace(tzinfo=UTC)
+    if tz:
         from zoneinfo import ZoneInfo
         return pub.astimezone(ZoneInfo(tz)).date()
     return pub.date()

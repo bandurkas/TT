@@ -329,7 +329,7 @@ def sync_video_product_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
             upsert(ctx.session, VideoProductMetric, rows, ["video_id", "product_id", "metric_date"])
         if overall:
             # only measured product clicks; `impressions` stays = views (list API), ctr from list API
-            vals = {k: v for k, v in overall.items() if k == "product_clicks" and v is not None}
+            vals = {k: v for k, v in overall.items() if k == "product_clicks" and v}
             if vals:
                 ctx.session.execute(update(VideoMetric).where(VideoMetric.video_id == vid,
                                                               VideoMetric.metric_date == day,
