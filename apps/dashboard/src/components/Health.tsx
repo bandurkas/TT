@@ -3,6 +3,7 @@ import { EnHint, noteKey, useLang, useT } from "@/lib/i18n";
 import { idr, int, num, pct, ratio } from "@/lib/format";
 import type { Card, Overview } from "@/lib/types";
 import { kpiChange } from "@/lib/kpi";
+import { orderMoney } from "@/lib/orders";
 import { ErrorNote, Pill, Skeleton, Sparkline, ZoneHeader, statusTone } from "./ui";
 
 const MAIN = ["net_profit", "gmv", "net_seller_revenue", "orders", "ad_spend", "net_margin"];
@@ -95,6 +96,8 @@ export default function Health({ ov, loading, error, reload }: { ov: Overview | 
   const gradeCls = health?.grade === "POOR" ? "dn" : health?.grade === "GOOD" ? "up" : "";
   const ringColor = health ? barColor(health.score) : "var(--gray-soft)";
   const previousOrders = num(byKey.get("orders")?.prev);
+  const money = (value: string | null | undefined) => orderMoney(value, lang, ov?.shop.currency);
+  const expense = (value: string) => money(value.startsWith("-") ? value.slice(1) : `-${value}`);
   return (
     <section className="zone" id="zone1">
       <ZoneHeader id="z1" eyebrow={t("1 · Business health")} title={t("Where the money went")} hint={t("Open “How to read this” for definitions")} />
@@ -132,14 +135,20 @@ export default function Health({ ov, loading, error, reload }: { ov: Overview | 
             <div className="card pace">
               <div className="k lbl">{t("Unit economics · per unit")} {ue ? `· ${int(ue.units, lang)} ${t("units")}` : ""}</div>
               {ue ? (
-                <table className="tbl" style={{ marginTop: 6 }}><tbody>
-                  <tr><td>{t("Revenue after seller discount")}</td><td className="r">{idr(ue.revenue_per_unit, lang)}</td></tr>
-                  <tr><td>{t("TikTok fees (commission, processing, logistics, affiliate)")}</td><td className="r dn">{idr(-(num(ue.fees_per_unit) ?? 0), lang)}</td></tr>
-                  <tr><td>{t("COGS")}</td><td className="r dn">{idr(-(num(ue.cogs_per_unit) ?? 0), lang)}</td></tr>
-                  <tr><td><b>{t("Contribution before ads")}</b></td><td className="r"><b>{idr(ue.contribution_per_unit, lang)}</b></td></tr>
-                  <tr><td>{t("Ad cost per unit (blended)")} <span className="tiny">· {t("estimate")}</span></td><td className="r dn">{idr(-(num(ue.ad_cost_per_unit) ?? 0), lang)}</td></tr>
-                  <tr><td><b>{t("Net per unit")}</b></td><td className={`r ${(num(ue.net_per_unit) ?? 0) < 0 ? "dn" : ""}`}><b>{idr(ue.net_per_unit, lang)}</b></td></tr>
+                <><table className="tbl" style={{ marginTop: 6 }}><tbody>
+                  <tr><td>{lang === "ru" ? "Выручка с учётом возвратов и корректировок, до комиссий" : "Revenue after refunds and adjustments, before fees"}</td><td className="r">{money(ue.revenue_per_unit)}</td></tr>
+                  <tr><td>{t("TikTok fees (commission, processing, logistics, affiliate)")}</td><td className="r dn">{expense(ue.fees_per_unit)}</td></tr>
+                  <tr><td>{lang === "ru" ? "Товар, упаковка и прочие внесённые затраты" : "Product, packaging and other entered costs"}</td><td className="r dn">{expense(ue.cogs_per_unit)}</td></tr>
+                  {!!num(ue.contribution_rounding_per_unit) && <tr><td>{lang === "ru" ? "Округление на единицу" : "Per-unit rounding"}</td><td className="r">{money(ue.contribution_rounding_per_unit)}</td></tr>}
+                  <tr><td><b>{t("Contribution before ads")}</b></td><td className="r"><b>{money(ue.contribution_per_unit)}</b></td></tr>
+                  <tr><td>{t("Ad cost per unit (blended)")} <span className="tiny">· {t("estimate")}</span></td><td className="r dn">{expense(ue.ad_cost_per_unit)}</td></tr>
+                  {!!num(ue.rounding_per_unit) && <tr><td>{lang === "ru" ? "Округление на единицу" : "Per-unit rounding"}</td><td className="r">{money(ue.rounding_per_unit)}</td></tr>}
+                  <tr><td><b>{t("Net per unit")}</b></td><td className={`r ${(num(ue.net_per_unit) ?? 0) < 0 ? "dn" : ""}`}><b>{money(ue.net_per_unit)}</b></td></tr>
                 </tbody></table>
+                  <p className="small muted">{lang === "ru" ? "Все строки рассчитаны по одним и тем же заказам. Выручка здесь учитывает возвраты и корректировки и отличается от GMV магазина." : "All rows use the same order calculations. Revenue here includes refunds and adjustments and differs from shop GMV."}</p>
+                  {(!!num(ue.calculation_difference) || !!num(ue.contribution_difference)) && <p className="banner bad">{lang === "ru" ? "Исходные суммы не сходятся. Проверьте расчёты заказов; это не погрешность округления." : "Source amounts do not reconcile. Check order calculations; this is not a rounding difference."}</p>}
+                  <a href="#zorders">{lang === "ru" ? "Открыть подробный журнал заказов →" : "Open detailed order journal →"}</a>
+                </>
               ) : <div className="muted small" style={{ marginTop: 8 }}>—</div>}
             </div>
           </div>

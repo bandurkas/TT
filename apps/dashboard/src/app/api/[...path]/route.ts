@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { demoOrders, demoOrderPage } from "@/lib/order-mock";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,14 @@ const listTasks = async () => {
 export async function GET(_req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   if (process.env.MOCK !== "1") return off();
   const key = (await ctx.params).path.join("/");
+  if (key === "orders" || /^orders\/\d+$/.test(key)) {
+    const params = new URL(_req.url).searchParams;
+    if (params.has("shop_id") && params.get("shop_id") !== "1") return NextResponse.json({ detail: "shop not found" }, { status: 404 });
+    const all = demoOrders(await read("orders.json"));
+    if (key === "orders") return NextResponse.json(demoOrderPage(all, params));
+    const detail = all.find(o => o.id === Number(key.split("/")[1]));
+    return detail ? NextResponse.json(detail) : NextResponse.json({ detail: "order not found" }, { status: 404 });
+  }
   if (key === "tasks") return NextResponse.json(await listTasks());
   const f = FILES[key];
   if (!f) return NextResponse.json({ detail: "not found" }, { status: 404 });

@@ -6,6 +6,7 @@ import { usePeriod } from "@/lib/period";
 import type { Campaigns, Creators, Finding, Funnel as FunnelT, Insights, Overview, Products, TaskIn, Tasks, Trends, VideoProducts as VPT, Videos } from "@/lib/types";
 import { Header, Rail } from "@/components/Shell";
 import Health from "@/components/Health";
+import Orders from "@/components/Orders";
 import Diagnosis from "@/components/Diagnosis";
 import Trend from "@/components/Trend";
 import Explorer from "@/components/Explorer";
@@ -48,6 +49,7 @@ function Dashboard() {
           <div className="wrap">
             {apiDown && <div className="banner bad" role="alert"><b>{tr(lang, "API unreachable")}</b> <span className="mono small">{ov.error}</span><button className="btn sm" onClick={() => setTick((x) => x + 1)}>{tr(lang, "Retry")}</button></div>}
             <Health ov={ov.data} loading={ov.loading} error={apiDown ? null : ov.error} reload={ov.reload} />
+            <Orders key={q} query={q} shopId={state.shopId} tick={tick} />
             <Diagnosis ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
             <Trend tr={trd.data} ov={ov.data} loading={trd.loading} error={apiDown ? null : trd.error} reload={trd.reload} />
             <Explorer tab={state.tab} setTab={(tab) => update({ tab })} apiDown={apiDown} products={prods} videos={vids} campaigns={camps} creators={crs} />

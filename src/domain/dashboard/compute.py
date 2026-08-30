@@ -269,13 +269,23 @@ def unit_economics(t: Totals) -> dict[str, Any] | None:
         return None
     u = Decimal(t.units)
     q = lambda v: (v / u).quantize(Decimal(1))
-    rev = q(t.gmv - t.refunds)
+    # All rows use the same order-profit basis; Shop Analytics GMV is a different data source.
+    rev = q(t.net_seller_revenue + t.fees + t.affiliate)
     fees = q(t.fees + t.affiliate)
     cogs = q(t.cogs)
     ads = q(t.ad_cost)
+    difference = t.net_seller_revenue - t.cogs - t.ad_cost - t.net_profit
+    contribution_difference = t.net_seller_revenue - t.cogs - t.contribution
     return {"units": t.units, "revenue_per_unit": rev, "fees_per_unit": fees, "cogs_per_unit": cogs,
             "contribution_per_unit": q(t.contribution), "ad_cost_per_unit": ads,
-            "net_per_unit": q(t.net_profit), "ad_cost_is_estimate": True}
+            "net_per_unit": q(t.net_profit), "ad_cost_is_estimate": True,
+            "revenue_basis": "after_refunds_and_adjustments_before_fees",
+            "calculation_difference": difference,
+            "contribution_difference": contribution_difference,
+            "contribution_rounding_per_unit": q(t.contribution) - (rev - fees - cogs)
+            if difference == ZERO and contribution_difference == ZERO else None,
+            "rounding_per_unit": q(t.net_profit) - (q(t.contribution) - ads)
+            if difference == ZERO and contribution_difference == ZERO else None}
 
 
 # --- trends -------------------------------------------------------------------------------------

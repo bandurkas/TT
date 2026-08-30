@@ -40,6 +40,11 @@ export interface UnitEconomics {
   ad_cost_per_unit: Dec;
   net_per_unit: Dec;
   ad_cost_is_estimate: boolean;
+  revenue_basis?: string;
+  calculation_difference?: Dec;
+  contribution_difference?: Dec;
+  contribution_rounding_per_unit?: Dec | null;
+  rounding_per_unit?: Dec | null;
 }
 
 export interface DataQuality {

@@ -16,6 +16,7 @@ from src.db.session import SessionLocal
 from src.domain.dashboard import compute as C
 from src.domain.dashboard import insights as I
 from src.domain.dashboard import loaders as L
+from src.domain.dashboard import order_loaders as OL
 
 router = APIRouter(prefix="/api")
 TASK_STATUSES = ("today", "in_progress", "review", "done")
@@ -254,6 +255,25 @@ def insights(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
 
 
 # --- tasks (existing `tasks` table: why/expected_impact/source_entity/evaluation JSONB) ---------
+@router.get("/orders")
+def order_journal(c: Ctx = Depends(ctx_dep), search: str = Query("", max_length=100),
+                  state: Literal["all", "final", "preliminary", "not_calculated"] = "all",
+                  loss_only: bool = False, offset: int = Query(0, ge=0),
+                  limit: int = Query(25, ge=1, le=100)) -> dict[str, Any]:
+    return _n({**c.meta(), **OL.page(c.session, c.shop.id, c.period.start, c.period.end, c.tz,
+                                    search.strip(), state, loss_only, offset, limit)})
+
+
+@router.get("/orders/{order_id}")
+def order_details(order_id: int, dep: Any = Depends(shop_dep)) -> dict[str, Any]:
+    shop, session = dep
+    try:
+        return _n({"shop_id": shop.id, "timezone": shop.timezone,
+                   **OL.detail(session, shop.id, order_id)})
+    except LookupError as e:
+        raise HTTPException(404, "order not found") from e
+
+
 class TaskIn(BaseModel):
     title: str = Field(min_length=3, max_length=255)
     detail: str | None = None

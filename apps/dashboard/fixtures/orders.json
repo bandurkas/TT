@@ -1,0 +1,1068 @@
+[
+  {
+    "id": 1,
+    "external_order_id": "DEMO-001",
+    "created_at": "2026-08-22 10:00:00+00:00",
+    "order_status": "COMPLETED",
+    "currency": "IDR",
+    "state": "final",
+    "profit_status": "ADJUSTED",
+    "version": 3,
+    "calculated_at": "2026-08-22 10:00:00+00:00",
+    "items": [
+      {
+        "title": "Lomira — набор для ухода, полная комплектация с запасными насадками",
+        "sku_id": "SKU-A",
+        "sku_title": "2 pcs",
+        "quantity": 2
+      }
+    ],
+    "unconfirmed_fields": [],
+    "amounts": {
+      "revenue_base": "90000",
+      "fees": "12500",
+      "costs": "27000",
+      "refunds": "10000",
+      "other_effect": "-9300",
+      "ad_cost": "12000",
+      "net_profit": "29200",
+      "profit_share": "0.324444",
+      "shares": {
+        "fees": "0.138889",
+        "costs": "0.3",
+        "refunds": "0.111111",
+        "other_effect": "-0.103333",
+        "ad_cost": "0.133333",
+        "net_profit": "0.324444"
+      }
+    },
+    "lines": [
+      {
+        "key": "sale_proceeds",
+        "amount": "100000",
+        "share": "1.111111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "seller_discounts",
+        "amount": "-10000",
+        "share": "-0.111111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "revenue_base",
+        "amount": "90000",
+        "share": "1",
+        "subtotal": true,
+        "evidence": "final"
+      },
+      {
+        "key": "refunds",
+        "amount": "-10000",
+        "share": "-0.111111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "platform_fees",
+        "amount": "-9000",
+        "share": "-0.1",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "affiliate_commission",
+        "amount": "-2000",
+        "share": "-0.022222",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "seller_shipping",
+        "amount": "-1000",
+        "share": "-0.011111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "taxes",
+        "amount": "-500",
+        "share": "-0.005556",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "subsidies",
+        "amount": "1000",
+        "share": "0.011111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "adjustments",
+        "amount": "-300",
+        "share": "-0.003333",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "net_seller_revenue",
+        "amount": "68200",
+        "share": "0.757778",
+        "subtotal": true,
+        "evidence": "final"
+      },
+      {
+        "key": "cogs",
+        "amount": "-25000",
+        "share": "-0.277778",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "packaging",
+        "amount": "-1500",
+        "share": "-0.016667",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "inbound_logistics",
+        "amount": "-500",
+        "share": "-0.005556",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "other_variable",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "contribution_profit",
+        "amount": "41200",
+        "share": "0.457778",
+        "subtotal": true,
+        "evidence": "calculated"
+      },
+      {
+        "key": "allocated_ad_cost",
+        "amount": "-12000",
+        "share": "-0.133333",
+        "subtotal": false,
+        "evidence": "estimate"
+      },
+      {
+        "key": "estimated_net_profit",
+        "amount": "29200",
+        "share": "0.324444",
+        "subtotal": true,
+        "evidence": "estimate"
+      }
+    ],
+    "transactions": [
+      {
+        "id": "sale:gross_sales_amount",
+        "field": "gross_sales_amount",
+        "kind": "SALE_PROCEEDS",
+        "group": "sale_proceeds",
+        "amount": "100000",
+        "raw_amount": "100000",
+        "share": "1.111111",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:seller_discount_amount",
+        "field": "seller_discount_amount",
+        "kind": "SELLER_DISCOUNT",
+        "group": "seller_discounts",
+        "amount": "-10000",
+        "raw_amount": "-10000",
+        "share": "-0.111111",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:fee_residual",
+        "field": "fee_residual",
+        "kind": "PLATFORM_COMMISSION",
+        "group": "platform_fees",
+        "amount": "-9000",
+        "raw_amount": "-9000",
+        "share": "-0.1",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:affiliate_commission_amount",
+        "field": "affiliate_commission_amount",
+        "kind": "AFFILIATE_COMMISSION",
+        "group": "affiliate_commission",
+        "amount": "-2000",
+        "raw_amount": "-2000",
+        "share": "-0.022222",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:shipping_cost_amount",
+        "field": "shipping_cost_amount",
+        "kind": "SHIPPING_FEE",
+        "group": "seller_shipping",
+        "amount": "-1000",
+        "raw_amount": "-1000",
+        "share": "-0.011111",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:pit_amount",
+        "field": "pit_amount",
+        "kind": "TAX",
+        "group": "taxes",
+        "amount": "-500",
+        "raw_amount": "-500",
+        "share": "-0.005556",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "return:gross_sales_refund_amount",
+        "field": "gross_sales_refund_amount",
+        "kind": "REFUND",
+        "group": "refunds",
+        "amount": "-10000",
+        "raw_amount": "-10000",
+        "share": "-0.111111",
+        "statement_id": "statement-B",
+        "evidence": "final"
+      },
+      {
+        "id": "return:subsidy",
+        "field": "subsidy",
+        "kind": "PLATFORM_SUBSIDY",
+        "group": "subsidies",
+        "amount": "1000",
+        "raw_amount": "1000",
+        "share": "0.011111",
+        "statement_id": "statement-B",
+        "evidence": "final"
+      },
+      {
+        "id": "return:adjustment_amount",
+        "field": "adjustment_amount",
+        "kind": "OTHER_ADJUSTMENT",
+        "group": "adjustments",
+        "amount": "-300",
+        "raw_amount": "-300",
+        "share": "-0.003333",
+        "statement_id": "statement-B",
+        "evidence": "final"
+      }
+    ],
+    "settlements": [
+      {
+        "statement_id": "statement-A",
+        "amount": "77500",
+        "statement_time": "2026-08-22 10:00:00+00:00",
+        "fetched_at": "2026-08-22 10:00:00+00:00",
+        "currency": "IDR"
+      },
+      {
+        "statement_id": "statement-B",
+        "amount": "-9300",
+        "statement_time": "2026-08-22 10:00:00+00:00",
+        "fetched_at": "2026-08-22 10:00:00+00:00",
+        "currency": "IDR"
+      }
+    ],
+    "warnings": [
+      "advertising_allocated"
+    ],
+    "calculation_check": {
+      "status": "matched",
+      "differences": {
+        "net_seller_revenue": "0",
+        "contribution_profit": "0",
+        "estimated_net_profit": "0"
+      }
+    },
+    "settlement_check": {
+      "status": "matched",
+      "difference": "0",
+      "actual": "68200"
+    },
+    "basis": "revenue_after_seller_discount_before_refunds_and_fees",
+    "revenue_base": "90000",
+    "source": "settled",
+    "ad_method": "BLENDED",
+    "ad_confidence": "LOW",
+    "ad_window_days": 7,
+    "cost_versions": [
+      {
+        "sku_id": "SKU-A",
+        "effective_from": "2026-08-01",
+        "cogs_per_unit": "12500",
+        "evidence": "internal"
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "external_order_id": "DEMO-001",
+    "created_at": "2026-08-22 10:00:00+00:00",
+    "order_status": "COMPLETED",
+    "currency": "IDR",
+    "state": "preliminary",
+    "profit_status": "PROVISIONAL",
+    "version": 3,
+    "calculated_at": "2026-08-22 10:00:00+00:00",
+    "items": [
+      {
+        "title": "Lomira — набор для ухода, полная комплектация с запасными насадками",
+        "sku_id": "SKU-A",
+        "sku_title": "2 pcs",
+        "quantity": 2
+      }
+    ],
+    "unconfirmed_fields": [
+      "fees",
+      "costs"
+    ],
+    "amounts": {
+      "revenue_base": "90000",
+      "fees": "0",
+      "costs": "0",
+      "refunds": "0",
+      "other_effect": "0",
+      "ad_cost": "12000",
+      "net_profit": "78000",
+      "profit_share": "0.866667",
+      "shares": {
+        "fees": "0",
+        "costs": "0",
+        "refunds": "0",
+        "other_effect": "0",
+        "ad_cost": "0.133333",
+        "net_profit": "0.866667"
+      }
+    },
+    "lines": [
+      {
+        "key": "sale_proceeds",
+        "amount": "100000",
+        "share": "1.111111",
+        "subtotal": false,
+        "evidence": "estimate"
+      },
+      {
+        "key": "seller_discounts",
+        "amount": "-10000",
+        "share": "-0.111111",
+        "subtotal": false,
+        "evidence": "estimate"
+      },
+      {
+        "key": "revenue_base",
+        "amount": "90000",
+        "share": "1",
+        "subtotal": true,
+        "evidence": "estimate"
+      },
+      {
+        "key": "refunds",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "platform_fees",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "affiliate_commission",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "seller_shipping",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "taxes",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "subsidies",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "adjustments",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "net_seller_revenue",
+        "amount": "90000",
+        "share": "1",
+        "subtotal": true,
+        "evidence": "estimate"
+      },
+      {
+        "key": "cogs",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "packaging",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "inbound_logistics",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "other_variable",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "unavailable"
+      },
+      {
+        "key": "contribution_profit",
+        "amount": "90000",
+        "share": "1",
+        "subtotal": true,
+        "evidence": "calculated"
+      },
+      {
+        "key": "allocated_ad_cost",
+        "amount": "-12000",
+        "share": "-0.133333",
+        "subtotal": false,
+        "evidence": "estimate"
+      },
+      {
+        "key": "estimated_net_profit",
+        "amount": "78000",
+        "share": "0.866667",
+        "subtotal": true,
+        "evidence": "estimate"
+      }
+    ],
+    "transactions": [],
+    "settlements": [],
+    "warnings": [
+      "cogs_missing",
+      "fees_unknown_zero_assumption",
+      "advertising_allocated"
+    ],
+    "calculation_check": {
+      "status": "matched",
+      "differences": {
+        "net_seller_revenue": "0",
+        "contribution_profit": "0",
+        "estimated_net_profit": "0"
+      }
+    },
+    "settlement_check": {
+      "status": "pending",
+      "difference": null,
+      "actual": null
+    },
+    "basis": "revenue_after_seller_discount_before_refunds_and_fees",
+    "revenue_base": "90000",
+    "source": "ratio_estimate",
+    "ad_method": "BLENDED",
+    "ad_confidence": "LOW",
+    "ad_window_days": 7,
+    "cost_versions": []
+  },
+  {
+    "id": 1,
+    "external_order_id": "DEMO-001",
+    "created_at": "2026-08-22 10:00:00+00:00",
+    "order_status": "COMPLETED",
+    "currency": "IDR",
+    "state": "not_calculated",
+    "profit_status": null,
+    "version": null,
+    "calculated_at": null,
+    "items": [
+      {
+        "title": "Lomira — набор для ухода, полная комплектация с запасными насадками",
+        "sku_id": "SKU-A",
+        "sku_title": "2 pcs",
+        "quantity": 2
+      }
+    ],
+    "unconfirmed_fields": [],
+    "amounts": null,
+    "lines": [],
+    "transactions": [],
+    "settlements": [],
+    "warnings": [
+      "not_calculated"
+    ],
+    "calculation_check": null,
+    "settlement_check": {
+      "status": "unavailable",
+      "difference": null,
+      "actual": null
+    }
+  },
+  {
+    "id": 1,
+    "external_order_id": "DEMO-001",
+    "created_at": "2026-08-22 10:00:00+00:00",
+    "order_status": "COMPLETED",
+    "currency": "IDR",
+    "state": "final",
+    "profit_status": "ADJUSTED",
+    "version": 3,
+    "calculated_at": "2026-08-22 10:00:00+00:00",
+    "items": [
+      {
+        "title": "Lomira — набор для ухода, полная комплектация с запасными насадками",
+        "sku_id": "SKU-A",
+        "sku_title": "2 pcs",
+        "quantity": 2
+      }
+    ],
+    "unconfirmed_fields": [],
+    "amounts": {
+      "revenue_base": "90000",
+      "fees": "12500",
+      "costs": "27000",
+      "refunds": "10000",
+      "other_effect": "-9300",
+      "ad_cost": "90000",
+      "net_profit": "-48800",
+      "profit_share": "-0.542222",
+      "shares": {
+        "fees": "0.138889",
+        "costs": "0.3",
+        "refunds": "0.111111",
+        "other_effect": "-0.103333",
+        "ad_cost": "1",
+        "net_profit": "-0.542222"
+      }
+    },
+    "lines": [
+      {
+        "key": "sale_proceeds",
+        "amount": "100000",
+        "share": "1.111111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "seller_discounts",
+        "amount": "-10000",
+        "share": "-0.111111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "revenue_base",
+        "amount": "90000",
+        "share": "1",
+        "subtotal": true,
+        "evidence": "final"
+      },
+      {
+        "key": "refunds",
+        "amount": "-10000",
+        "share": "-0.111111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "platform_fees",
+        "amount": "-9000",
+        "share": "-0.1",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "affiliate_commission",
+        "amount": "-2000",
+        "share": "-0.022222",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "seller_shipping",
+        "amount": "-1000",
+        "share": "-0.011111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "taxes",
+        "amount": "-500",
+        "share": "-0.005556",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "subsidies",
+        "amount": "1000",
+        "share": "0.011111",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "adjustments",
+        "amount": "-300",
+        "share": "-0.003333",
+        "subtotal": false,
+        "evidence": "final"
+      },
+      {
+        "key": "net_seller_revenue",
+        "amount": "68200",
+        "share": "0.757778",
+        "subtotal": true,
+        "evidence": "final"
+      },
+      {
+        "key": "cogs",
+        "amount": "-25000",
+        "share": "-0.277778",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "packaging",
+        "amount": "-1500",
+        "share": "-0.016667",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "inbound_logistics",
+        "amount": "-500",
+        "share": "-0.005556",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "other_variable",
+        "amount": "0",
+        "share": "0",
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "contribution_profit",
+        "amount": "41200",
+        "share": "0.457778",
+        "subtotal": true,
+        "evidence": "calculated"
+      },
+      {
+        "key": "allocated_ad_cost",
+        "amount": "-90000",
+        "share": "-1",
+        "subtotal": false,
+        "evidence": "estimate"
+      },
+      {
+        "key": "estimated_net_profit",
+        "amount": "-48800",
+        "share": "-0.542222",
+        "subtotal": true,
+        "evidence": "estimate"
+      }
+    ],
+    "transactions": [
+      {
+        "id": "sale:gross_sales_amount",
+        "field": "gross_sales_amount",
+        "kind": "SALE_PROCEEDS",
+        "group": "sale_proceeds",
+        "amount": "100000",
+        "raw_amount": "100000",
+        "share": "1.111111",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:seller_discount_amount",
+        "field": "seller_discount_amount",
+        "kind": "SELLER_DISCOUNT",
+        "group": "seller_discounts",
+        "amount": "-10000",
+        "raw_amount": "-10000",
+        "share": "-0.111111",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:fee_residual",
+        "field": "fee_residual",
+        "kind": "PLATFORM_COMMISSION",
+        "group": "platform_fees",
+        "amount": "-9000",
+        "raw_amount": "-9000",
+        "share": "-0.1",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:affiliate_commission_amount",
+        "field": "affiliate_commission_amount",
+        "kind": "AFFILIATE_COMMISSION",
+        "group": "affiliate_commission",
+        "amount": "-2000",
+        "raw_amount": "-2000",
+        "share": "-0.022222",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:shipping_cost_amount",
+        "field": "shipping_cost_amount",
+        "kind": "SHIPPING_FEE",
+        "group": "seller_shipping",
+        "amount": "-1000",
+        "raw_amount": "-1000",
+        "share": "-0.011111",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:pit_amount",
+        "field": "pit_amount",
+        "kind": "TAX",
+        "group": "taxes",
+        "amount": "-500",
+        "raw_amount": "-500",
+        "share": "-0.005556",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      },
+      {
+        "id": "return:gross_sales_refund_amount",
+        "field": "gross_sales_refund_amount",
+        "kind": "REFUND",
+        "group": "refunds",
+        "amount": "-10000",
+        "raw_amount": "-10000",
+        "share": "-0.111111",
+        "statement_id": "statement-B",
+        "evidence": "final"
+      },
+      {
+        "id": "return:subsidy",
+        "field": "subsidy",
+        "kind": "PLATFORM_SUBSIDY",
+        "group": "subsidies",
+        "amount": "1000",
+        "raw_amount": "1000",
+        "share": "0.011111",
+        "statement_id": "statement-B",
+        "evidence": "final"
+      },
+      {
+        "id": "return:adjustment_amount",
+        "field": "adjustment_amount",
+        "kind": "OTHER_ADJUSTMENT",
+        "group": "adjustments",
+        "amount": "-300",
+        "raw_amount": "-300",
+        "share": "-0.003333",
+        "statement_id": "statement-B",
+        "evidence": "final"
+      },
+      {
+        "id": "sale:unrecognized_fee",
+        "field": "unrecognized_fee",
+        "kind": "UNKNOWN",
+        "group": "unknown",
+        "amount": "0",
+        "raw_amount": "-100",
+        "share": "0",
+        "statement_id": "statement-A",
+        "evidence": "final"
+      }
+    ],
+    "settlements": [
+      {
+        "statement_id": "statement-A",
+        "amount": "77501",
+        "statement_time": "2026-08-22 10:00:00+00:00",
+        "fetched_at": "2026-08-22 10:00:00+00:00",
+        "currency": "IDR"
+      },
+      {
+        "statement_id": "statement-B",
+        "amount": "-9300",
+        "statement_time": "2026-08-22 10:00:00+00:00",
+        "fetched_at": "2026-08-22 10:00:00+00:00",
+        "currency": "IDR"
+      }
+    ],
+    "warnings": [
+      "mismatch",
+      "advertising_allocated",
+      "unknown_transactions"
+    ],
+    "calculation_check": {
+      "status": "matched",
+      "differences": {
+        "net_seller_revenue": "0",
+        "contribution_profit": "0",
+        "estimated_net_profit": "0"
+      }
+    },
+    "settlement_check": {
+      "status": "mismatch",
+      "difference": "-1",
+      "actual": "68201"
+    },
+    "basis": "revenue_after_seller_discount_before_refunds_and_fees",
+    "revenue_base": "90000",
+    "source": "settled",
+    "ad_method": "BLENDED",
+    "ad_confidence": "LOW",
+    "ad_window_days": 7,
+    "cost_versions": [
+      {
+        "sku_id": "SKU-A",
+        "effective_from": "2026-08-01",
+        "cogs_per_unit": "12500",
+        "evidence": "internal"
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "external_order_id": "DEMO-001",
+    "created_at": "2026-08-22 10:00:00+00:00",
+    "order_status": "COMPLETED",
+    "currency": "IDR",
+    "state": "preliminary",
+    "profit_status": "PROVISIONAL",
+    "version": 3,
+    "calculated_at": "2026-08-22 10:00:00+00:00",
+    "items": [
+      {
+        "title": "Lomira — набор для ухода, полная комплектация с запасными насадками",
+        "sku_id": "SKU-A",
+        "sku_title": "2 pcs",
+        "quantity": 2
+      }
+    ],
+    "unconfirmed_fields": [],
+    "amounts": {
+      "revenue_base": "0",
+      "fees": "12500",
+      "costs": "27000",
+      "refunds": "10000",
+      "other_effect": "-9300",
+      "ad_cost": "12000",
+      "net_profit": "-60800",
+      "profit_share": null,
+      "shares": {
+        "fees": null,
+        "costs": null,
+        "refunds": null,
+        "other_effect": null,
+        "ad_cost": null,
+        "net_profit": null
+      }
+    },
+    "lines": [
+      {
+        "key": "sale_proceeds",
+        "amount": "0",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "seller_discounts",
+        "amount": "0",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "revenue_base",
+        "amount": "0",
+        "share": null,
+        "subtotal": true,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "refunds",
+        "amount": "-10000",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "platform_fees",
+        "amount": "-9000",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "affiliate_commission",
+        "amount": "-2000",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "seller_shipping",
+        "amount": "-1000",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "taxes",
+        "amount": "-500",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "subsidies",
+        "amount": "1000",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "adjustments",
+        "amount": "-300",
+        "share": null,
+        "subtotal": false,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "net_seller_revenue",
+        "amount": "-21800",
+        "share": null,
+        "subtotal": true,
+        "evidence": "preliminary"
+      },
+      {
+        "key": "cogs",
+        "amount": "-25000",
+        "share": null,
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "packaging",
+        "amount": "-1500",
+        "share": null,
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "inbound_logistics",
+        "amount": "-500",
+        "share": null,
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "other_variable",
+        "amount": "0",
+        "share": null,
+        "subtotal": false,
+        "evidence": "internal"
+      },
+      {
+        "key": "contribution_profit",
+        "amount": "-48800",
+        "share": null,
+        "subtotal": true,
+        "evidence": "calculated"
+      },
+      {
+        "key": "allocated_ad_cost",
+        "amount": "-12000",
+        "share": null,
+        "subtotal": false,
+        "evidence": "estimate"
+      },
+      {
+        "key": "estimated_net_profit",
+        "amount": "-60800",
+        "share": null,
+        "subtotal": true,
+        "evidence": "estimate"
+      }
+    ],
+    "transactions": [],
+    "settlements": [],
+    "warnings": [
+      "advertising_allocated"
+    ],
+    "calculation_check": {
+      "status": "matched",
+      "differences": {
+        "net_seller_revenue": "0",
+        "contribution_profit": "0",
+        "estimated_net_profit": "0"
+      }
+    },
+    "settlement_check": {
+      "status": "pending",
+      "difference": null,
+      "actual": null
+    },
+    "basis": "revenue_after_seller_discount_before_refunds_and_fees",
+    "revenue_base": "0",
+    "source": "unsettled_record",
+    "ad_method": "BLENDED",
+    "ad_confidence": "LOW",
+    "ad_window_days": 7,
+    "cost_versions": [
+      {
+        "sku_id": "SKU-A",
+        "effective_from": "2026-08-01",
+        "cogs_per_unit": "12500",
+        "evidence": "internal"
+      }
+    ]
+  }
+]

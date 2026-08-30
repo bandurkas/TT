@@ -75,6 +75,29 @@ def test_trend_series_fills_gaps_and_cumulates():
     assert s[1]["orders"] == 0
 
 
+def test_unit_economics_does_not_mix_shop_gmv_with_order_profit():
+    t = C.Totals(units=88, gmv=D(63285) * 88, net_seller_revenue=D(75646) * 88,
+                 fees=D(10900) * 88, cogs=D(25568) * 88, contribution=D(50078) * 88,
+                 ad_cost=D(28354) * 88, net_profit=D(21724) * 88)
+    u = C.unit_economics(t)
+    assert u["revenue_per_unit"] == D(86546)
+    assert u["revenue_per_unit"] - u["fees_per_unit"] - u["cogs_per_unit"] == u["contribution_per_unit"]
+    assert u["contribution_per_unit"] - u["ad_cost_per_unit"] == u["net_per_unit"]
+    assert u["calculation_difference"] == 0
+
+
+def test_unit_economics_reports_rounding_but_never_disguises_source_mismatch():
+    t = C.Totals(units=3, net_seller_revenue=D(10), fees=D(4), cogs=D(2),
+                 contribution=D(8), ad_cost=D(1), net_profit=D(7))
+    u = C.unit_economics(t)
+    assert u["revenue_per_unit"] - u["fees_per_unit"] - u["cogs_per_unit"] + u["contribution_rounding_per_unit"] == u["contribution_per_unit"]
+    assert u["contribution_per_unit"] - u["ad_cost_per_unit"] + u["rounding_per_unit"] == u["net_per_unit"]
+    t.contribution += 2
+    bad = C.unit_economics(t)
+    assert bad["contribution_difference"] == -2
+    assert bad["rounding_per_unit"] is None and bad["contribution_rounding_per_unit"] is None
+
+
 def test_product_rows_status_rules():
     def prow(pid, d, **kw):
         r = day(d, **kw)

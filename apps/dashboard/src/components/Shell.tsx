@@ -4,12 +4,15 @@ import { dateTime, periodLabel } from "@/lib/format";
 import type { Overview } from "@/lib/types";
 import type { PeriodState, Preset } from "@/lib/period";
 import { useEffect, useState } from "react";
+import { orderText } from "@/lib/orders";
+import { useLang } from "@/lib/i18n";
 
 export function Rail({ shop, counts }: { shop?: string; counts: { recs: number; board: number } }) {
   const t = useT();
+  const lang = useLang();
   const [active, setActive] = useState("z1");
   useEffect(() => {
-    const ids = ["z1", "z2", "z3", "z4", "z4b", "z5", "z6", "z7"];
+    const ids = ["z1", "zorders", "z2", "z3", "z4", "z4b", "z5", "z6", "z7"];
     const els = ids.map((i) => document.getElementById(i)).filter((e): e is HTMLElement => !!e);
     const io = new IntersectionObserver((es) => { const v = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]; if (v) setActive(v.target.id); }, { rootMargin: "-80px 0px -60% 0px" });
     els.forEach((e) => io.observe(e));
@@ -27,6 +30,7 @@ export function Rail({ shop, counts }: { shop?: string; counts: { recs: number; 
         <a className={cls("z4b")} href="#z4b" onClick={go("z4b")}>{t("Creative / video")}</a>
         <a href="#z4" onClick={go("z4")}>{t("Product / commerce")}</a>
         <a className={cls("z5")} href="#z5" onClick={go("z5")}>{t("Finance")}</a>
+        <a className={cls("zorders")} href="#zorders" onClick={go("zorders")}>{orderText(lang, "journal")}</a>
         <div className="lbl">{t("Explore")}</div>
         <a href="#z4" onClick={go("z4")}>{t("Campaigns")}</a>
         <a href="#z4" onClick={go("z4")}>{t("Products")}</a>
