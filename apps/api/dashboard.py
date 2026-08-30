@@ -160,7 +160,8 @@ def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     gl = sum((d["gmv_live"] for d in days), Decimal(0))
     tot = gv + gpc + gl
     pd_hist = L.product_daily(c.session, c.shop.id, c.period.start - timedelta(days=C.LIFT_WINDOW), c.period.end)
-    history = C.video_history(vpm, pd_hist, daily, vmeta, pmeta, c.period, c.min_orders)
+    history = C.video_history(vpm, pd_hist, daily, vmeta, pmeta, c.period, c.min_orders,
+                              data_end=min(c.period.end, c.today - timedelta(days=1)))
     return _n({**c.meta(), "history": history,
                "shop_split": {"gmv_video": gv, "gmv_product_card": gpc, "gmv_live": gl, "gmv_total": tot,
                               "video_share": C.ratio(gv, tot) if tot else None, "days": days},

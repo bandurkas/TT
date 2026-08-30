@@ -260,3 +260,25 @@ export interface Tasks {
   tasks: Task[];
   columns: Record<TaskStatus, Task[]>;
 }
+
+// GET /api/analytics/video-products — videos → product cards dependency
+export interface VPDay { date: string; gmv_video: Dec; gmv_product_card: Dec; gmv_live: Dec; video_views: number }
+export interface VPLag { lag_days: number; correlation: Dec | null; n: number }
+export interface VPVideoRef {
+  video_id: number; external_video_id: string | null; caption: string | null;
+  impressions: number; clicks: number; units_sold: number; gmv: Dec; customers: number; ctr: Dec | null;
+}
+export interface VPProduct {
+  product_id: number; title: string; external_product_id: string | null; gmv: Dec; orders: number; net_profit: Dec;
+  status: ProductStatus | "NO_SALES"; video_gmv: Dec; video_units: number; video_share: Dec | null;
+  video_impressions: number; video_clicks: number; videos: VPVideoRef[];
+}
+export interface VPProductRef { product_id: number; title: string; impressions: number; clicks: number; units_sold: number; gmv: Dec; customers: number; ctr: Dec | null }
+export interface VPVideo { video_id: number; external_video_id: string | null; caption: string | null; views: number; classification: VideoClass | null; products: VPProductRef[] }
+export interface VideoProducts extends Meta {
+  shop_split: { gmv_video: Dec; gmv_product_card: Dec; gmv_live: Dec; gmv_total: Dec; video_share: Dec | null; days: VPDay[] };
+  dependency: { lags: VPLag[]; best_lag: number | null; note: string };
+  products: VPProduct[];
+  videos: VPVideo[];
+  notes: string[];
+}

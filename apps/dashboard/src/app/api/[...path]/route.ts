@@ -10,7 +10,7 @@ const FIX = path.join(process.cwd(), "fixtures");
 const FILES: Record<string, string> = {
   "dashboard/overview": "overview.json", "dashboard/trends": "trends.json", "dashboard/funnel": "funnel.json",
   "dashboard/insights": "insights.json", "analytics/products": "products.json", "analytics/videos": "videos.json",
-  "analytics/campaigns": "campaigns.json", "analytics/creators": "creators.json",
+  "analytics/campaigns": "campaigns.json", "analytics/video-products": "video-products.json", "analytics/creators": "creators.json",
 };
 const STATUSES = ["today", "in_progress", "review", "done"] as const;
 

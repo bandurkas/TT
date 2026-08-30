@@ -1,0 +1,425 @@
+{
+ "shop": {
+  "id": 1,
+  "name": "Lomira.product",
+  "currency": "IDR",
+  "timezone": "Asia/Jakarta"
+ },
+ "period": {
+  "start": "2026-08-01",
+  "end": "2026-08-31"
+ },
+ "compare": {
+  "start": "2026-07-02",
+  "end": "2026-08-01"
+ },
+ "generated_at": "2026-08-31T09:12:00Z",
+ "shop_split": {
+  "gmv_video": "871516",
+  "gmv_product_card": "5560896",
+  "gmv_live": "0",
+  "gmv_total": "6432412",
+  "video_share": "0.1355",
+  "days": [
+   {
+    "date": "2026-08-01",
+    "gmv_video": "5211",
+    "gmv_product_card": "104241",
+    "gmv_live": "0",
+    "video_views": 137
+   },
+   {
+    "date": "2026-08-02",
+    "gmv_video": "5422",
+    "gmv_product_card": "108482",
+    "gmv_live": "0",
+    "video_views": 154
+   },
+   {
+    "date": "2026-08-03",
+    "gmv_video": "5633",
+    "gmv_product_card": "112723",
+    "gmv_live": "0",
+    "video_views": 171
+   },
+   {
+    "date": "2026-08-04",
+    "gmv_video": "5844",
+    "gmv_product_card": "116964",
+    "gmv_live": "0",
+    "video_views": 188
+   },
+   {
+    "date": "2026-08-05",
+    "gmv_video": "6055",
+    "gmv_product_card": "121205",
+    "gmv_live": "0",
+    "video_views": 205
+   },
+   {
+    "date": "2026-08-06",
+    "gmv_video": "6266",
+    "gmv_product_card": "125446",
+    "gmv_live": "0",
+    "video_views": 222
+   },
+   {
+    "date": "2026-08-07",
+    "gmv_video": "6477",
+    "gmv_product_card": "129687",
+    "gmv_live": "0",
+    "video_views": 239
+   },
+   {
+    "date": "2026-08-08",
+    "gmv_video": "6688",
+    "gmv_product_card": "133928",
+    "gmv_live": "0",
+    "video_views": 256
+   },
+   {
+    "date": "2026-08-09",
+    "gmv_video": "6899",
+    "gmv_product_card": "138169",
+    "gmv_live": "0",
+    "video_views": 123
+   },
+   {
+    "date": "2026-08-10",
+    "gmv_video": "7110",
+    "gmv_product_card": "142410",
+    "gmv_live": "0",
+    "video_views": 140
+   },
+   {
+    "date": "2026-08-11",
+    "gmv_video": "7321",
+    "gmv_product_card": "146651",
+    "gmv_live": "0",
+    "video_views": 157
+   },
+   {
+    "date": "2026-08-12",
+    "gmv_video": "23972",
+    "gmv_product_card": "150892",
+    "gmv_live": "0",
+    "video_views": 536
+   },
+   {
+    "date": "2026-08-13",
+    "gmv_video": "24303",
+    "gmv_product_card": "178693",
+    "gmv_live": "0",
+    "video_views": 589
+   },
+   {
+    "date": "2026-08-14",
+    "gmv_video": "24634",
+    "gmv_product_card": "185054",
+    "gmv_live": "0",
+    "video_views": 642
+   },
+   {
+    "date": "2026-08-15",
+    "gmv_video": "24965",
+    "gmv_product_card": "191415",
+    "gmv_live": "0",
+    "video_views": 695
+   },
+   {
+    "date": "2026-08-16",
+    "gmv_video": "25296",
+    "gmv_product_card": "197776",
+    "gmv_live": "0",
+    "video_views": 748
+   },
+   {
+    "date": "2026-08-17",
+    "gmv_video": "25627",
+    "gmv_product_card": "204137",
+    "gmv_live": "0",
+    "video_views": 801
+   },
+   {
+    "date": "2026-08-18",
+    "gmv_video": "25958",
+    "gmv_product_card": "210498",
+    "gmv_live": "0",
+    "video_views": 854
+   },
+   {
+    "date": "2026-08-19",
+    "gmv_video": "26289",
+    "gmv_product_card": "196859",
+    "gmv_live": "0",
+    "video_views": 407
+   },
+   {
+    "date": "2026-08-20",
+    "gmv_video": "26620",
+    "gmv_product_card": "203220",
+    "gmv_live": "0",
+    "video_views": 460
+   },
+   {
+    "date": "2026-08-21",
+    "gmv_video": "26951",
+    "gmv_product_card": "209581",
+    "gmv_live": "0",
+    "video_views": 513
+   },
+   {
+    "date": "2026-08-22",
+    "gmv_video": "27282",
+    "gmv_product_card": "215942",
+    "gmv_live": "0",
+    "video_views": 566
+   },
+   {
+    "date": "2026-08-23",
+    "gmv_video": "27613",
+    "gmv_product_card": "222303",
+    "gmv_live": "0",
+    "video_views": 619
+   },
+   {
+    "date": "2026-08-24",
+    "gmv_video": "27944",
+    "gmv_product_card": "228664",
+    "gmv_live": "0",
+    "video_views": 672
+   },
+   {
+    "date": "2026-08-25",
+    "gmv_video": "28275",
+    "gmv_product_card": "235025",
+    "gmv_live": "0",
+    "video_views": 725
+   },
+   {
+    "date": "2026-08-26",
+    "gmv_video": "28606",
+    "gmv_product_card": "241386",
+    "gmv_live": "0",
+    "video_views": 778
+   },
+   {
+    "date": "2026-08-27",
+    "gmv_video": "73813",
+    "gmv_product_card": "282467",
+    "gmv_live": "0",
+    "video_views": 1699
+   },
+   {
+    "date": "2026-08-28",
+    "gmv_video": "81732",
+    "gmv_product_card": "288188",
+    "gmv_live": "0",
+    "video_views": 1736
+   },
+   {
+    "date": "2026-08-29",
+    "gmv_video": "89651",
+    "gmv_product_card": "173909",
+    "gmv_live": "0",
+    "video_views": 1773
+   },
+   {
+    "date": "2026-08-30",
+    "gmv_video": "97570",
+    "gmv_product_card": "179630",
+    "gmv_live": "0",
+    "video_views": 1810
+   },
+   {
+    "date": "2026-08-31",
+    "gmv_video": "65489",
+    "gmv_product_card": "185351",
+    "gmv_live": "0",
+    "video_views": 1847
+   }
+  ]
+ },
+ "dependency": {
+  "lags": [
+   {
+    "lag_days": 0,
+    "correlation": "0.31",
+    "n": 31
+   },
+   {
+    "lag_days": 1,
+    "correlation": "0.42",
+    "n": 30
+   },
+   {
+    "lag_days": 2,
+    "correlation": "0.18",
+    "n": 29
+   }
+  ],
+  "best_lag": 1,
+  "note": "Pearson correlation of daily video views vs product-card GMV shifted by lag; n = days; |r|<0.3 weak, ≥0.5 strong; correlation ≠ causation"
+ },
+ "products": [
+  {
+   "product_id": 1,
+   "title": "Socks Kaos Kaki Pria Hitam 5 Pasang",
+   "external_product_id": "1729876543210001",
+   "gmv": "2000000",
+   "orders": 21,
+   "net_profit": "-168000",
+   "status": "INVESTIGATE",
+   "video_gmv": "453797",
+   "video_units": 5,
+   "video_share": "0.2269",
+   "video_impressions": 812,
+   "video_clicks": 26,
+   "videos": [
+    {
+     "video_id": 11,
+     "external_video_id": "7670679046610570504",
+     "caption": "#kaoskaki #foryou 5 pasang",
+     "impressions": 481,
+     "clicks": 17,
+     "units_sold": 3,
+     "gmv": "275700",
+     "customers": 2,
+     "ctr": "0.0353"
+    },
+    {
+     "video_id": 15,
+     "external_video_id": "7670150890476571922",
+     "caption": "kaos kaki pria hitam premium",
+     "impressions": 331,
+     "clicks": 9,
+     "units_sold": 2,
+     "gmv": "178097",
+     "customers": 2,
+     "ctr": "0.0272"
+    }
+   ]
+  },
+  {
+   "product_id": 2,
+   "title": "Kaos Kaki Abu-Abu 5 pasang",
+   "external_product_id": "1729876543210002",
+   "gmv": "510000",
+   "orders": 6,
+   "net_profit": "-104000",
+   "status": "REDUCE",
+   "video_gmv": "85000",
+   "video_units": 1,
+   "video_share": "0.1667",
+   "video_impressions": 210,
+   "video_clicks": 5,
+   "videos": [
+    {
+     "video_id": 12,
+     "external_video_id": "7668123456784410",
+     "caption": "kaos kaki abu-abu",
+     "impressions": 210,
+     "clicks": 5,
+     "units_sold": 1,
+     "gmv": "85000",
+     "customers": 1,
+     "ctr": "0.0238"
+    }
+   ]
+  },
+  {
+   "product_id": 3,
+   "title": "Kaos Kaki Wanita Putih 5 Pasang",
+   "external_product_id": "1729876543210003",
+   "gmv": "340000",
+   "orders": 4,
+   "net_profit": "-69000",
+   "status": "SMALL_SAMPLE",
+   "video_gmv": "0",
+   "video_units": 0,
+   "video_share": "0",
+   "video_impressions": 0,
+   "video_clicks": 0,
+   "videos": []
+  },
+  {
+   "product_id": 4,
+   "title": "Kaos Kaki Anak Putih Isi 10 Pasang",
+   "external_product_id": "1729876543210004",
+   "gmv": "150000",
+   "orders": 1,
+   "net_profit": "-1000",
+   "status": "SMALL_SAMPLE",
+   "video_gmv": "0",
+   "video_units": 0,
+   "video_share": "0",
+   "video_impressions": 0,
+   "video_clicks": 0,
+   "videos": []
+  }
+ ],
+ "videos": [
+  {
+   "video_id": 11,
+   "external_video_id": "7670679046610570504",
+   "caption": "#kaoskaki #foryou 5 pasang",
+   "views": 14884,
+   "classification": "PROMISING",
+   "products": [
+    {
+     "product_id": 1,
+     "title": "Socks Kaos Kaki Pria Hitam 5 Pasang",
+     "impressions": 481,
+     "clicks": 17,
+     "units_sold": 3,
+     "gmv": "275700",
+     "customers": 2,
+     "ctr": "0.0353"
+    }
+   ]
+  },
+  {
+   "video_id": 15,
+   "external_video_id": "7670150890476571922",
+   "caption": "kaos kaki pria hitam premium",
+   "views": 6120,
+   "classification": "NEUTRAL",
+   "products": [
+    {
+     "product_id": 1,
+     "title": "Socks Kaos Kaki Pria Hitam 5 Pasang",
+     "impressions": 331,
+     "clicks": 9,
+     "units_sold": 2,
+     "gmv": "178097",
+     "customers": 2,
+     "ctr": "0.0272"
+    }
+   ]
+  },
+  {
+   "video_id": 12,
+   "external_video_id": "7668123456784410",
+   "caption": "kaos kaki abu-abu",
+   "views": 2340,
+   "classification": "LOW_ATTENTION",
+   "products": [
+    {
+     "product_id": 2,
+     "title": "Kaos Kaki Abu-Abu 5 pasang",
+     "impressions": 210,
+     "clicks": 5,
+     "units_sold": 1,
+     "gmv": "85000",
+     "customers": 1,
+     "ctr": "0.0238"
+    }
+   ]
+  }
+ ],
+ "notes": [
+  "per video × product impressions/clicks/GMV are measured by TikTok video analytics",
+  "product-card GMV without a video is organic/search/GMV Max product-card traffic; its impressions are NOT AVAILABLE",
+  "shop split from shop_metrics (gmv_video / gmv_product_card / gmv_live)"
+ ]
+}

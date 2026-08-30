@@ -245,5 +245,8 @@ def test_video_history_lift_and_phase():
     v = out["videos"][0]
     assert v["peak_day"] == date(2026, 8, 11) and v["peak_views"] == 800 and v["phase"] == "fading"
     assert v["recent_vs_peak"] == D("0.1875")
+    pend = C.video_history(vpm, pdr, vd, {1: NS(external_video_id="v1", caption="c", published_at=pub)},
+                           {3: NS(title="Pria")}, AUG, 5, data_end=date(2026, 8, 12))
+    assert pend["products"][0]["lifts"][0]["verdict"] == "pending"
     assert C._lift_verdict(D(0), D(0), 0, 5) == ("insufficient", None)
     assert C._lift_verdict(D(1), D("0.5"), 4, 5) == ("negative", D("-0.5"))

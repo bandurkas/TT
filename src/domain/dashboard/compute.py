@@ -608,7 +608,7 @@ def _lift_verdict(before_pd: Decimal, after_pd: Decimal, after_orders: int, min_
 
 def video_history(vpm: Iterable[Any], product_daily_rows: Iterable[Any], video_daily: Mapping[int, Sequence[Any]],
                   video_meta: Mapping[int, Any], product_meta: Mapping[int, Any], period: Period,
-                  min_orders: int) -> dict[str, Any]:
+                  min_orders: int, data_end: date | None = None) -> dict[str, Any]:
     """Per product: daily series (video vs total), video launch events, before/after lift per video.
     Per video: daily views→impressions→clicks→units, peak day, decay. Deterministic; lift = orders/day
     in the 7 days after publish vs 7 days before (all traffic, so it is an association, not attribution)."""
@@ -655,6 +655,8 @@ def video_history(vpm: Iterable[Any], product_daily_rows: Iterable[Any], video_d
             ag = sum((_d(getattr(x, "gmv", 0)) for x in after if x), ZERO)
             b_pd, a_pd = Decimal(bo) / LIFT_WINDOW, Decimal(ao) / LIFT_WINDOW
             verdict, lift = _lift_verdict(b_pd, a_pd, ao, min_orders)
+            if data_end is not None and pday + timedelta(days=LIFT_WINDOW - 1) > data_end:
+                verdict, lift = "pending", None  # after-window not complete yet
             vg_after = sum((vp_day.get((pid, pday + timedelta(days=i)), {}).get("video_gmv", ZERO)
                             for i in range(LIFT_WINDOW)), ZERO)
             lifts.append({"video_id": vid, "external_video_id": ext, "published": pday,
