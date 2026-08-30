@@ -50,3 +50,7 @@ Identity confirmed on every row: `settlement_amount = revenue_amount + fee_amoun
 - Use the per-order statement record (field-based) as the settled truth; `fee_amount` is aggregate — components: affiliate, shipping cost, dynamic commission (residual), order processing fee (residual).
 - Ad cost = GMV Max payout deductions (shop-level, daily) → allocate PROPORTIONAL/BLENDED to orders; plus Ads API report for per-campaign breakdown once available.
 - Marketplace `Order source` (TikTok Shop / Tokopedia) is in the export; API equivalent `commerce_platform` on order.
+
+
+## Addendum 2026-08-31 — ad deductions
+Export `income_20260830221550(UTC+7)` (01–30 Aug) Reports: `GMV payment for TikTok Ads` −2,495,139 = Σ 11 adjustment-only statements in `settlements` (6 matched by id earlier + 5 on Aug 1/2/10/11 = 264,106). No other adjustment types in August. Total settlement −93,654 = cash view. Classification `AD_DEDUCTION` for all 11 confirmed.
