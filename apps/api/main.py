@@ -20,7 +20,8 @@ def sync_summary(session) -> list[dict]:
     out = []
     for s in rows:
         ok, att = s.last_successful_sync, s.last_attempt
-        limit = STALE_AFTER.get(s.resource_type.removeprefix("job:"))
+        rt = s.resource_type
+        limit = STALE_AFTER.get(rt[4:]) if rt.startswith("job:") else None
         stale = bool(limit) and ((ok is None or now - ok > limit) or
                                  (s.status == "running" and att is not None and now - att > limit))
         out.append({"integration": s.integration, "resource": s.resource_type, "status": s.status,

@@ -29,6 +29,15 @@ def test_health_reports_jobs_and_syncs():
     assert body["syncs"][0]["error"] == "boom" and body["syncs"][0]["last_success"] is None
 
 
+def test_health_ingest_rows_never_stale():
+    old = datetime.now(UTC) - timedelta(days=3)
+    rows = [NS(integration="tiktok_shop", resource_type="withdrawals", status="success",
+               last_successful_sync=old, last_attempt=old, error=None)]
+    with patch.object(api, "SessionLocal", lambda: _session(rows)):
+        body = TestClient(api.app).get("/health").json()
+    assert body["status"] == "ok" and body["syncs"][0]["stale"] is False
+
+
 def test_health_stale_job_degrades():
     old = datetime.now(UTC) - timedelta(hours=5)
     rows = [NS(integration="tt", resource_type="job:finance_cycle", status="success",
