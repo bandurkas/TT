@@ -40,12 +40,28 @@ class Ctx:
         self.period, self.compare = C.default_periods(self.today, start, end, cmp_start, cmp_end)
         self.floor = Decimal(str(self.cfg.minimum_net_margin)) if self.cfg else DEFAULT_FLOOR
         self.min_orders = int(self.cfg.minimum_sample_orders) if self.cfg else DEFAULT_MIN_ORDERS
+        self._memo: dict[tuple, Any] = {}
+
+    def memo(self, key: tuple, fn):
+        if key not in self._memo:
+            self._memo[key] = fn()
+        return self._memo[key]
+
+    def profits(self, period: C.Period):
+        return self.memo(("profits", period.start, period.end),
+                         lambda: L.current_profits(self.session, self.shop.id, period.start, period.end, self.tz))
+
+    def daily(self, period: C.Period):
+        return self.memo(("daily", period.start, period.end),
+                         lambda: L.shop_daily(self.session, self.shop.id, period.start, period.end))
+
+    def funnel_days(self, period: C.Period):
+        return self.memo(("funnel", period.start, period.end),
+                         lambda: L.shop_funnel_by_day(self.session, self.shop.id, period.start, period.end))
 
     def totals(self, period: C.Period) -> C.Totals:
-        rows = L.shop_daily(self.session, self.shop.id, period.start, period.end)
-        funnel = L.shop_funnel_by_day(self.session, self.shop.id, period.start, period.end)
-        _, refunded, _ = L.current_profits(self.session, self.shop.id, period.start, period.end, self.tz)
-        return C.sum_daily(rows, period, funnel, refunded)
+        return self.memo(("totals", period.start, period.end), lambda: C.sum_daily(
+            self.daily(period), period, self.funnel_days(period), self.profits(period)[1]))
 
     def meta(self) -> dict[str, Any]:
         return {"shop": {"id": self.shop.id, "name": self.shop.name, "currency": self.shop.currency,
@@ -58,8 +74,19 @@ class Ctx:
 def ctx_dep(shop_id: int | None = None, start: date | None = Query(None, alias="from"),
             end: date | None = Query(None, alias="to"), cmp_from: date | None = None,
             cmp_to: date | None = None, session: Any = Depends(get_session)) -> Ctx:
+    if (cmp_from is None) != (cmp_to is None):
+        raise HTTPException(422, "cmp_from and cmp_to must be given together")
+    if cmp_from and cmp_to and cmp_from > cmp_to:
+        cmp_from, cmp_to = cmp_to, cmp_from
     try:
         return Ctx(session, shop_id, start, end, cmp_from, cmp_to)
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+
+
+def shop_dep(shop_id: int | None = None, session: Any = Depends(get_session)):
+    try:
+        return L.shop_and_config(session, shop_id)[0], session
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
 
@@ -70,7 +97,7 @@ def _n(d: dict[str, Any]) -> dict[str, Any]:
 
 def _overview(c: Ctx) -> dict[str, Any]:
     cur, prev = c.totals(c.period), c.totals(c.compare)
-    rows = L.shop_daily(c.session, c.shop.id, c.period.start, c.period.end)
+    rows = c.daily(c.period)
     sync_at, fresh = L.last_sync(c.session, c.shop.id)
     missing, unmapped = L.cogs_gaps(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
     dq = C.data_quality(fresh, cur, missing, unmapped)
@@ -91,15 +118,16 @@ def overview(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
 
 @router.get("/dashboard/trends")
 def trends(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
-    rows = L.shop_daily(c.session, c.shop.id, c.period.start, c.period.end)
+    rows = c.daily(c.period)
     series = C.trend_series(rows, c.period)
     events = [{"date": d["date"], "type": "ad_deduction", "amount": d["amount"],
                "label": f"GMV Max deduction {d['amount']}"}
               for d in L.ad_deductions(c.session, c.shop.id, c.period.start, c.period.end, c.tz)]
     _, meta = L.videos_with_metrics(c.session, c.shop.id, c.period.start, c.period.end)
     for v in meta.values():
-        if v.published_at and c.period.start <= v.published_at.date() <= c.period.end:
-            events.append({"date": v.published_at.date(), "type": "video_posted", "amount": None,
+        pday = C._pub_date(v, c.tz)
+        if pday and c.period.start <= pday <= c.period.end:
+            events.append({"date": pday, "type": "video_posted", "amount": None,
                            "label": f"new video {v.external_video_id}"})
     events.sort(key=lambda e: e["date"])
     sm = L.shop_metrics(c.session, c.shop.id, c.period.start, c.period.end)
@@ -123,7 +151,8 @@ def _videos(c: Ctx) -> list[dict[str, Any]]:
     cfg = ScoringConfig(minimum_net_margin=c.floor, minimum_sample_orders=c.min_orders,
                         minimum_sample_impressions=int(c.cfg.minimum_sample_impressions) if c.cfg else 1000,
                         minimum_sample_clicks=int(c.cfg.minimum_sample_clicks) if c.cfg else 30)
-    return C.video_cards(daily, meta, c.period, c.today, cfg)
+    return c.memo(("videos", c.period.start, c.period.end),
+                  lambda: C.video_cards(daily, meta, c.period, c.today, cfg, c.tz))
 
 
 @router.get("/analytics/videos")
@@ -142,8 +171,7 @@ def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     pmeta = L.products(c.session, c.shop.id)
     prows = C.product_rows(pd, pmeta, c.period, pf, c.floor, c.min_orders)
     daily, vmeta = L.videos_with_metrics(c.session, c.shop.id, c.period.start, c.period.end)
-    cards = C.video_cards(daily, vmeta, c.period, c.today, ScoringConfig(minimum_net_margin=c.floor,
-                                                                          minimum_sample_orders=c.min_orders))
+    cards = _videos(c)
     views = {vid: sum(int(r.views or 0) for r in rows) for vid, rows in daily.items()}
     vclass = {cd["video_id"]: cd["classification"] for cd in cards}
     vpm = L.video_product_metrics(c.session, c.shop.id, c.period.start, c.period.end)
@@ -159,9 +187,11 @@ def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     gpc = sum((d["gmv_product_card"] for d in days), Decimal(0))
     gl = sum((d["gmv_live"] for d in days), Decimal(0))
     tot = gv + gpc + gl
-    pd_hist = L.product_daily(c.session, c.shop.id, c.period.start - timedelta(days=C.LIFT_WINDOW), c.period.end)
+    loaded_start = c.period.start - timedelta(days=2 * C.LIFT_WINDOW)
+    pd_hist = L.product_daily(c.session, c.shop.id, loaded_start, c.period.end)
     history = C.video_history(vpm, pd_hist, daily, vmeta, pmeta, c.period, c.min_orders,
-                              data_end=min(c.period.end, c.today - timedelta(days=1)))
+                              data_end=min(c.period.end, c.today - timedelta(days=1)),
+                              loaded_start=loaded_start, tz=c.tz)
     return _n({**c.meta(), "history": history,
                "shop_split": {"gmv_video": gv, "gmv_product_card": gpc, "gmv_live": gl, "gmv_total": tot,
                               "video_share": C.ratio(gv, tot) if tot else None, "days": days},
@@ -181,7 +211,7 @@ def campaigns(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
 
 @router.get("/analytics/creators")
 def creators(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
-    rows, _, _ = L.current_profits(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
+    rows = c.profits(c.period)[0]
     agg = L.affiliate_totals(rows)
     return _n({**c.meta(), "rows": [{"creator": "Affiliate (aggregated)", **agg}],
                "note": "Per-creator attribution NOT AVAILABLE from Shop API orders; affiliate commission is measured."})
@@ -192,12 +222,12 @@ def _funnel(c: Ctx) -> dict[str, Any]:
     base = L.funnel_counts(c.session, c.shop.id, c.compare, c.tz)
     t = c.totals(c.period)
     avg_profit = (t.contribution / t.orders).quantize(Decimal(1)) if t.orders else None
-    return C.funnel_view(cur, base, avg_profit)
+    return c.memo(("funnel_view",), lambda: C.funnel_view(cur, base, avg_profit))
 
 
 @router.get("/dashboard/funnel")
 def funnel(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
-    rows, _, _ = L.current_profits(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
+    rows = c.profits(c.period)[0]
     return _n({**c.meta(), **_funnel(c), "waterfall": C.waterfall(rows)})
 
 
@@ -257,9 +287,10 @@ def task_out(t: Task) -> dict[str, Any]:
 
 
 @router.get("/tasks")
-def list_tasks(shop_id: int | None = None, status: str | None = None,
-               session: Any = Depends(get_session)) -> dict[str, Any]:
-    shop, _ = L.shop_and_config(session, shop_id)
+def list_tasks(status: str | None = None, dep: Any = Depends(shop_dep)) -> dict[str, Any]:
+    shop, session = dep
+    if status and status not in TASK_STATUSES:
+        raise HTTPException(422, f"status must be one of {TASK_STATUSES}")
     q = select(Task).where(Task.shop_id == shop.id)
     if status:
         q = q.where(Task.status == status)
@@ -269,12 +300,12 @@ def list_tasks(shop_id: int | None = None, status: str | None = None,
 
 
 @router.post("/tasks", status_code=201)
-def create_task(body: TaskIn, shop_id: int | None = None, session: Any = Depends(get_session)) -> dict[str, Any]:
-    shop, _ = L.shop_and_config(session, shop_id)
+def create_task(body: TaskIn, dep: Any = Depends(shop_dep)) -> dict[str, Any]:
+    shop, session = dep
     t = Task(shop_id=shop.id, title=body.title, why=body.detail, team=body.team, priority=body.priority,
              status=body.status, owner=body.owner, deadline=_dl(body.deadline),
              expected_impact={"note": body.impact_note} if body.impact_note else None,
-             source_entity={"source": body.source or "manual", **body.evidence})
+             source_entity={**body.evidence, "source": body.source or "manual"})
     session.add(t)
     session.commit()
     session.refresh(t)

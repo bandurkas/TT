@@ -256,7 +256,7 @@ def profit_health(cur: Totals, prev: Totals, floor: Decimal, dq: DataQuality) ->
     comp["refunds"] = None if rr is None else clamp(100 - rr / Decimal("0.15") * 50)
     comp["data_quality"] = dq.score
     known = [v for v in comp.values() if v is not None]
-    score = round(sum(known) / len(known)) if known else 0
+    score = clamp(Decimal(sum(known)) / len(known)) if known else 0
     grade = "GOOD" if score >= 75 else "FAIR" if score >= 50 else "POOR"
     return {"score": score, "grade": grade, "components": comp}
 
@@ -347,27 +347,44 @@ def product_rows(product_daily: Iterable[Any], product_meta: Mapping[int, Any], 
 
 
 # --- videos -------------------------------------------------------------------------------------
+def _pub_date(meta: Any, tz: str | None) -> date | None:
+    pub = getattr(meta, "published_at", None)
+    if pub is None:
+        return None
+    if tz and pub.tzinfo is not None:
+        from zoneinfo import ZoneInfo
+        return pub.astimezone(ZoneInfo(tz)).date()
+    return pub.date()
+
+
 def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[int, Any], period: Period,
-                today: date, cfg: ScoringConfig) -> list[dict[str, Any]]:
+                today: date, cfg: ScoringConfig, tz: str | None = None) -> list[dict[str, Any]]:
     """video_metrics rows grouped by video -> classified cards (creative_scoring). Ad spend per video
     is NOT AVAILABLE (Ads API) -> classification uses traffic/orders only; net_profit unknown -> 0."""
     agg: dict[int, dict[str, Any]] = {}
     for vid, rows in video_daily.items():
         imp = clk = orders = 0
+        measured = derived = 0
         gmv = ZERO
         views = 0
         for r in rows:
             if not (period.start <= r.metric_date <= period.end):
                 continue
             v = int(r.views or 0)
-            imp += int(r.impressions or 0) or v
-            clk += int(r.product_clicks or 0) or int((Decimal(v) * _d(r.ctr)).to_integral_value())
+            imp += v  # CTR base = views (API's click_through_rate is clicks/views)
+            if int(r.product_clicks or 0):
+                clk += int(r.product_clicks)
+                measured += 1
+            else:
+                clk += int((Decimal(v) * _d(r.ctr)).to_integral_value())
+                derived += 1
             orders += int(r.orders or 0)
             views += int(r.views or 0)
             gmv += _d(r.gmv)
         if imp == clk == orders == views == 0:
             continue
-        agg[vid] = {"impressions": imp, "clicks": clk, "orders": orders, "gmv": gmv, "views": views}
+        agg[vid] = {"impressions": imp, "clicks": clk, "orders": orders, "gmv": gmv, "views": views,
+                    "clicks_measured_days": measured, "clicks_derived_days": derived}
     ctrs = [ratio(a["clicks"], a["impressions"]) for a in agg.values() if a["impressions"]]
     cvrs = [ratio(a["orders"], a["clicks"]) for a in agg.values() if a["clicks"]]
     base = ScoringBaselines(account_median_ctr=median([c for c in ctrs if c is not None]),
@@ -376,7 +393,8 @@ def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[in
     for vid, a in agg.items():
         meta = video_meta.get(vid)
         pub = getattr(meta, "published_at", None)
-        age = max(1, (today - pub.date()).days) if pub else 1
+        pday = _pub_date(meta, tz)
+        age = max(1, (today - pday).days) if pday else 1
         res = classify_video(VideoMetrics(video_id=str(vid), impressions=a["impressions"], clicks=a["clicks"],
                                           orders=a["orders"], gmv=a["gmv"], age_days=age), base, cfg)
         out.append({"video_id": vid, "external_video_id": getattr(meta, "external_video_id", None),
@@ -387,6 +405,8 @@ def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[in
                     "ctr": res.ctr.quantize(PCT) if res.ctr is not None else None,
                     "cvr": res.cvr.quantize(PCT) if res.cvr is not None else None,
                     "gpm": (a["gmv"] / a["views"] * 1000).quantize(Decimal(1)) if a["views"] else None,
+                    "clicks_note": (f"measured product clicks on {a['clicks_measured_days']} days, derived "
+                                    f"(views × CTR) on {a['clicks_derived_days']} days"),
                     "ad_spend": None, "net_profit": None, "ad_spend_note": NOT_AVAILABLE + ": Ads API",
                     "classification": res.classification.value, "confidence": res.confidence.value,
                     "reasons": list(res.reasons)})
@@ -469,10 +489,11 @@ def waterfall(profits: Iterable[Any]) -> dict[str, Any]:
                            "affiliate_commission", "seller_shipping", "taxes", "subsidies", "adjustments",
                            "cogs", "packaging", "inbound_logistics", "other_variable", "contribution_profit",
                            "allocated_ad_cost", "estimated_net_profit", "net_seller_revenue")}
-    n = prov = 0
+    n = prov = cogs_missing = 0
     for p in profits:
         n += 1
         prov += 1 if str(p.profit_status) == "PROVISIONAL" else 0
+        cogs_missing += 1 if (getattr(p, "inputs_snapshot", None) or {}).get("cogs_missing") else 0
         for k in s:
             s[k] += _d(getattr(p, k, 0))
     steps = [
@@ -485,13 +506,13 @@ def waterfall(profits: Iterable[Any]) -> dict[str, Any]:
          "measured": prov == 0},
         {"key": "net_seller_revenue", "amount": s["net_seller_revenue"], "subtotal": True, "measured": prov == 0},
         {"key": "cogs", "amount": -(s["cogs"] + s["packaging"] + s["inbound_logistics"] + s["other_variable"]),
-         "measured": True},
+         "measured": cogs_missing == 0, "note": f"{cogs_missing} orders on default/zero COGS" if cogs_missing else None},
         {"key": "contribution_before_ads", "amount": s["contribution_profit"], "subtotal": True,
          "measured": prov == 0},
         {"key": "ad_deductions_blended", "amount": -s["allocated_ad_cost"], "measured": False},
         {"key": "net_profit", "amount": s["estimated_net_profit"], "subtotal": True, "measured": False},
     ]
-    return {"orders": n, "provisional_orders": prov, "steps": steps,
+    return {"orders": n, "provisional_orders": prov, "cogs_missing_orders": cogs_missing, "steps": steps,
             "note": "Measured = settled statements; provisional orders carry estimated fees; "
                     "ad cost = BLENDED payout deductions (estimate)."}
 
@@ -530,7 +551,14 @@ def pearson(xs: Sequence[Decimal], ys: Sequence[Decimal]) -> Decimal | None:
 
 
 def lag_dependency(days: Sequence[dict[str, Any]], max_lag: int = 2) -> dict[str, Any]:
-    """days: [{date, video_views, gmv_product_card}] sorted; correlation of views(t) vs card GMV(t+lag)."""
+    """days: [{date, video_views, gmv_product_card}]; reindexed to a contiguous date range (missing days
+    = 0) so that views(t) is aligned with card GMV(t+lag)."""
+    if days:
+        by = {d["date"]: d for d in days}
+        lo, hi = min(by), max(by)
+        days = [by.get(lo + timedelta(days=k), {"date": lo + timedelta(days=k), "video_views": 0,
+                                                 "gmv_product_card": ZERO})
+                for k in range((hi - lo).days + 1)]
     lags = []
     for lag in range(max_lag + 1):
         xs = [Decimal(d["video_views"]) for d in days[:len(days) - lag]] if lag else [Decimal(d["video_views"]) for d in days]
@@ -582,6 +610,8 @@ def video_product_map(vpm: Iterable[Any], product_rows_: Sequence[dict[str, Any]
                          "status": p.get("status", "NO_SALES"), "video_gmv": vg,
                          "video_units": sum(v["units_sold"] for v in vids),
                          "video_share": ratio(vg, gmv) if gmv > 0 else None,
+                         "video_share_note": ("video GMV (TikTok video analytics) vs order-based product GMV; "
+                                              "different day bucketing, can exceed 1"),
                          "video_impressions": sum(v["impressions"] for v in vids),
                          "video_clicks": sum(v["clicks"] for v in vids), "videos": vids})
     products.sort(key=lambda p: (-p["gmv"], -p["video_gmv"]))
@@ -608,7 +638,8 @@ def _lift_verdict(before_pd: Decimal, after_pd: Decimal, after_orders: int, min_
 
 def video_history(vpm: Iterable[Any], product_daily_rows: Iterable[Any], video_daily: Mapping[int, Sequence[Any]],
                   video_meta: Mapping[int, Any], product_meta: Mapping[int, Any], period: Period,
-                  min_orders: int, data_end: date | None = None) -> dict[str, Any]:
+                  min_orders: int, data_end: date | None = None, loaded_start: date | None = None,
+                  tz: str | None = None) -> dict[str, Any]:
     """Per product: daily series (video vs total), video launch events, before/after lift per video.
     Per video: daily views→impressions→clicks→units, peak day, decay. Deterministic; lift = orders/day
     in the 7 days after publish vs 7 days before (all traffic, so it is an association, not attribution)."""
@@ -640,10 +671,9 @@ def video_history(vpm: Iterable[Any], product_daily_rows: Iterable[Any], video_d
         events, lifts = [], []
         for vid in sorted(vids_per_product.get(pid, ())):
             vm = video_meta.get(vid)
-            pub = getattr(vm, "published_at", None)
-            if pub is None:
+            pday = _pub_date(vm, tz)
+            if pday is None:
                 continue
-            pday = pub.date()
             ext = getattr(vm, "external_video_id", None)
             if period.start <= pday <= period.end:
                 events.append({"date": pday, "video_id": vid, "external_video_id": ext, "type": "published"})
@@ -657,6 +687,8 @@ def video_history(vpm: Iterable[Any], product_daily_rows: Iterable[Any], video_d
             verdict, lift = _lift_verdict(b_pd, a_pd, ao, min_orders)
             if data_end is not None and pday + timedelta(days=LIFT_WINDOW - 1) > data_end:
                 verdict, lift = "pending", None  # after-window not complete yet
+            elif loaded_start is not None and pday - timedelta(days=LIFT_WINDOW) < loaded_start:
+                verdict, lift = "out_of_range", None  # before-window predates loaded data
             vg_after = sum((vp_day.get((pid, pday + timedelta(days=i)), {}).get("video_gmv", ZERO)
                             for i in range(LIFT_WINDOW)), ZERO)
             lifts.append({"video_id": vid, "external_video_id": ext, "published": pday,

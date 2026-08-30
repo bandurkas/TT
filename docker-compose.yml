@@ -40,6 +40,19 @@ services:
       redis: { condition: service_started }
     restart: unless-stopped
 
+  dashboard:
+    build:
+      context: ./apps/dashboard
+      args:
+        NEXT_PUBLIC_API_BASE: ""
+    environment:
+      NEXT_PUBLIC_API_BASE: ""
+      PORT: "3400"
+    ports:
+      - "${DASHBOARD_PORT:-3400}:3400"
+    depends_on: [api]
+    restart: unless-stopped
+
   caddy:
     image: caddy:2-alpine
     ports:
@@ -49,7 +62,7 @@ services:
       - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [api]
+    depends_on: [api, dashboard]
     restart: unless-stopped
 
 volumes:

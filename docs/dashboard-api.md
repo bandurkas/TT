@@ -15,3 +15,21 @@ All routes under `/api`. Query params (all optional): `shop_id`, `from`, `to` (I
 | `GET /api/tasks` / `POST /api/tasks` / `PATCH /api/tasks/{id}` | 7 | task {id, title, detail, team performance/video/design/product/finance/management, priority P1-P3, status today/in_progress/review/done, owner, deadline, impact_note, source, evidence, result_note, done_at}; GET also returns `columns` grouped by status |
 
 Labels the UI must keep: ad cost = "BLENDED estimate (LOW)"; provisional orders ≠ settled; reported ROAS / per-campaign / per-video ad cost = NOT AVAILABLE until Ads API. `/health` (no `/api` prefix) reports DB + last sync/job times.
+
+## Dashboard (frontend, `apps/dashboard`)
+
+Next.js 15 App Router, TypeScript, one global stylesheet with the mock's CSS variables (dark mode via `prefers-color-scheme`), no chart libraries (SVG). Client page fetches all endpoints in parallel from `NEXT_PUBLIC_API_BASE` (default `""` = same origin; Caddy proxies `/api/*` to `api:8400`). Filter state lives in the URL: `?preset=month|30d|custom&from=&to=&tab=products|videos|campaigns|creators&shop_id=`. Language (EN/RU) persists in `localStorage["tt-lang"]`.
+
+| Zone | Component | Endpoint |
+|---|---|---|
+| Header | `Shell.tsx` | `overview.shop/period/compare/data_quality` |
+| 1 Business health | `Health.tsx` | `/api/dashboard/overview` (`cards`, `health`, `unit_economics`, `totals`, `notes`) |
+| 2 Diagnosis | `Diagnosis.tsx` | `/api/dashboard/insights.findings` (labelled "Deterministic rules · no LLM") |
+| 3 Trend | `Trend.tsx` | `/api/dashboard/trends` (`series`, `events`, `gmv_sources`) |
+| 4 Explorer | `Explorer.tsx` | `/api/analytics/products`, `/videos`, `/campaigns`, `/creators` |
+| 4b Videos → Product cards | `VideoProducts.tsx`, `History.tsx` | `/api/analytics/video-products` (`shop_split`, `dependency`, `products`, `videos`, `history`) |
+| 5 Funnel & waterfall | `Funnel.tsx` | `/api/dashboard/funnel` |
+| 6 Opportunities & leakage | `Opps.tsx` | `/api/dashboard/insights.opportunities/.risks` |
+| 7 Team board | `Board.tsx` | `GET/POST /api/tasks`, `PATCH /api/tasks/{id}` (status buttons; "Create task" prefills from a finding with `evidence={insight: key, ...links}`, `source="insight"`) |
+
+Decimals are parsed with `Number()` only for display; nothing is recomputed client-side. Nulls render as "—" with the API note. Dev without the API: `npm run dev:mock` (fixtures under `apps/dashboard/fixtures/`).

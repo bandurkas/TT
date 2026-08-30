@@ -40,7 +40,7 @@ from src.domain.ingest.upserts import (
     video_ids,
 )
 from src.integrations.sync_state import SyncStateStore
-from src.integrations.tiktok_shop.client import TikTokShopClient
+from src.integrations.tiktok_shop.client import ShopApiError, TikTokShopClient
 
 log = logging.getLogger("tt.ingest")
 INTEGRATION = m.INTEGRATION
@@ -315,19 +315,34 @@ def sync_video_product_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
          .where(Video.shop_id == ctx.shop_id, VideoMetric.metric_date == day,
                 VideoMetric.metric_hour.is_(None)))
     n_videos = n_rows = 0
-    for vid, ext in ctx.session.execute(q):
-        detail = ctx.client.get_video_performance_detail(ext, start, end)
+    errors: list[str] = []
+    targets = list(ctx.session.execute(q))
+    for vid, ext in targets:
+        try:
+            detail = ctx.client.get_video_performance_detail(ext, start, end)
+        except ShopApiError as e:  # one dead/private video must not wedge the whole day
+            errors.append(f"{ext}: {str(e)[:120]}")
+            log.warning("video detail %s %s failed: %s", ext, day, e)
+            continue
         rows, overall = m.map_video_detail(detail, vid, pids, day, ctx.now)
         if rows:
             upsert(ctx.session, VideoProductMetric, rows, ["video_id", "product_id", "metric_date"])
         if overall:
-            ctx.session.execute(update(VideoMetric).where(VideoMetric.video_id == vid,
-                                                          VideoMetric.metric_date == day,
-                                                          VideoMetric.metric_hour.is_(None))
-                                .values(**overall))
+            # only measured product clicks; `impressions` stays = views (list API), ctr from list API
+            vals = {k: v for k, v in overall.items() if k == "product_clicks" and v is not None}
+            if vals:
+                ctx.session.execute(update(VideoMetric).where(VideoMetric.video_id == vid,
+                                                              VideoMetric.metric_date == day,
+                                                              VideoMetric.metric_hour.is_(None))
+                                    .values(**vals))
         n_videos += 1
         n_rows += len(rows)
-    return {"videos": n_videos, "video_product_metrics": n_rows}
+    if targets and not n_videos:
+        raise RuntimeError(f"video detail failed for all {len(targets)} videos: {errors[0]}")
+    out: dict[str, Any] = {"videos": n_videos, "video_product_metrics": n_rows}
+    if errors:
+        out["video_errors"] = errors[:20]
+    return out
 
 
 def upsert_video_products(session: Session, rows: list[dict]) -> int:
@@ -352,10 +367,13 @@ def backfill_video_products(session: Session, shop_id: int) -> dict[str, int]:
     q = select(RawApiResponse).where(RawApiResponse.resource == "video_performance",
                                      RawApiResponse.shop_id == shop_id)
     n_raw = 0
+    n_skipped = 0
     for raw in session.scalars(q):
         n_raw += 1
-        meta = raw.request_meta or {}
-        day = _meta_day(meta) or raw.fetched_at.date()
+        day = _meta_day(raw.request_meta or {})
+        if day is None:
+            n_skipped += 1
+            continue
         for v in ((raw.payload or {}).get("data") or {}).get("videos") or []:
             vid = vids.get(str(v.get("id")))
             if vid is None:
@@ -370,12 +388,13 @@ def backfill_video_products(session: Session, shop_id: int) -> dict[str, int]:
                     cur["last_seen"] = max(cur["last_seen"], day)
     n = upsert_video_products(session, list(rows_by_key.values()))
     session.commit()
-    return {"raw_responses": n_raw, "links": n}
+    return {"raw_responses": n_raw, "skipped_no_day": n_skipped, "links": n}
 
 
 def _meta_day(meta: dict) -> date | None:
+    """DbRawSink stores {"method","path","query":{"start_date_ge":...},...}."""
     for k in ("start_date_ge", "start_date", "date", "day"):
-        v = meta.get(k) or (meta.get("params") or {}).get(k)
+        v = meta.get(k) or (meta.get("query") or {}).get(k) or (meta.get("params") or {}).get(k)
         if isinstance(v, str) and len(v) >= 10:
             try:
                 return date.fromisoformat(v[:10])

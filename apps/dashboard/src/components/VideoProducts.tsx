@@ -5,6 +5,7 @@ import { dayMon, idr, int, num, pct, shortId } from "@/lib/format";
 import type { VideoProducts as VP } from "@/lib/types";
 import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
 import { ProductPill, VideoPill } from "./Explorer";
+import History from "./History";
 
 const fmtAxis = (v: number) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}m` : Math.abs(v) >= 1e3 ? `${Math.round(v / 1e3)}k` : String(v));
 
@@ -128,15 +129,16 @@ export default function VideoProducts({ vp, loading, error, reload }: { vp: VP |
                       <span><b>Video {shortId(v.external_video_id ?? v.video_id)}</b> <span className="tiny">{v.caption ?? ""}</span></span>
                       <span className="small">{int(v.views, lang)} {t("Views count").toLowerCase()} <VideoPill c={v.classification} /></span>
                     </div>
-                    <table className="tbl" style={{ marginTop: 6 }}>
+                    <div className="scroll" style={{ marginTop: 6 }}><table className="tbl">
                       <thead><tr><th>{t("Product")}</th><th className="r">{t("Impressions")}</th><th className="r">{t("Clicks")}</th><th className="r">CTR</th><th className="r">{t("Units")}</th><th className="r">{t("GMV")}</th></tr></thead>
                       <tbody>{v.products.map((p) => <tr key={p.product_id}><td style={{ whiteSpace: "normal" }}>{p.title}</td><td className="r">{int(p.impressions, lang)}</td><td className="r">{int(p.clicks, lang)}</td><td className="r">{pct(p.ctr, lang)}</td><td className="r">{int(p.units_sold, lang)}</td><td className="r">{idr(p.gmv, lang)}</td></tr>)}</tbody>
-                    </table>
+                    </table></div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
+          {vp.history && <History hist={vp.history} />}
           <div className="note">{vp.notes.join(" · ")} · {t("correlation ≠ causation")}</div>
         </>
       )}

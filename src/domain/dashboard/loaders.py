@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 
@@ -84,9 +85,13 @@ def product_funnel(session: Any, shop_id: int, start: date, end: date
 def current_profits(session: Any, shop_id: int, start: date, end: date, tz: str
                     ) -> tuple[list[Any], dict[date, int], dict[date, int]]:
     """Current profit rows in period + refunded-order count per day + completed per day."""
+    z = ZoneInfo(tz)
+    lo = datetime.combine(start, datetime.min.time(), tzinfo=z)
+    hi = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=z)
     q = (select(OrderProfitRow, Order.order_created_at, Order.order_status)
          .join(Order, Order.id == OrderProfitRow.order_id)
-         .where(Order.shop_id == shop_id, OrderProfitRow.is_current.is_(True)))
+         .where(Order.shop_id == shop_id, OrderProfitRow.is_current.is_(True),
+                Order.order_created_at >= lo, Order.order_created_at < hi))
     rows, refunded, completed = [], defaultdict(int), defaultdict(int)
     for p, created, status in session.execute(q):
         d = local_date(created, tz)
@@ -156,7 +161,12 @@ def ad_deductions(session: Any, shop_id: int, start: date, end: date, tz: str) -
     from src.db.models import Settlement
     from src.domain.profit.jobs import is_ad_deduction
     out = []
-    for s in session.scalars(select(Settlement).where(Settlement.shop_id == shop_id)
+    z = ZoneInfo(tz)
+    lo = datetime.combine(start, datetime.min.time(), tzinfo=z)
+    hi = datetime.combine(end + timedelta(days=1), datetime.min.time(), tzinfo=z)
+    for s in session.scalars(select(Settlement).where(Settlement.shop_id == shop_id,
+                                                      Settlement.settlement_at >= lo,
+                                                      Settlement.settlement_at < hi)
                              .order_by(Settlement.settlement_at)):
         d = local_date(s.settlement_at, tz)
         if d and start <= d <= end and is_ad_deduction(s):

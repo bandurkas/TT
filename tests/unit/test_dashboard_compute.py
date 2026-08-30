@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal as D
 from types import SimpleNamespace as NS
 
@@ -250,3 +250,31 @@ def test_video_history_lift_and_phase():
     assert pend["products"][0]["lifts"][0]["verdict"] == "pending"
     assert C._lift_verdict(D(0), D(0), 0, 5) == ("insufficient", None)
     assert C._lift_verdict(D(1), D("0.5"), 4, 5) == ("negative", D("-0.5"))
+
+
+def test_video_cards_mixed_measured_and_derived_clicks():
+    rows = [NS(metric_date=date(2026, 8, 20), impressions=None, product_clicks=0, orders=0, gmv=D(0), views=4000,
+               ctr=D("0.01")),
+            NS(metric_date=date(2026, 8, 21), impressions=545, product_clicks=17, orders=1, gmv=D(100000), views=15000,
+               ctr=D("0.0011"))]
+    c = C.video_cards({1: rows}, {1: NS(external_video_id="v", caption=None, published_at=None, duration_seconds=None)},
+                      AUG, date(2026, 8, 31), ScoringConfig(minimum_sample_impressions=1000))[0]
+    assert c["impressions"] == 19000 and c["clicks"] == 57  # views stay the CTR base; 40 derived + 17 measured
+    assert "measured product clicks on 1 days" in c["clicks_note"]
+
+
+def test_lift_out_of_range_and_lag_reindex():
+    pub = datetime(2026, 7, 28, 3, 0, tzinfo=UTC)  # 10:00 Jakarta on 28 Jul
+    pdr = [NS(product_id=3, metric_date=date(2026, 7, 25) + timedelta(days=k), gmv=D(1), orders=1, net_profit=D(0))
+           for k in range(20)]
+    vpm = [NS(video_id=1, product_id=3, metric_date=date(2026, 8, 2), impressions=10, clicks=1, units_sold=1,
+              gmv=D(5), customers=1)]
+    out = C.video_history(vpm, pdr, {}, {1: NS(external_video_id="v", published_at=pub)}, {}, AUG, 5,
+                          data_end=date(2026, 8, 30), loaded_start=date(2026, 7, 25), tz="Asia/Jakarta")
+    lift = out["products"][0]["lifts"][0]
+    assert lift["published"] == date(2026, 7, 28) and lift["verdict"] == "out_of_range" and lift["lift_pct"] is None
+    utc_late = datetime(2026, 8, 3, 20, 0, tzinfo=UTC)  # 03:00 Jakarta on 4 Aug
+    assert C._pub_date(NS(published_at=utc_late), "Asia/Jakarta") == date(2026, 8, 4)
+    gap = [{"date": date(2026, 8, k), "video_views": 10 * k, "gmv_product_card": D(100 * k)} for k in (1, 2, 3, 5, 6, 7, 8, 9)]
+    dep = C.lag_dependency(gap)
+    assert dep["lags"][0]["n"] == 9  # reindexed over the contiguous range incl. the missing 4 Aug

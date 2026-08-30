@@ -10,7 +10,6 @@ tt.lomiraproduct.com {
 		reverse_proxy api:8400
 	}
 	handle {
-		# dashboard (Next.js) lands here later; until then proxy to api
-		reverse_proxy api:8400
+		reverse_proxy dashboard:3400
 	}
 }

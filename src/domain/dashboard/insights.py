@@ -61,7 +61,7 @@ def findings(cur: Totals, prev: Totals, floor: Decimal, products: Sequence[dict[
                       f"{diag['current_rate']:.2%} vs baseline {diag['baseline_rate']:.2%} "
                       f"({diag['delta_pct']:+.1%})",
                       "; ".join(diag["evidence"]) or "conversion below the previous comparable period",
-                      diag.get("lost_profit"), MEDIUM, "product_metrics + analytics_order_profit", False,
+                      diag.get("lost_profit"), MEDIUM, "video_metrics + analytics_order_profit", False,
                       {"zone": "funnel"}))
     # 5. losing products
     for p in products:

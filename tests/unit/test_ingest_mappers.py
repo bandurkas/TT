@@ -200,3 +200,12 @@ def test_map_video_detail_and_products():
     links = map_video_products({"products": [{"id": "P1"}, {"id": "P1"}, {"id": "nope"}]}, 7, {"P1": 3},
                                date(2026, 8, 30))
     assert links == [{"video_id": 7, "product_id": 3, "first_seen": date(2026, 8, 30), "last_seen": date(2026, 8, 30)}]
+
+
+def test_meta_day_reads_query_block():
+    from datetime import date
+
+    from src.domain.ingest.jobs import _meta_day
+    assert _meta_day({"method": "GET", "query": {"start_date_ge": "2026-08-05", "end_date_lt": "2026-08-06"}}) == \
+        date(2026, 8, 5)
+    assert _meta_day({"query": {}}) is None and _meta_day({}) is None

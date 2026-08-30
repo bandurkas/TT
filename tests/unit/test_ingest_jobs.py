@@ -264,3 +264,40 @@ def test_build_upsert_dedupes_conflict_key():
     stmt = build_upsert(OrderItem, rows, ["order_id", "external_item_id"])
     params = stmt.compile().params
     assert "quantity_m1" not in params and params["quantity_m0"] == 2  # single row, last wins
+
+
+def test_sync_video_product_metrics_isolates_per_video_errors(monkeypatch):
+    from datetime import UTC, date, datetime
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    from src.domain.ingest import jobs as J
+    from src.integrations.tiktok_shop.client import ShopApiError
+    session = MagicMock()
+    session.execute.return_value = [(1, "v1"), (2, "v2")]
+    monkeypatch.setattr(J, "product_ids", lambda s, sid: {"P1": 3})
+    calls = []
+    monkeypatch.setattr(J, "upsert", lambda s, model, rows, keys: calls.append((model.__name__, len(rows))))
+
+    def detail(ext, a, b):
+        if ext == "v2":
+            raise ShopApiError(105, "private video")
+        return {"performance": {"intervals": [{"sales": {"breakdowns": [
+            {"product_id": "P1", "product_impressions": 10, "product_clicks": 2, "ctr": "0.2",
+             "customers": 1, "gmv": {"amount": "5"}, "items_sold": 1}],
+            "overall": {"product_clicks": 2, "product_impressions": None, "ctr": None}}}]}}
+    ctx = NS(session=session, shop_id=1, now=datetime(2026, 8, 31, tzinfo=UTC),
+             client=NS(get_video_performance_detail=detail))
+    out = J.sync_video_product_metrics(ctx, date(2026, 8, 30))
+    assert out["videos"] == 1 and out["video_product_metrics"] == 1 and out["video_errors"][0].startswith("v2")
+    assert calls == [("VideoProductMetric", 1)]
+    # overall update only carries product_clicks (never impressions/ctr, never None)
+    upd = [c for c in session.execute.call_args_list if c.args and hasattr(c.args[0], "compile")]
+    assert upd and "product_clicks" in str(upd[-1].args[0].compile()) and "impressions" not in str(upd[-1].args[0].compile())
+
+    def all_fail(ext, a, b):
+        raise ShopApiError(500, "down")
+    ctx.client = NS(get_video_performance_detail=all_fail)
+    import pytest
+    with pytest.raises(RuntimeError):
+        J.sync_video_product_metrics(ctx, date(2026, 8, 30))
