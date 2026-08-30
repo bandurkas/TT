@@ -17,3 +17,6 @@ apps/dashboard/.next/
 apps/dashboard/out/
 .DS_Store
 *.log
+.tools/
+*.tsbuildinfo
+apps/dashboard/next-env.d.ts
