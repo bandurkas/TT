@@ -1,5 +1,5 @@
 "use client";
-import { useLang, useT } from "@/lib/i18n";
+import { EnHint, useLang, useT } from "@/lib/i18n";
 import { idr, int, num, pct } from "@/lib/format";
 import type { Funnel as FunnelT } from "@/lib/types";
 import { ErrorNote, Skeleton, ZoneHeader } from "./ui";
@@ -41,9 +41,9 @@ export default function Funnel({ fn, loading, error, reload }: { fn: FunnelT | n
               );
             })}
             {d ? (
-              <div className="diagbox"><b style={{ color: "var(--bad)" }}>{t("Largest deterioration")}: {t(d.stage_from)} → {t(d.stage_to)}</b> · {pct(d.current_rate, lang)} {t("vs baseline")} {pct(d.baseline_rate, lang)} ({pct(d.delta_pct, lang, { sign: true })}). {t("Est.")} {int(d.lost_orders, lang)} {t("lost orders")}, <b>{idr(d.lost_profit, lang)}</b> {t("contribution")}. {d.evidence.join("; ")} <span className="tiny">({t("estimate")})</span></div>
+              <div className="diagbox"><b style={{ color: "var(--bad)" }}>{t("Largest deterioration")}: {t(d.stage_from)} → {t(d.stage_to)}</b> · {pct(d.current_rate, lang)} {t("vs baseline")} {pct(d.baseline_rate, lang)} ({pct(d.delta_pct, lang, { sign: true })}). {t("Est.")} {int(d.lost_orders, lang)} {t("lost orders")}, <b>{idr(d.lost_profit, lang)}</b> {t("contribution")}. {d.evidence.join("; ")} <span className="tiny">({t("estimate")})</span><EnHint lang={lang} /></div>
             ) : <div className="diagbox ok">{t("No funnel deterioration vs the previous comparable period.")}</div>}
-            <div className="tiny" style={{ marginTop: 8 }}>{t("baseline = previous comparable period")}</div>
+            <div className="tiny" style={{ marginTop: 8 }}>{t("baseline = previous comparable period")} · {t("(log scale)")}</div>
           </div>
           <div className="card wf">
             <div className="k lbl" style={{ marginBottom: 8 }}>{t("Profit waterfall")} · {int(wf?.orders ?? 0, lang)} {t("orders")} · {int(wf?.provisional_orders ?? 0, lang)} {t("provisional")}</div>
@@ -54,7 +54,7 @@ export default function Funnel({ fn, loading, error, reload }: { fn: FunnelT | n
                 <span className={`val ${a < 0 ? "dn" : ""}`}>{s.subtotal ? <b>{idr(a, lang)}</b> : idr(a, lang)}</span>
               </div>
             ))}
-            <div className="tiny" style={{ marginTop: 8 }}>{wf?.note}</div>
+            <div className="tiny" style={{ marginTop: 8 }}>{wf?.note}<EnHint lang={lang} /></div>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 "use client";
-import { useLang, useT } from "@/lib/i18n";
+import { EnHint, useLang, useT } from "@/lib/i18n";
 import { idr } from "@/lib/format";
 import type { Finding, Insights } from "@/lib/types";
 import { ErrorNote, Skeleton, ZoneHeader } from "./ui";
@@ -14,7 +14,7 @@ function List({ items, tone, onCreateTask }: { items: Finding[]; tone: "up" | "d
           <span className="no">{i + 1}</span>
           <div>
             <div className="t">{f.title}</div>
-            <div className="s">{f.detail} · {t("Confidence")} {t(f.confidence)} · <button className="btn xs" onClick={() => onCreateTask(f)}>{t("Create task")}</button></div>
+            <div className="s">{f.detail}<EnHint lang={lang} /> · {t("Confidence")} {t(f.confidence)} · <button className="btn xs" onClick={() => onCreateTask(f)}>{t("Create task")}</button></div>
           </div>
           <div className={`amt ${tone}`}>{f.impact === null ? "—" : idr(f.impact, lang, { sign: true })}<small>{t(f.measured ? "measured" : "estimate")}</small></div>
         </div>

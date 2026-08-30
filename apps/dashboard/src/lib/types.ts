@@ -22,6 +22,7 @@ export interface Card {
   status: Status;
   note: string | null;
   provisional: boolean;
+  meta: { units?: number; refunded?: number; ad_share?: Dec | null; floor?: Dec; break_even?: Dec | null; settled?: number; provisional?: number };
 }
 
 export interface Health {
@@ -75,6 +76,8 @@ export interface TrendEvent {
   type: "ad_deduction" | "video_posted" | string;
   amount: Dec | null;
   label: string;
+  video_id?: number | null;
+  external_video_id?: string | null;
 }
 
 export interface GmvSource {
@@ -144,6 +147,7 @@ export interface VideoCard {
   ad_spend: null;
   net_profit: null;
   ad_spend_note: string;
+  clicks_note?: string;
   classification: VideoClass;
   confidence: "HIGH" | "MEDIUM" | "LOW";
   reasons: string[];
@@ -287,7 +291,7 @@ export interface VideoProducts extends Meta {
 // history block of /api/analytics/video-products (compute.video_history)
 export interface VPHistDay { date: string; gmv: Dec; orders: number; net_profit: Dec; video_gmv: Dec; non_video_gmv: Dec; video_clicks: number; video_impressions: number; video_units: number }
 export interface VPHistEvent { date: string; video_id: number; external_video_id: string | null; type: "published" }
-export type LiftVerdict = "positive" | "neutral" | "negative" | "insufficient" | "pending";
+export type LiftVerdict = "positive" | "neutral" | "negative" | "insufficient" | "pending" | "out_of_range";
 export interface VPLift {
   video_id: number; external_video_id: string | null; published: string;
   before: { orders: number; gmv: Dec; orders_per_day: Dec };

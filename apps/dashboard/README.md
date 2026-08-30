@@ -27,7 +27,7 @@ src/app/api/[...path]/route.ts  MOCK=1 fixture server (+ in-memory tasks POST/PA
 src/lib/types.ts             API shapes (mirror apps/api/dashboard.py; Decimals = strings)
 src/lib/api.ts               fetch helpers, useApi hook, createTask/patchTask
 src/lib/format.ts            Rp 1.87m / Rp 254k / Rp 25,000, percentages, dates (Number() only for display)
-src/lib/i18n.ts              EN keys → RU map (mock strings reused), LangContext
+src/lib/i18n.tsx             EN keys → RU map (mock strings reused), LangContext
 src/lib/period.ts            ?preset=month|30d|custom&from&to&tab&shop_id → API query
 src/components/Shell.tsx     rail + header (period picker, compare, last sync, data-quality badge, Refresh, EN/RU)
 src/components/Health.tsx    zone 1  /api/dashboard/overview

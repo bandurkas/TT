@@ -1,5 +1,5 @@
 "use client";
-import { useLang, useT } from "@/lib/i18n";
+import { EnHint, noteKey, useLang, useT } from "@/lib/i18n";
 import { idr, int, num, pct, ratio } from "@/lib/format";
 import type { Card, Overview } from "@/lib/types";
 import { ErrorNote, Pill, Skeleton, Sparkline, ZoneHeader, statusTone } from "./ui";
@@ -45,24 +45,24 @@ function Note({ c, ov }: { c: Card; ov: Overview }) {
   const tone = statusTone(c.status);
   switch (c.key) {
     case "net_profit": return <>{tone === "bad" ? <Pill tone="bad">{t("Losing")}</Pill> : tone === "good" ? <Pill tone="good">{t("Profitable")}</Pill> : null}<span className="tiny">{c.provisional ? t("provisional ≠ settled") : ""}</span></>;
-    case "gmv": return <span>{int(ov.totals.units, lang)} {t("units")}</span>;
+    case "gmv": return <span>{int(c.meta?.units ?? ov.totals.units, lang)} {t("units")}</span>;
     case "net_seller_revenue": return <span>{t("after fees & refunds")}</span>;
-    case "orders": return <span>{int(ov.totals.refunded_orders, lang)} {t("refunded")}</span>;
+    case "orders": return <span>{int(c.meta?.refunded ?? ov.totals.refunded_orders, lang)} {t("refunded")}</span>;
     case "ad_spend": {
-      const m = /^([\d.]+) of net revenue$/.exec(c.note ?? "");
-      return <><span className="dn">{m ? `${pct(m[1], lang)} ${t("of net revenue")}` : ""}</span><Pill tone="warn">{t("BLENDED estimate · LOW confidence")}</Pill></>;
+      const share = c.meta?.ad_share ?? null;
+      return <><span className="dn">{share !== null ? `${pct(share, lang)} ${t("of net revenue")}` : ""}</span><Pill tone="warn">{t("BLENDED estimate · LOW confidence")}</Pill></>;
     }
     case "net_margin": {
-      const m = /^floor ([\d.]+)$/.exec(c.note ?? "");
-      return <>{m && <span>{t("floor")} {pct(m[1], lang, { frac: 0 })}</span>}{tone === "bad" ? <Pill tone="bad">{t("Below floor")}</Pill> : tone === "good" ? <Pill tone="good">{t("Above floor")}</Pill> : null}</>;
+      const floor = c.meta?.floor ?? null;
+      return <>{floor !== null && <span>{t("floor")} {pct(floor, lang, { frac: 0 })}</span>}{tone === "bad" ? <Pill tone="bad">{t("Below floor")}</Pill> : tone === "good" ? <Pill tone="good">{t("Above floor")}</Pill> : null}</>;
     }
     case "blended_roas": {
-      const m = /^break-even ([\d.]+)$/.exec(c.note ?? "");
-      return <span>{m ? `${t("break-even")} ${ratio(m[1], lang)}` : t("net revenue / ad spend")} · <span className="tiny">{t("estimate")}</span></span>;
+      const be = c.meta?.break_even ?? null;
+      return <span>{be !== null ? `${t("break-even")} ${ratio(be, lang)}` : t("net revenue / ad spend")} · <span className="tiny">{t("estimate")}</span></span>;
     }
-    case "cvr": return <span>{t("orders / product clicks")}</span>;
+    case "cvr": return <span>{t("video orders / derived clicks")}</span>;
     case "refund_rate": return <span>{t("refunded orders / orders")}</span>;
-    case "settlement_coverage": return <Pill tone={tone === "good" ? "good" : "warn"}>{int(ov.totals.settled_orders, lang)} {t("settled")} · {int(ov.totals.provisional_orders, lang)} {t("provisional")}</Pill>;
+    case "settlement_coverage": return <Pill tone={tone === "good" ? "good" : "warn"}>{int(c.meta?.settled ?? ov.totals.settled_orders, lang)} {t("settled")} · {int(c.meta?.provisional ?? ov.totals.provisional_orders, lang)} {t("provisional")}</Pill>;
     default: return c.note ? <span>{t(c.note)}</span> : null;
   }
 }
@@ -121,7 +121,7 @@ export default function Health({ ov, loading, error, reload }: { ov: Overview | 
               ) : <div className="muted small" style={{ marginTop: 8 }}>—</div>}
             </div>
           </div>
-          <div className="note"><b>{t("Notes")}:</b> {ov.notes.map((n) => t(n)).join(" ")}</div>
+          <div className="note"><b>{t("Notes")}:</b> {ov.notes.map((n, i) => { const k = noteKey(n); return <span key={i}>{k ? t(k) : n}{!k && <EnHint lang={lang} />} </span>; })}</div>
         </>
       )}
     </section>

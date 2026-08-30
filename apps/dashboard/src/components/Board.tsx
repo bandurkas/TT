@@ -45,8 +45,8 @@ function TaskCard({ task, onMove, busy }: { task: Task; onMove: (t: Task, s: Tas
         <span>{t("Owner")}: {task.owner || "—"}</span>
         {task.status === "done" ? <span>{t("Done")} {dayMon(task.done_at, lang)}</span> : task.deadline ? <span>{t("Deadline")}: {dayMon(task.deadline, lang)}</span> : task.impact_note ? <span>{t("Impact")} {task.impact_note}</span> : null}
         <span className="mv">
-          {prev && <button className="btn xs" disabled={busy} title={`${t("Move to")} ${t(COL_LABEL[prev])}`} onClick={() => onMove(task, prev)}>◀</button>}
-          {next && <button className="btn xs" disabled={busy} title={`${t("Move to")} ${t(COL_LABEL[next])}`} onClick={() => onMove(task, next)}>▶</button>}
+          {prev && <button className="btn xs" disabled={busy} aria-label={`${t("Move to previous column")}: ${t(COL_LABEL[prev])}`} title={`${t("Move to")} ${t(COL_LABEL[prev])}`} onClick={() => onMove(task, prev)}>◀</button>}
+          {next && <button className="btn xs" disabled={busy} aria-label={`${t("Move to next column")}: ${t(COL_LABEL[next])}`} title={`${t("Move to")} ${t(COL_LABEL[next])}`} onClick={() => onMove(task, next)}>▶</button>}
         </span>
       </div>
     </div>
@@ -84,7 +84,7 @@ export default function Board({ tasks, loading, error, reload, draft, clearDraft
     <section className="zone">
       <ZoneHeader id="z7" eyebrow={t("7 · Team action board")} title={t("Accept · edit · assign · measure after 72 h")} hint={<button className="btn sm pri" onClick={() => { setOpen((o) => !o); if (open) clearDraft(); }}>{open ? t("Cancel") : t("New task")}</button>} />
       {error && <ErrorNote error={error} onRetry={reload} />}
-      {err && <div className="banner bad" role="alert">{err}</div>}
+      {err && !open && <div className="banner bad" role="alert">{err}</div>}
       {open && (
         <form className="card form" onSubmit={submit}>
           <label className="wide">{t("Title")}<input required minLength={3} maxLength={255} value={form.title} onChange={(e) => set("title", e.target.value)} /></label>

@@ -1,5 +1,5 @@
 "use client";
-import { useLang, useT } from "@/lib/i18n";
+import { EnHint, useLang, useT } from "@/lib/i18n";
 import { idr } from "@/lib/format";
 import type { Finding, Insights } from "@/lib/types";
 import { Conf, ErrorNote, Skeleton, ZoneHeader, scrollTo } from "./ui";
@@ -41,7 +41,7 @@ export default function Diagnosis({ ins, loading, error, reload, onCreateTask, o
               <span className="no">{f.severity === "OPPORTUNITY" ? "✓" : i + 1}</span>
               <div>
                 <div className={`t ${sevCls(f.severity)}`}><span className={`pill ${f.severity === "CRITICAL" ? "p-bad" : f.severity === "WARNING" ? "p-warn" : f.severity === "OPPORTUNITY" ? "p-good" : "p-gray"}`} style={{ marginRight: 8 }}>{t(f.severity)}</span>{f.title}</div>
-                <div className="e">{f.detail}</div>
+                <div className="e">{f.detail}<EnHint lang={lang} /></div>
                 <div className="m">
                   <span>{t("Impact")} <b>{f.impact === null ? "—" : idr(f.impact, lang, { sign: true })}</b> <span className="tiny">({t(f.measured ? "measured" : "estimate")})</span></span>
                   <Conf c={f.confidence} />
@@ -51,7 +51,7 @@ export default function Diagnosis({ ins, loading, error, reload, onCreateTask, o
               <FindingActions f={f} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
             </div>
           ))}
-          <div className="tiny" style={{ marginTop: 10 }}>{ins.note}</div>
+          <div className="tiny" style={{ marginTop: 10 }}>{ins.note}<EnHint lang={lang} /></div>
         </div>
       )}
     </section>

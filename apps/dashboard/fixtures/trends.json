@@ -362,25 +362,33 @@
    "date": "2026-08-23",
    "type": "ad_deduction",
    "amount": "1110000",
-   "label": "GMV Max deduction 1110000"
+   "label": "GMV Max deduction 1110000",
+   "video_id": null,
+   "external_video_id": null
   },
   {
    "date": "2026-08-27",
    "type": "ad_deduction",
    "amount": "699000",
-   "label": "GMV Max deduction 699000"
+   "label": "GMV Max deduction 699000",
+   "video_id": null,
+   "external_video_id": null
   },
   {
    "date": "2026-08-27",
    "type": "video_posted",
    "amount": null,
-   "label": "new video 7670123456781922"
+   "label": "new video 7670123456781922",
+   "video_id": 11,
+   "external_video_id": "7670123456781922"
   },
   {
    "date": "2026-08-29",
    "type": "ad_deduction",
    "amount": "422033",
-   "label": "GMV Max deduction 422033"
+   "label": "GMV Max deduction 422033",
+   "video_id": null,
+   "external_video_id": null
   }
  ],
  "gmv_sources": [

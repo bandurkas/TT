@@ -73,13 +73,10 @@ export const RU: Record<string, string> = {
   "BLENDED estimate · LOW confidence": "СМЕШАННАЯ оценка · НИЗКАЯ уверенность", "derived (views × CTR)": "расчётно (просмотры × CTR)",
   "provisional ≠ settled": "предварительно ≠ рассчитано", "HIGH": "ВЫСОКАЯ", "MEDIUM": "СРЕДНЯЯ", "LOW": "НИЗКАЯ",
   "CRITICAL": "КРИТИЧНО", "WARNING": "ВНИМАНИЕ", "OPPORTUNITY": "ВОЗМОЖНОСТЬ", "INFO": "ИНФО",
-  "Ad spend = GMV Max payout deductions, BLENDED over trailing 7 days (estimate, LOW).": "Реклама = списания GMV Max из выплат, СМЕШАННО за 7 дней (оценка, НИЗКАЯ уверенность).",
-  "Provisional orders: fees estimated from trailing settled ratio; not final.": "Предварительные заказы: комиссии оценены по доле рассчитанных; не финал.",
-  "Reported ROAS / per-campaign cost: NOT AVAILABLE until the TikTok Ads app is approved.": "ROAS по TikTok / расход по кампаниям: НЕДОСТУПНО до одобрения приложения TikTok Ads.",
   "4b · Videos → Product cards": "4b · Видео → карточки товара", "Which video drives which listing": "Какое видео продаёт какую карточку",
   "GMV: video vs product card": "GMV: видео vs карточка товара", "Video views": "Просмотры видео", "Product card GMV": "GMV карточек товара", "Video GMV": "GMV из видео",
   "video share of GMV": "доля видео в GMV", "Dependency: views → product-card sales": "Зависимость: просмотры → продажи карточек", "same day": "тот же день", "+1 day": "+1 день", "+2 days": "+2 дня",
-  "weak": "слабая", "moderate": "умеренная", "strong": "сильная", "n/a": "н/д", "days": "дней", "best lag": "лучший лаг", "correlation ≠ causation": "корреляция ≠ причинность",
+  "weak": "слабая", "moderate": "умеренная", "strong": "сильная", "n/a": "н/д", "day": "день", "days": "дней", "best lag": "лучший лаг", "correlation ≠ causation": "корреляция ≠ причинность",
   "Products ← videos feeding them": "Товары ← видео, которые их продают", "Videos → products they sell": "Видео → товары, которые они продают",
   "Impressions": "Показы", "Video units": "Шт из видео", "Video GMV share": "Доля GMV из видео", "no video traffic measured": "видео-трафик не измерен",
   "measured by TikTok video analytics": "измерено аналитикой видео TikTok", "customers": "покупателей",
@@ -88,10 +85,19 @@ export const RU: Record<string, string> = {
   "positive": "рост", "negative": "спад", "neutral": "без изменений", "insufficient": "мало данных", "pending": "ждём 7 дней",
   "rising": "растёт", "steady": "стабильно", "fading": "затухает", "peak": "пик", "recent vs peak": "сейчас к пику", "Video lifecycle": "Жизненный цикл видео",
   "Association on all traffic, not attribution": "Ассоциация по всему трафику, не атрибуция", "Select product": "Выберите товар", "No history for this period.": "Истории за период нет.",
+  "outside loaded data": "вне загруженных данных", "out_of_range": "вне загруженных данных",
+  "video orders / derived clicks": "заказы из видео / расчётные клики", "(log scale)": "(лог. шкала)", "derived": "расчётно", "share of product GMV": "доля GMV товара",
+  "SCALE": "Масштабировать", "HEALTHY": "Здоров", "WATCH": "Наблюдать", "INVESTIGATE": "Разобраться", "REDUCE": "Сократить", "SMALL_SAMPLE": "Мало данных", "NO_SALES": "Нет продаж",
+  "WINNER": "Победитель", "PROMISING": "Перспективно", "TRAFFIC_NO_SALES": "Трафик без продаж", "LOW_ATTENTION": "Слабый хук", "LOSER": "Убыточно", "FATIGUING": "Выгорает", "NEUTRAL": "Нейтрально", "INSUFFICIENT_DATA": "Мало данных",
+  "note.ad_blended": "Реклама = списания GMV Max из выплат, СМЕШАННО за 7 дней (оценка, НИЗКАЯ уверенность).", "note.provisional": "Предварительные заказы: комиссии оценены по доле рассчитанных; не финал.", "note.roas_na": "ROAS по TikTok / расход по кампаниям: НЕДОСТУПНО до одобрения приложения TikTok Ads.",
+  "EN": "EN", "source text in English": "исходный текст на английском", "Source · overview totals (API)": "Источник · итоги overview (API)", "last day of series": "последний день ряда",
+  "Move to next column": "Перевести в следующую колонку", "Move to previous column": "Перевести в предыдущую колонку", "Expand": "Раскрыть",
   "Notes": "Примечания", "Generated": "Сформировано", "Keep": "Оставить", "Reduce priority": "Снизить приоритет",
 };
 
 export const t = (lang: Lang, key: string): string => (lang === "ru" ? RU[key] ?? key : key);
+/** Hint shown next to API-authored EN text in RU mode. */
+export const EnHint = ({ lang }: { lang: Lang }) => (lang === "ru" ? <span className="pill p-gray" title={RU["source text in English"]} style={{ marginLeft: 6 }}>EN</span> : null);
 
 export const LangContext = createContext<Lang>("en");
 export const useLang = (): Lang => useContext(LangContext);
@@ -99,3 +105,7 @@ export const useT = () => {
   const lang = useLang();
   return (key: string) => t(lang, key);
 };
+
+/** Overview notes are API-authored sentences; map by keyword to a dictionary key so wording drift does not break RU. */
+export const noteKey = (n: string): string | null =>
+  /BLENDED/i.test(n) ? "note.ad_blended" : /Provisional orders/i.test(n) ? "note.provisional" : /Reported ROAS/i.test(n) ? "note.roas_na" : null;

@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useLang, useT } from "@/lib/i18n";
-import { dayMon, idr, int, num, pct, periodLabel } from "@/lib/format";
-import type { Trends } from "@/lib/types";
+import { dayMon, idr, int, num, pct, periodLabel, shortId } from "@/lib/format";
+import type { Overview, Trends } from "@/lib/types";
 import { ErrorNote, Skeleton, ZoneHeader } from "./ui";
 
 const fmtAxis = (v: number) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}m` : Math.abs(v) >= 1e3 ? `${Math.round(v / 1e3)}k` : String(v));
@@ -56,13 +56,13 @@ export function TrendChart({ tr }: { tr: Trends }) {
   );
 }
 
-export default function Trend({ tr, loading, error, reload }: { tr: Trends | null; loading: boolean; error: string | null; reload: () => void }) {
+export default function Trend({ tr, ov, loading, error, reload }: { tr: Trends | null; ov: Overview | null; loading: boolean; error: string | null; reload: () => void }) {
   const lang = useLang(), t = useT();
-  const s = tr?.series ?? [];
-  const sum = (k: "gmv" | "ad_cost" | "net_profit") => s.reduce((a, d) => a + (num(d[k]) ?? 0), 0);
-  const orders = s.reduce((a, d) => a + d.orders, 0), settled = s.reduce((a, d) => a + d.settled_orders, 0), prov = s.reduce((a, d) => a + d.provisional_orders, 0);
+  // No client-side re-summing: totals come from overview.totals (server Decimal sums); only the last cum_net_profit is read off the series.
+  const tot = ov?.totals ?? null;
+  const last = tr?.series.length ? tr.series[tr.series.length - 1] : null;
   const src = tr?.gmv_sources.length ? tr.gmv_sources[tr.gmv_sources.length - 1] : null;
-  const evLabel = (e: Trends["events"][number]) => e.type === "ad_deduction" ? `${t("GMV Max deduction")} ${idr(e.amount, lang)}` : e.type === "video_posted" ? `${t("new video posted")} (${e.label.replace(/^new video\s*/, "")})` : e.label;
+  const evLabel = (e: Trends["events"][number]) => e.type === "ad_deduction" ? `${t("GMV Max deduction")} ${idr(e.amount, lang)}` : e.type === "video_posted" ? `${t("new video posted")} (${shortId(e.external_video_id ?? e.video_id ?? e.label)})` : e.label;
   return (
     <section className="zone">
       <ZoneHeader id="z3" eyebrow={t("3 · Sales & profit trend")} title={tr ? `${periodLabel(tr.period.start, tr.period.end, lang)}, ${t("daily")}` : t("daily")} />
@@ -79,10 +79,11 @@ export default function Trend({ tr, loading, error, reload }: { tr: Trends | nul
             <TrendChart tr={tr} />
           </div>
           <div className="card pace">
-            <div className="k lbl">{t("Period totals")}</div>
-            <div className="big">{int(orders, lang)} {t("orders")}</div>
-            <div style={{ color: "var(--ink2)" }}>{int(settled, lang)} {t("settled")} · {int(prov, lang)} {t("provisional")} <span className="tiny">({t("provisional ≠ settled")})</span></div>
-            <div className="small" style={{ marginTop: 6 }}>{t("GMV")} <b>{idr(sum("gmv"), lang)}</b> · {t("Ad deduction")} <b className="dn">{idr(-sum("ad_cost"), lang)}</b> · {t("Net profit")} <b className={sum("net_profit") < 0 ? "dn" : "up"}>{idr(sum("net_profit"), lang)}</b></div>
+            <div className="k lbl">{t("Period totals")} <span style={{ textTransform: "none", letterSpacing: 0 }}>· {t("Source · overview totals (API)")}</span></div>
+            <div className="big">{tot ? int(tot.orders, lang) : "—"} {t("orders")}</div>
+            <div style={{ color: "var(--ink2)" }}>{tot ? int(tot.settled_orders, lang) : "—"} {t("settled")} · {tot ? int(tot.provisional_orders, lang) : "—"} {t("provisional")} <span className="tiny">({t("provisional ≠ settled")})</span></div>
+            <div className="small" style={{ marginTop: 6 }}>{t("GMV")} <b>{idr(tot?.gmv, lang)}</b> · {t("Ad deduction")} <b className="dn">{tot ? idr(-(num(tot.ad_cost) ?? 0), lang) : "—"}</b> · {t("Net profit")} <b className={(num(tot?.net_profit) ?? 0) < 0 ? "dn" : "up"}>{idr(tot?.net_profit, lang)}</b></div>
+            {last && <div className="tiny">{t("Cumulative net profit")} · {t("last day of series")} {dayMon(last.date, lang)}: {idr(last.cum_net_profit, lang)}</div>}
             {src && (
               <div className="small" style={{ marginTop: 6 }}><span className="k lbl">{t("GMV by source")} · {dayMon(src.date, lang)}</span><br />
                 {t("video")} {idr(src.gmv_video, lang)} · {t("product card")} {idr(src.gmv_product_card, lang)} · {t("live")} {idr(src.gmv_live, lang)} · GMV Max {pct(src.gmv_max_pct, lang)}

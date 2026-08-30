@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useLang, useT } from "@/lib/i18n";
+import { EnHint, useLang, useT } from "@/lib/i18n";
 import { dayMon, idr, int, num, pct, ratio, shortId } from "@/lib/format";
 import type { VPHistory, VPHistProduct, VPHistVideo, LiftVerdict, VideoPhase } from "@/lib/types";
 import { Pill } from "./ui";
@@ -49,7 +49,8 @@ function ProductTimeline({ p }: { p: VPHistProduct }) {
   );
 }
 
-const VERDICT: Record<LiftVerdict, "good" | "bad" | "gray"> = { positive: "good", negative: "bad", neutral: "gray", insufficient: "gray", pending: "gray" };
+const VERDICT: Record<LiftVerdict, "good" | "bad" | "gray"> = { positive: "good", negative: "bad", neutral: "gray", insufficient: "gray", pending: "gray", out_of_range: "gray" };
+const HAS_NUMBERS: LiftVerdict[] = ["positive", "negative", "neutral"];
 const PHASE: Record<VideoPhase, "good" | "info" | "warn" | "gray"> = { rising: "good", steady: "info", fading: "warn", insufficient: "gray" };
 
 function Lifts({ p }: { p: VPHistProduct }) {
@@ -58,14 +59,15 @@ function Lifts({ p }: { p: VPHistProduct }) {
   return (
     <div className="list" style={{ padding: 0 }}>
       {p.lifts.map((l) => {
-        const tone = VERDICT[l.verdict];
+        const tone = VERDICT[l.verdict] ?? "gray";
         const lift = num(l.lift_pct);
+        const withNumbers = HAS_NUMBERS.includes(l.verdict);
         return (
           <div className="item" key={l.video_id} style={{ gridTemplateColumns: "auto 1fr auto" }}>
-            <Pill tone={tone}>{t(l.verdict)}</Pill>
+            <Pill tone={tone}>{t(l.verdict === "out_of_range" ? "outside loaded data" : l.verdict)}</Pill>
             <div>
-              <div className={`t ${tone === "good" ? "up" : tone === "bad" ? "dn" : ""}`}>Video {shortId(l.external_video_id ?? l.video_id)} · {t("published")} {dayMon(l.published, lang)}: {t("orders/day")} {ratio(l.before.orders_per_day, lang)} → {ratio(l.after.orders_per_day, lang)}{lift !== null && `, ${pct(lift, lang, { sign: true, frac: 0 })}`}</div>
-              <div className="s">{t("before")} {int(l.before.orders, lang)} {t("orders")} / {idr(l.before.gmv, lang)} · {t("after")} {int(l.after.orders, lang)} {t("orders")} / {idr(l.after.gmv, lang)} ({t("Video GMV")} {idr(l.after.video_gmv, lang)}) · {l.note}</div>
+              <div className={`t ${tone === "good" ? "up" : tone === "bad" ? "dn" : ""}`}>{t("Video")} {shortId(l.external_video_id ?? l.video_id)} · {t("published")} {dayMon(l.published, lang)}{withNumbers && <>: {t("orders/day")} {ratio(l.before.orders_per_day, lang)} → {ratio(l.after.orders_per_day, lang)}{lift !== null && `, ${pct(lift, lang, { sign: true, frac: 0 })}`}</>}</div>
+              <div className="s">{withNumbers && <>{t("before")} {int(l.before.orders, lang)} {t("orders")} / {idr(l.before.gmv, lang)} · {t("after")} {int(l.after.orders, lang)} {t("orders")} / {idr(l.after.gmv, lang)} ({t("Video GMV")} {idr(l.after.video_gmv, lang)}) · </>}{l.note}<EnHint lang={lang} /></div>
             </div>
             <span />
           </div>
@@ -85,7 +87,7 @@ function VideoSpark({ v }: { v: VPHistVideo }) {
   return (
     <div className="card" style={{ padding: "10px 12px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <span><b>Video {shortId(v.external_video_id ?? v.video_id)}</b> <span className="tiny">{v.caption ?? ""} · {t("published")} {dayMon(v.published_at, lang)}</span></span>
+        <span><b>{t("Video")} {shortId(v.external_video_id ?? v.video_id)}</b> <span className="tiny">{v.caption ?? ""} · {t("published")} {dayMon(v.published_at, lang)}</span></span>
         <Pill tone={PHASE[v.phase]}>{t(v.phase)}</Pill>
       </div>
       <svg viewBox="0 0 100 30" preserveAspectRatio="none" style={{ width: "100%", height: 40, marginTop: 6 }} aria-hidden="true">
@@ -98,7 +100,7 @@ function VideoSpark({ v }: { v: VPHistVideo }) {
 }
 
 export default function History({ hist }: { hist: VPHistory }) {
-  const t = useT();
+  const t = useT(), lang = useLang();
   const [pid, setPid] = useState<number | null>(hist.products[0]?.product_id ?? null);
   const p = hist.products.find((x) => x.product_id === pid) ?? hist.products[0];
   if (!p) return <div className="note">{t("No history for this period.")}</div>;
@@ -123,7 +125,7 @@ export default function History({ hist }: { hist: VPHistory }) {
           </div>
         </div>
       </div>
-      <div className="tiny">{hist.notes.join(" · ")}</div>
+      <div className="tiny">{hist.notes.join(" · ")}<EnHint lang={lang} /></div>
     </>
   );
 }

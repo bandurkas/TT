@@ -37,7 +37,7 @@ function Dashboard() {
   const onOpenTab = useCallback((tab: string) => { update({ tab }); scrollTo("z4"); }, [update]);
   const all = [ov, ins, trd, prods, vids, camps, crs, vp, fn, tasks];
   const refreshing = all.some((x) => x.loading);
-  const apiDown = ov.error !== null && all.every((x) => x.error !== null || x.loading);
+  const apiDown = all.every((x) => x.error !== null && !x.loading);
   const counts = useMemo(() => ({ recs: (ins.data?.opportunities.length ?? 0) + (ins.data?.risks.length ?? 0), board: tasks.data?.columns.today.length ?? 0 }), [ins.data, tasks.data]);
   return (
     <LangContext.Provider value={lang}>
@@ -49,8 +49,8 @@ function Dashboard() {
             {apiDown && <div className="banner bad" role="alert"><b>{tr(lang, "API unreachable")}</b> <span className="mono small">{ov.error}</span><button className="btn sm" onClick={() => setTick((x) => x + 1)}>{tr(lang, "Retry")}</button></div>}
             <Health ov={ov.data} loading={ov.loading} error={apiDown ? null : ov.error} reload={ov.reload} />
             <Diagnosis ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
-            <Trend tr={trd.data} loading={trd.loading} error={apiDown ? null : trd.error} reload={trd.reload} />
-            <Explorer tab={state.tab} setTab={(tab) => update({ tab })} products={prods} videos={vids} campaigns={camps} creators={crs} />
+            <Trend tr={trd.data} ov={ov.data} loading={trd.loading} error={apiDown ? null : trd.error} reload={trd.reload} />
+            <Explorer tab={state.tab} setTab={(tab) => update({ tab })} apiDown={apiDown} products={prods} videos={vids} campaigns={camps} creators={crs} />
             <VideoProducts vp={vp.data} loading={vp.loading} error={apiDown ? null : vp.error} reload={vp.reload} />
             <Funnel fn={fn.data} loading={fn.loading} error={apiDown ? null : fn.error} reload={fn.reload} />
             <Opps ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} />

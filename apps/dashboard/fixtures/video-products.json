@@ -805,8 +805,8 @@
        "gmv": "190000",
        "orders_per_day": "0.29"
       },
-      "lift_pct": "-0.5",
-      "verdict": "negative",
+      "lift_pct": null,
+      "verdict": "out_of_range",
       "note": "orders/day 7d after publish vs 7d before, all traffic (association)"
      },
      {
