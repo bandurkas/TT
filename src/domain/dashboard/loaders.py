@@ -53,17 +53,23 @@ def products(session: Any, shop_id: int) -> dict[int, Any]:
 
 
 def shop_funnel_by_day(session: Any, shop_id: int, start: date, end: date) -> dict[date, tuple[int, int]]:
-    """(impressions=views, clicks) per day from product-level metrics (sku_id IS NULL rows)."""
-    q = (select(ProductMetric.metric_date, func.sum(ProductMetric.views), func.sum(ProductMetric.clicks))
-         .join(Product, Product.id == ProductMetric.product_id)
-         .where(Product.shop_id == shop_id, ProductMetric.sku_id.is_(None),
-                ProductMetric.metric_date >= start, ProductMetric.metric_date <= end)
-         .group_by(ProductMetric.metric_date))
-    return {d: (int(v or 0), int(c or 0)) for d, v, c in session.execute(q)}
+    """(views, derived clicks = Σ views × ctr) per day from video_metrics. Product performance API
+    carries no impressions/clicks (verified 2026-08-31), so the funnel top is video traffic only."""
+    q = (select(VideoMetric.metric_date, VideoMetric.views, VideoMetric.product_clicks, VideoMetric.ctr)
+         .join(Video, Video.id == VideoMetric.video_id)
+         .where(Video.shop_id == shop_id, VideoMetric.metric_hour.is_(None),
+                VideoMetric.metric_date >= start, VideoMetric.metric_date <= end))
+    out: dict[date, list[int]] = defaultdict(lambda: [0, 0])
+    for d, views, clicks, ctr in session.execute(q):
+        v = int(views or 0)
+        out[d][0] += v
+        out[d][1] += int(clicks or 0) or int((Decimal(v) * Decimal(str(ctr or 0))).to_integral_value())
+    return {d: (a, b) for d, (a, b) in out.items()}
 
 
 def product_funnel(session: Any, shop_id: int, start: date, end: date
                    ) -> dict[tuple[int, date], tuple[int, int, int]]:
+    """Product-level (views, clicks, refunds) per day; views/clicks are 0 from this API (see above)."""
     q = (select(ProductMetric.product_id, ProductMetric.metric_date, ProductMetric.views,
                 ProductMetric.clicks, ProductMetric.refunds)
          .join(Product, Product.id == ProductMetric.product_id)

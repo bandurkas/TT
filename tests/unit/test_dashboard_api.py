@@ -71,6 +71,7 @@ def test_overview_shape_and_period():
     assert body["compare"] == {"start": "2026-07-01", "end": "2026-07-31"}
     cards = {c["key"]: c for c in body["cards"]}
     assert cards["net_profit"]["value"] == "230000" and cards["orders"]["value"] == "5"
+    assert cards["gmv"]["sparkline"][-1] == "0" and cards["net_margin"]["value"] == "0.5055"
     assert cards["reported_roas"]["value"] is None
     assert body["health"]["components"]["data_quality"] == body["data_quality"]["score"]
     assert any("BLENDED" in n for n in body["notes"]) and body["shop"]["currency"] == "IDR"

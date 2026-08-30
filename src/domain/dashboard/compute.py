@@ -46,6 +46,17 @@ def pct_change(cur: Decimal | None, prev: Decimal | None) -> Decimal | None:
     return ((cur - prev) / abs(prev)).quantize(PCT)
 
 
+def normalize(obj: Any) -> Any:
+    """Decimal -> exponent-free string (25000 not 25000.000000); recurses into dict/list."""
+    if isinstance(obj, Decimal):
+        return format(obj.normalize() if obj != ZERO else ZERO, "f")
+    if isinstance(obj, dict):
+        return {k: normalize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [normalize(v) for v in obj]
+    return obj
+
+
 def clamp(v: Decimal, lo: Decimal = ZERO, hi: Decimal = Decimal(100)) -> int:
     return int(max(lo, min(hi, v)).quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
@@ -293,8 +304,8 @@ def product_status(t: Totals, floor: Decimal, min_orders: int) -> tuple[str, str
         return "REDUCE", f"net loss {t.net_profit}"
     if m < floor:
         return "INVESTIGATE", f"margin {m} below floor {floor}"
-    if m >= 2 * floor and (t.cvr or ZERO) > 0:
-        return "SCALE", f"margin {m} ≥ 2× floor"
+    if m >= 2 * floor and t.orders >= 2 * min_orders:
+        return "SCALE", f"margin {m} ≥ 2× floor on {t.orders} orders"
     return "HEALTHY", f"margin {m}"
 
 
@@ -343,8 +354,9 @@ def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[in
         for r in rows:
             if not (period.start <= r.metric_date <= period.end):
                 continue
-            imp += int(r.impressions or 0)
-            clk += int(r.product_clicks or 0)
+            v = int(r.views or 0)
+            imp += int(r.impressions or 0) or v
+            clk += int(r.product_clicks or 0) or int((Decimal(v) * _d(r.ctr)).to_integral_value())
             orders += int(r.orders or 0)
             views += int(r.views or 0)
             gmv += _d(r.gmv)
@@ -393,6 +405,12 @@ class FunnelCounts:
                 FunnelStage("settled", self.settled)]
 
 
+STAGE_NOTES = {"impression": "video views (Shop API analytics)",
+               "click": "derived: views × click_through_rate (no click count in API)",
+               "order": "orders with a profit row", "completed": "COMPLETED/DELIVERED orders",
+               "settled": "orders with a settled statement (lags 8–10 days; not a conversion)"}
+
+
 def funnel_view(cur: FunnelCounts, base: FunnelCounts, avg_profit_per_order: Decimal | None,
                 min_stage_count: int = 30) -> dict[str, Any]:
     cs, bs = cur.stages(), base.stages()
@@ -401,13 +419,19 @@ def funnel_view(cur: FunnelCounts, base: FunnelCounts, avg_profit_per_order: Dec
         c_rate = ratio(cs[i].count, cs[i - 1].count)
         b_rate = ratio(bs[i].count, bs[i - 1].count)
         steps.append({"from": cs[i - 1].name, "to": cs[i].name, "count": cs[i].count,
-                      "rate": c_rate, "baseline_rate": b_rate, "delta_pct": pct_change(c_rate, b_rate)})
-    diag: FunnelDiagnosis | None = detect_funnel_deterioration(cs, bs, avg_profit_per_order, min_stage_count)
-    return {"stages": [{"name": s.name, "count": s.count} for s in cs], "steps": steps,
+                      "rate": c_rate, "baseline_rate": b_rate, "delta_pct": pct_change(c_rate, b_rate),
+                      "timing_only": cs[i].name == "settled"})
+    # settlement is a timing stage, never a conversion problem -> excluded from deterioration search
+    diag: FunnelDiagnosis | None = detect_funnel_deterioration(cs[:-1], bs[:-1], avg_profit_per_order,
+                                                               min_stage_count)
+    return {"stages": [{"name": s.name, "count": s.count, "note": STAGE_NOTES.get(s.name)} for s in cs],
+            "steps": steps,
             "diagnosis": None if diag is None else {
-                "stage_from": diag.stage_from, "stage_to": diag.stage_to, "current_rate": diag.current_rate,
-                "baseline_rate": diag.baseline_rate, "delta_pct": diag.delta_pct,
-                "lost_orders": diag.lost_orders, "lost_profit": diag.lost_profit,
+                "stage_from": diag.stage_from, "stage_to": diag.stage_to,
+                "current_rate": diag.current_rate.quantize(PCT), "baseline_rate": diag.baseline_rate.quantize(PCT),
+                "delta_pct": (diag.delta_pct / 100).quantize(PCT),
+                "lost_orders": diag.lost_orders.quantize(Decimal(1)),
+                "lost_profit": diag.lost_profit.quantize(Decimal(1)) if diag.lost_profit is not None else None,
                 "evidence": list(diag.evidence), "estimated": True},
             "baseline_note": "baseline = previous comparable period"}
 

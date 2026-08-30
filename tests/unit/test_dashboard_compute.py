@@ -85,9 +85,11 @@ def test_product_rows_status_rules():
     meta = {1: NS(title="A", external_product_id="x1"), 3: NS(title="C", external_product_id="x3")}
     out = C.product_rows(rows, meta, AUG, {(1, date(2026, 8, 1)): (1000, 100, 1)}, D("0.10"), 5)
     by = {r["product_id"]: r for r in out}
-    assert by[1]["status"] == "SCALE" and by[1]["cvr"] == D("0.07") and by[1]["title"] == "A"
+    assert by[1]["status"] == "HEALTHY" and by[1]["cvr"] == D("0.07") and by[1]["title"] == "A"  # 7 < 10 orders
     assert by[2]["status"] == "SMALL_SAMPLE" and by[2]["title"] == "product 2"
-    assert by[3]["status"] == "HEALTHY" and by[3]["ad_cost"] == D(0)  # no CVR data -> not SCALE
+    assert by[3]["status"] == "HEALTHY" and by[3]["ad_cost"] == D(0)
+    big = [prow(5, date(2026, 8, k), ads=0) for k in range(1, 12)]
+    assert C.product_rows(big, {}, AUG, {}, D("0.10"), 5)[0]["status"] == "SCALE"
     assert out[0]["net_profit"] >= out[-1]["net_profit"]
     loss = C.product_status(C.Totals(orders=6, net_seller_revenue=D(100), net_profit=D(-5)), D("0.1"), 5)
     assert loss[0] == "REDUCE"
@@ -96,8 +98,9 @@ def test_product_rows_status_rules():
 
 
 def test_video_cards_classification_and_sorting():
-    def vm(d, imp, clk, orders, gmv, views):
-        return NS(metric_date=d, impressions=imp, product_clicks=clk, orders=orders, gmv=D(gmv), views=views)
+    def vm(d, imp, clk, orders, gmv, views, ctr=None):
+        return NS(metric_date=d, impressions=imp, product_clicks=clk, orders=orders, gmv=D(gmv), views=views,
+                  ctr=ctr)
     daily = {1: [vm(date(2026, 8, 20), 5000, 150, 6, 480000, 6000)],
              2: [vm(date(2026, 8, 20), 5000, 40, 0, 0, 5000)],
              3: [vm(date(2026, 8, 20), 100, 1, 0, 0, 120)],
@@ -112,15 +115,27 @@ def test_video_cards_classification_and_sorting():
     assert by[3]["classification"] == "INSUFFICIENT_DATA"
     assert by[1]["ad_spend"] is None and "NOT_AVAILABLE" in by[1]["ad_spend_note"]
     assert by[1]["age_days"] == 21
+    derived = C.video_cards({9: [vm(date(2026, 8, 20), None, 0, 2, 100000, 4000, D("0.025"))]},
+                            {9: NS(external_video_id="v9", caption=None, published_at=None, duration_seconds=None)},
+                            AUG, date(2026, 8, 31), ScoringConfig(minimum_sample_impressions=1000))[0]
+    assert derived["impressions"] == 4000 and derived["clicks"] == 100 and derived["ctr"] == D("0.025")
+
+
+def test_normalize_decimals():
+    out = C.normalize({"a": D("25000.000000"), "b": [D("0E-6"), D("-1.50")], "c": {"d": D("0.1156")}, "e": 1})
+    assert out == {"a": "25000", "b": ["0", "-1.5"], "c": {"d": "0.1156"}, "e": 1}
 
 
 def test_funnel_view_and_waterfall():
     cur = C.FunnelCounts(10000, 100, 5, 4, 3)
     base = C.FunnelCounts(10000, 200, 10, 9, 9)
     f = C.funnel_view(cur, base, D(50000))
-    assert f["stages"][0] == {"name": "impression", "count": 10000}
+    assert f["stages"][0]["name"] == "impression" and f["stages"][0]["count"] == 10000
     assert f["steps"][0]["rate"] == D("0.01") and f["steps"][0]["baseline_rate"] == D("0.02")
     assert f["diagnosis"]["stage_from"] == "impression" and f["diagnosis"]["estimated"] is True
+    assert f["diagnosis"]["delta_pct"] == D("-0.5") and f["steps"][-1]["timing_only"] is True
+    lag = C.funnel_view(C.FunnelCounts(1000, 100, 50, 45, 10), C.FunnelCounts(1000, 100, 50, 45, 45), D(1))
+    assert lag["diagnosis"] is None  # settlement lag is not a deterioration
     profits = [NS(profit_status="SETTLED", sale_proceeds=D(100000), seller_discounts=D(9000), refunds=D(0),
                   platform_fees=D(8000), affiliate_commission=D(2000), seller_shipping=D(500), taxes=D(0),
                   subsidies=D(0), adjustments=D(0), cogs=D(25000), packaging=D(0), inbound_logistics=D(0),

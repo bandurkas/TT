@@ -64,6 +64,10 @@ def ctx_dep(shop_id: int | None = None, start: date | None = Query(None, alias="
         raise HTTPException(404, str(e)) from e
 
 
+def _n(d: dict[str, Any]) -> dict[str, Any]:
+    return C.normalize(d)
+
+
 def _overview(c: Ctx) -> dict[str, Any]:
     cur, prev = c.totals(c.period), c.totals(c.compare)
     rows = L.shop_daily(c.session, c.shop.id, c.period.start, c.period.end)
@@ -82,7 +86,7 @@ def _overview(c: Ctx) -> dict[str, Any]:
 
 @router.get("/dashboard/overview")
 def overview(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
-    return _overview(c)
+    return _n(_overview(c))
 
 
 @router.get("/dashboard/trends")
@@ -99,10 +103,10 @@ def trends(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
                            "label": f"new video {v.external_video_id}"})
     events.sort(key=lambda e: e["date"])
     sm = L.shop_metrics(c.session, c.shop.id, c.period.start, c.period.end)
-    return {**c.meta(), "series": series, "events": events,
+    return _n({**c.meta(), "series": series, "events": events,
             "gmv_sources": [{"date": m.metric_date, "gmv_total": m.gmv_total, "gmv_video": m.gmv_video,
                              "gmv_product_card": m.gmv_product_card, "gmv_live": m.gmv_live,
-                             "gmv_max_pct": m.gross_revenue_gmv_max_pct} for m in sm]}
+                             "gmv_max_pct": m.gross_revenue_gmv_max_pct} for m in sm]})
 
 
 @router.get("/analytics/products")
@@ -110,7 +114,8 @@ def products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     pd = L.product_daily(c.session, c.shop.id, c.period.start, c.period.end)
     pf = L.product_funnel(c.session, c.shop.id, c.period.start, c.period.end)
     rows = C.product_rows(pd, L.products(c.session, c.shop.id), c.period, pf, c.floor, c.min_orders)
-    return {**c.meta(), "rows": rows, "ad_cost_note": "BLENDED estimate (shop-level deductions split by revenue)"}
+    return _n({**c.meta(), "rows": rows, "cvr_note": C.NOT_AVAILABLE + ": product clicks not in Shop API",
+               "ad_cost_note": "BLENDED estimate (shop-level deductions split by revenue)"})
 
 
 def _videos(c: Ctx) -> list[dict[str, Any]]:
@@ -123,22 +128,24 @@ def _videos(c: Ctx) -> list[dict[str, Any]]:
 
 @router.get("/analytics/videos")
 def videos(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
-    return {**c.meta(), "cards": _videos(c), "ad_spend_note": C.NOT_AVAILABLE + ": per-video ad cost needs Ads API"}
+    return _n({**c.meta(), "cards": _videos(c),
+               "clicks_note": "derived: views × click_through_rate", 
+               "ad_spend_note": C.NOT_AVAILABLE + ": per-video ad cost needs Ads API"})
 
 
 @router.get("/analytics/campaigns")
 def campaigns(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     ded = L.ad_deductions(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
-    return {**c.meta(), "available": False, "reason": "TikTok Ads app pending approval",
-            "shop_level_ad_cost": sum((d["amount"] for d in ded), Decimal(0)), "deductions": ded, "rows": []}
+    return _n({**c.meta(), "available": False, "reason": "TikTok Ads app pending approval",
+               "shop_level_ad_cost": sum((d["amount"] for d in ded), Decimal(0)), "deductions": ded, "rows": []})
 
 
 @router.get("/analytics/creators")
 def creators(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     rows, _, _ = L.current_profits(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
     agg = L.affiliate_totals(rows)
-    return {**c.meta(), "rows": [{"creator": "Affiliate (aggregated)", **agg}],
-            "note": "Per-creator attribution NOT AVAILABLE from Shop API orders; affiliate commission is measured."}
+    return _n({**c.meta(), "rows": [{"creator": "Affiliate (aggregated)", **agg}],
+               "note": "Per-creator attribution NOT AVAILABLE from Shop API orders; affiliate commission is measured."})
 
 
 def _funnel(c: Ctx) -> dict[str, Any]:
@@ -152,7 +159,7 @@ def _funnel(c: Ctx) -> dict[str, Any]:
 @router.get("/dashboard/funnel")
 def funnel(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     rows, _, _ = L.current_profits(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
-    return {**c.meta(), **_funnel(c), "waterfall": C.waterfall(rows)}
+    return _n({**c.meta(), **_funnel(c), "waterfall": C.waterfall(rows)})
 
 
 @router.get("/dashboard/insights")
@@ -162,10 +169,10 @@ def insights(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     pf = L.product_funnel(c.session, c.shop.id, c.period.start, c.period.end)
     prods = C.product_rows(pd, L.products(c.session, c.shop.id), c.period, pf, c.floor, c.min_orders)
     items = I.findings(cur, prev, c.floor, prods, _videos(c), _funnel(c), c.min_orders)
-    return {**c.meta(), "findings": items,
-            "opportunities": [f for f in items if f["kind"] == "opportunity"],
-            "risks": [f for f in items if f["kind"] == "risk" and f["severity"] in ("CRITICAL", "WARNING")],
-            "note": "Deterministic rules; impact = estimate unless measured=true. LLM narrative: not enabled."}
+    return _n({**c.meta(), "findings": items,
+               "opportunities": [f for f in items if f["kind"] == "opportunity"],
+               "risks": [f for f in items if f["kind"] == "risk" and f["severity"] in ("CRITICAL", "WARNING")],
+               "note": "Deterministic rules; impact = estimate unless measured=true. LLM narrative: not enabled."})
 
 
 # --- tasks (existing `tasks` table: why/expected_impact/source_entity/evaluation JSONB) ---------
