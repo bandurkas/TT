@@ -69,11 +69,11 @@ def ctx(o, items=None, rec=None, skus=None):
                     sku_records=skus or [], sku_external_by_id=SKU_MAP, product_by_sku_ext=PROD_MAP)
 
 
-def inputs(orders, settlements=(), cost=COST, fee_records=None):
+def inputs(orders, settlements=(), cost=COST, fee_records=None, default_cogs=None):
     return ProfitInputs(shop_id=1, currency="IDR", timezone=TZ, orders=orders, cost_versions=list(cost),
                         settlements=list(settlements),
                         fee_ratio_records=[c.record for c in orders if c.record] if fee_records is None
-                        else fee_records)
+                        else fee_records, default_cogs=default_cogs)
 
 
 # --- txn building ----------------------------------------------------------------------------
@@ -111,6 +111,21 @@ def test_missing_cogs_flagged_not_raised():
     p = res[0]
     assert p.profit.costs.cogs == 0 and p.snapshot["cogs_missing"] is True
     assert any(w.startswith("COGS missing") for w in p.profit.warnings)
+
+
+def test_missing_cogs_uses_shop_default_when_set():
+    res = compute_from_inputs(inputs([ctx(order(), rec=record(), skus=[sku_record(qty=2)])],
+                                     cost=[], default_cogs=D(25000)), NOW)
+    p = res[0]
+    assert p.profit.costs.cogs == D(50000)
+    assert p.snapshot["cogs_missing"] is True and p.snapshot["cogs_default_used"] is True
+    assert any("shop default 25000" in w for w in p.profit.warnings)
+    assert p.snapshot["cost_versions"] == [(SKU, "1970-01-01", "25000")]
+
+
+def test_known_cogs_not_overridden_by_default():
+    res = compute_from_inputs(inputs([ctx(order(), rec=record())], default_cogs=D(1)), NOW)
+    assert res[0].profit.costs.cogs == D(25000) and res[0].snapshot["cogs_default_used"] is False
 
 
 def test_items_fallback_to_sku_records_when_no_order_items():

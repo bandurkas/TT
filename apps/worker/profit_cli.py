@@ -1,4 +1,5 @@
-"""python -m apps.worker.profit_cli compute [--since YYYY-MM-DD] | report --month YYYY-MM [--json]"""
+"""python -m apps.worker.profit_cli compute [--since YYYY-MM-DD] | report --month YYYY-MM [--json]
+| config [--default-cogs N]"""
 import argparse
 import json
 import logging
@@ -9,7 +10,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from src.config.settings import settings
-from src.db.models import Shop
+from src.db.models import Shop, ShopConfig
 from src.db.models_profit import ShopDaily
 from src.db.session import SessionLocal
 from src.domain.profit import aggregates, jobs
@@ -34,6 +35,21 @@ def cmd_compute(session, shop_id: int | None, since: date | None) -> dict:
     agg = aggregates.recompute_daily(session, shop.id, res["dates"] or None, shop.timezone)
     return {"shop_id": shop.id, **{k: v for k, v in res.items() if k != "dates"},
             "dates": [str(d) for d in res["dates"]], **agg}
+
+
+def cmd_config(session, shop_id: int | None, default_cogs: Decimal | None) -> dict:
+    shop = pick_shop(session, shop_id)
+    cfg = session.scalar(select(ShopConfig).where(ShopConfig.shop_id == shop.id))
+    if cfg is None:
+        cfg = ShopConfig(shop_id=shop.id)
+        session.add(cfg)
+    if default_cogs is not None:
+        if default_cogs < 0:
+            raise SystemExit("default cogs must be >= 0")
+        cfg.default_cogs_per_unit = default_cogs
+    session.commit()
+    return {"shop_id": shop.id, "default_cogs_per_unit": cfg.default_cogs_per_unit,
+            "currency": shop.currency}
 
 
 def month_range(month: str) -> tuple[date, date]:
@@ -94,11 +110,16 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--since", type=date.fromisoformat, default=None)
     sp = sub.add_parser("report")
     sp.add_argument("--month", required=True, help="YYYY-MM")
+    sp = sub.add_parser("config")
+    sp.add_argument("--default-cogs", type=Decimal, default=None, help="fallback COGS per unit")
     a = p.parse_args(argv)
     logging.basicConfig(level=settings.log_level, format="%(asctime)s %(name)s %(message)s")
     with SessionLocal() as session:
         if a.cmd == "compute":
             print(json.dumps(cmd_compute(session, a.shop_id, a.since), default=str))
+            return 0
+        if a.cmd == "config":
+            print(json.dumps(cmd_config(session, a.shop_id, a.default_cogs), default=str))
             return 0
         shop = pick_shop(session, a.shop_id)
         rows = report_rows(session, shop.id, a.month)

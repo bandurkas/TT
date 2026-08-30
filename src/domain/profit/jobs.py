@@ -34,7 +34,7 @@ from src.analytics.profitability import (
 )
 from src.analytics.profitability import OrderProfit as EngineProfit
 from src.analytics.transaction_types import quantum
-from src.db.models import Order, OrderItem, Product, Settlement, Shop, Sku, SkuCostVersion
+from src.db.models import Order, OrderItem, Product, Settlement, Shop, ShopConfig, Sku, SkuCostVersion
 from src.db.models import OrderProfit as OrderProfitRow
 from src.db.models_finance import (
     STATEMENT_AMOUNT_FIELDS,
@@ -74,6 +74,7 @@ class ProfitInputs:
     cost_versions: list[CostVersion]  # sku_id = external sku id
     settlements: list[Any]  # Settlement-like rows
     fee_ratio_records: list[Any] = field(default_factory=list)  # settled records for fee ratio
+    default_cogs: Decimal | None = None  # shop_config.default_cogs_per_unit
 
 
 @dataclass
@@ -175,17 +176,24 @@ def build_items(ctx: OrderCtx, currency: str) -> list[OrderItemInput]:
 
 
 def cost_versions_with_fallback(versions: Sequence[CostVersion], items: Sequence[OrderItemInput],
-                                on: date, currency: str) -> tuple[list[CostVersion], list[str]]:
-    """Missing COGS -> zero-cost version + warning (never raise, never hide)."""
+                                on: date, currency: str,
+                                default_cogs: Decimal | None = None) -> tuple[list[CostVersion], list[str]]:
+    """Missing COGS -> shop default (if set) else zero-cost version; always a warning."""
     out = list(versions)
     warnings: list[str] = []
+    seen: set[str] = set()
     for it in items:
+        if it.sku_id in seen:
+            continue
         try:
             pick_cost_version(versions, it.sku_id, on)
         except LookupError:
-            warnings.append(f"COGS missing for sku {it.sku_id} on {on}; cogs=0")
+            seen.add(it.sku_id)
+            per_unit = default_cogs if default_cogs is not None else ZERO
+            src = f"shop default {per_unit}" if default_cogs is not None else "cogs=0"
+            warnings.append(f"COGS missing for sku {it.sku_id} on {on}; {src}")
             out.append(CostVersion(sku_id=it.sku_id, effective_from=NO_COGS_VERSION_FROM,
-                                   effective_to=None, cogs_per_unit=ZERO, currency=currency))
+                                   effective_to=None, cogs_per_unit=per_unit, currency=currency))
     return out, warnings
 
 
@@ -323,7 +331,7 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None) -> list[
         else:
             txns, warns = estimate_provisional(ctx.order, items, fee_ratio, cur)
             est = True
-        versions, cw = cost_versions_with_fallback(inp.cost_versions, items, d, cur)
+        versions, cw = cost_versions_with_fallback(inp.cost_versions, items, d, cur, inp.default_cogs)
         prepared.append((ctx, d, items, txns, versions, warns + cw, est))
 
     net_by_order = {str(ctx.order.id): (d, revenue_breakdown(txns, cur).net_seller_revenue)
@@ -357,6 +365,7 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None) -> list[
             "cost_versions": sorted({(ip.cost_version.sku_id, str(ip.cost_version.effective_from),
                                       str(ip.cost_version.cogs_per_unit)) for ip in p.items}),
             "cogs_missing": any(w.startswith("COGS missing") for w in warns),
+            "cogs_default_used": any("shop default" in w for w in warns),
             "ad_cost": str(p.allocated_ad_cost), "ad_method": "BLENDED", "ad_window_days": AD_WINDOW_DAYS,
             "status": p.profit_status.value, "local_date": str(d), "warnings": list(p.warnings),
         }
@@ -459,8 +468,11 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
                                     inbound_logistics_per_unit=_dec(v.inbound_logistics_per_unit),
                                     other_variable_cost_per_unit=_dec(v.other_variable_cost_per_unit)))
     settlements = list(session.scalars(select(Settlement).where(Settlement.shop_id == shop_id)))
+    cfg = session.scalar(select(ShopConfig).where(ShopConfig.shop_id == shop_id))
+    default_cogs = _dec(cfg.default_cogs_per_unit) if cfg and cfg.default_cogs_per_unit is not None else None
     return ProfitInputs(shop_id=shop_id, currency=shop.currency, timezone=tz, orders=ctxs,
-                        cost_versions=versions, settlements=settlements, fee_ratio_records=settled)
+                        cost_versions=versions, settlements=settlements, fee_ratio_records=settled,
+                        default_cogs=default_cogs)
 
 
 def load_current_rows(session: Any, order_ids: Sequence[int]) -> dict[int, Any]:

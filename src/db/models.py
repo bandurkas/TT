@@ -76,6 +76,7 @@ class ShopConfig(PKMixin, TimestampMixin, Base):
     alert_cooldown_minutes: Mapped[int] = mapped_column(Integer, default=360)
     report_time_local: Mapped[str] = mapped_column(String(5), default="08:00")
     operating_mode: Mapped[str] = mapped_column(String(32), default="MODE_2")  # SPEC §31
+    default_cogs_per_unit: Mapped[Decimal | None] = mapped_column(Money)  # fallback for SKUs w/o cost version
     extra: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
