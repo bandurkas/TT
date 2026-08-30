@@ -4,6 +4,7 @@ docs/tiktok-api-capability-matrix.md; getters accept aliases and {amount,currenc
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from src.db.models_finance import STATEMENT_AMOUNT_FIELDS
 
@@ -29,9 +30,15 @@ def cur(v: Any, default: str | None = None) -> str | None:
     return default
 
 
+SHOP_TZ = ZoneInfo("Asia/Jakarta")  # UNVERIFIED: analytics datetime strings assumed in shop tz
+
+
 def ts(v: Any) -> datetime | None:
     if v in (None, "", 0, "0"):
         return None
+    if isinstance(v, str) and not v.strip().lstrip("-").isdigit():
+        d = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+        return (d if d.tzinfo else d.replace(tzinfo=SHOP_TZ)).astimezone(UTC)
     n = int(v)
     if n > 10**11:  # milliseconds
         n //= 1000

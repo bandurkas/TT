@@ -166,3 +166,13 @@ def test_migration_covers_model_columns():
             assert f'"{c.name}"' in src or f"'{c.name}'" in src, (model.__tablename__, c.name)
     assert "'extra'" in src and "'payout_type'" in src
     assert hasattr(Settlement, "extra") and "extra" in Settlement.__table__.columns
+
+
+def test_ts_parses_datetime_string_in_shop_tz():
+    from datetime import UTC, datetime
+
+    from src.domain.ingest.mappers import ts
+    d = ts("2026-07-04 09:16:58")
+    assert d == datetime(2026, 7, 4, 2, 16, 58, tzinfo=UTC)
+    assert ts("1787356800") == datetime.fromtimestamp(1787356800, UTC)
+    assert ts("2026-07-04T09:16:58Z") == datetime(2026, 7, 4, 9, 16, 58, tzinfo=UTC)

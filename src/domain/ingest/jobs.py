@@ -77,7 +77,7 @@ def _run(ctx: IngestContext, resource: str, fn) -> dict[str, Any]:
         ctx.session.rollback()
         ctx.state.mark_error(*key, f"{type(e).__name__}: {e}")
         log.exception("%s failed", resource)
-        raise
+        return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
 
 
 # --- bootstrap ---------------------------------------------------------------------
