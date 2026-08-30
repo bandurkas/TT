@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     tiktok_shop_app_key: str = ""
     tiktok_shop_app_secret: str = ""
     token_store_dir: str = "data"
+    tiktok_ads_app_id: str = ""
+    tiktok_ads_secret: str = ""
 
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""

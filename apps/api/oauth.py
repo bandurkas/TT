@@ -3,11 +3,13 @@ import logging
 from fastapi import APIRouter, Request
 
 from src.config.settings import settings
+from src.integrations.tiktok_ads.auth import AdsAuthError, exchange_auth_code
 from src.integrations.tiktok_shop.auth import ShopAuthError, TokenStore, exchange_code
 
 log = logging.getLogger("tt.oauth")
 router = APIRouter(prefix="/oauth")
 shop_store = TokenStore(f"{settings.token_store_dir}/tiktok_shop_tokens.json")
+ads_store = TokenStore(f"{settings.token_store_dir}/tiktok_ads_tokens.json")
 
 
 @router.get("/tiktok-shop/callback")
@@ -46,4 +48,24 @@ async def tiktok_ads_callback(request: Request) -> dict:
     params = dict(request.query_params)
     code = params.get("auth_code")
     log.info("tiktok-ads callback received=%s keys=%s", bool(code), sorted(params))  # never log code
-    return {"received": bool(code), "params": sorted(params), "note": "exchange not implemented yet"}
+    if not code:
+        return {"ok": False, "error": "no auth_code in query", "params": sorted(params)}
+    if not settings.tiktok_ads_app_id:
+        return {"ok": False, "error": "ads app id not configured"}
+    try:
+        data = exchange_auth_code(settings.tiktok_ads_app_id, settings.tiktok_ads_secret, code)
+    except AdsAuthError as e:
+        log.error("ads token exchange failed: code=%s status=%s message=%s", e.code, e.status, e.message)
+        return {"ok": False, "error": "token exchange failed"}
+    except Exception as e:  # noqa: BLE001
+        log.error("ads token exchange failed: %s", type(e).__name__)
+        return {"ok": False, "error": "token exchange failed"}
+    ads_store.save(data)
+    log.info("tiktok-ads token stored advertisers=%s", data.get("advertiser_ids"))
+    return {"ok": True, "advertiser_ids": data.get("advertiser_ids"), "scope": data.get("scope"),
+            "note": "token stored; you can close this tab"}
+
+
+@router.get("/tiktok-ads/status")
+async def tiktok_ads_status() -> dict:
+    return {"configured": bool(settings.tiktok_ads_app_id), "tokens": ads_store.public_view()}

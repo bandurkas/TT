@@ -56,4 +56,4 @@ def test_shop_callback_unexpected_error_generic(monkeypatch, tmp_path, caplog):
 def test_ads_callback_never_logs_code(caplog):
     caplog.set_level(logging.INFO)
     r = TestClient(app).get("/oauth/tiktok-ads/callback?auth_code=SECRETCODE")
-    assert r.json()["received"] is True and "SECRETCODE" not in caplog.text
+    assert r.json()["ok"] is False and "SECRETCODE" not in caplog.text  # app id not configured
