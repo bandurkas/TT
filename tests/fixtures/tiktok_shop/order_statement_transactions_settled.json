@@ -1,0 +1,29 @@
+{
+ "_source": "GET /finance/202309/orders/{id}/statement_transactions, live 2026-08-30, shop Lomira.product (ID). PII-free.",
+ "order_id": "585489904998712566",
+ "order_create_time": 1786780800,
+ "statement_transactions": [
+  {"id": "7672624939999987473", "statement_id": "7676544904109082376", "statement_time": 1787356800, "status": "SETTLED", "currency": "IDR",
+   "gross_sales_amount": "100000", "gross_sales_refund_amount": "0", "revenue_amount": "100000", "net_sales_amount": "100000",
+   "seller_discount_amount": "0", "seller_discount_refund_amount": "0", "platform_discount_amount": "-2155", "platform_discount_refund_amount": "0",
+   "after_seller_discounts_subtotal_amount": "100637", "customer_payment_amount": "124982", "customer_refund_amount": "0", "customer_order_refund_amount": "0",
+   "fee_amount": "-19518", "platform_commission_amount": "0", "referral_fee_amount": "0", "transaction_fee_amount": "0",
+   "affiliate_commission_amount": "-7338", "affiliate_commission_before_pit": "-7338", "affiliate_ads_commission_amount": "0", "affiliate_partner_commission_amount": "0",
+   "shipping_cost_amount": "-2930", "shipping_fee_amount": "-26500", "actual_shipping_fee_amount": "-51500", "customer_shipping_fee_amount": "26500",
+   "customer_paid_shipping_fee_amount": "26500", "customer_paid_shipping_fee_refund_amount": "0", "customer_shipping_fee_offset_amount": "0",
+   "platform_shipping_fee_discount_amount": "25000", "shipping_fee_subsidy_amount": "0", "shipping_cost_discount_amount": "0", "promo_shipping_incentive_amount": "0",
+   "shipping_insurance_fee_amount": "0", "signature_confirmation_fee_amount": "0", "return_shipping_fee_amount": "0", "actual_return_shipping_fee_amount": "0",
+   "refund_administration_fee_amount": "0", "refund_shipping_cost_discount_amount": "0", "platform_refund_subsidy_amount": "0",
+   "fbm_shipping_cost_amount": "0", "fbt_fulfillment_fee_amount": "0", "fbt_fulfillment_fee_reimbursement_amount": "0", "fbt_shipping_cost_amount": "0",
+   "retail_delivery_fee_amount": "0", "retail_delivery_fee_payment_amount": "0", "retail_delivery_fee_refund_amount": "0",
+   "sales_tax_amount": "0", "sales_tax_payment_amount": "0", "sales_tax_refund_amount": "0", "isr_income_tax_amount": "0", "iva_vat_amount": "0", "pit_amount": "0",
+   "adjustment_amount": "0", "settlement_amount": "80482",
+   "sku_statement_transactions": [
+    {"sku_id": "1736823576747934791", "sku_name": "Dewasa: 41-47", "product_name": "Socks Kaos Kaki Pria Hitam 5 Pasang 85% Katun, Anti Bau, Tebal Lembut, Anti Gerah!", "quantity": 1,
+     "gross_sales_amount": "100000", "revenue_amount": "100000", "platform_discount_amount": "-2155", "fee_amount": "-19518", "affiliate_commission_amount": "-7338",
+     "shipping_cost_amount": "-2930", "shipping_fee_amount": "-26500", "customer_shipping_fee_amount": "26500", "platform_shipping_fee_discount_amount": "25000",
+     "actual_shipping_fee_amount": "-51500", "settlement_amount": "80482", "currency": "IDR"}
+   ]}
+ ],
+ "_observed_identity": "settlement_amount == revenue_amount + fee_amount + adjustment_amount (100000 - 19518 + 0 = 80482); second order: 200000 - 17940 = 182060. fee_amount aggregates commission/affiliate/shipping cost components."
+}
