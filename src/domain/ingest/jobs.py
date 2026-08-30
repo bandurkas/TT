@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from src.analytics.finance_fields import SETTLED_STATUSES
@@ -21,6 +21,8 @@ from src.db.models import (
     Sku,
     Video,
     VideoMetric,
+    VideoProduct,
+    VideoProductMetric,
 )
 from src.db.models_finance import OrderStatementRecord, OrderStatementSkuRecord, ShopMetric
 from src.domain.ingest import mappers as m
@@ -290,7 +292,8 @@ def _day_range(day: date) -> tuple[str, str]:
 def sync_video_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
     start, end = _day_range(day)
     vids = video_ids(ctx.session, ctx.shop_id)
-    n = 0
+    pids = product_ids(ctx.session, ctx.shop_id)
+    n = links = 0
     for v in ctx.client.get_video_performance(start, end):
         ext = str(v["id"])
         if ext not in vids:
@@ -298,8 +301,87 @@ def sync_video_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
                                    ["shop_id", "external_video_id"], "external_video_id"))
         upsert(ctx.session, VideoMetric, [m.map_video_metric(v, vids[ext], day, ctx.now)],
                ["video_id", "metric_date", "metric_hour"])
+        links += upsert_video_products(ctx.session, m.map_video_products(v, vids[ext], pids, day))
         n += 1
-    return {"video_metrics": n}
+    return {"video_metrics": n, "video_products": links}
+
+
+def sync_video_product_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
+    """Per video × product breakdown for videos that had views on `day` (1 API call per video).
+    Also fills video_metrics.impressions/product_clicks/ctr from the overall block."""
+    start, end = _day_range(day)
+    pids = product_ids(ctx.session, ctx.shop_id)
+    q = (select(Video.id, Video.external_video_id).join(VideoMetric, VideoMetric.video_id == Video.id)
+         .where(Video.shop_id == ctx.shop_id, VideoMetric.metric_date == day,
+                VideoMetric.metric_hour.is_(None), VideoMetric.views > 0))
+    n_videos = n_rows = 0
+    for vid, ext in ctx.session.execute(q):
+        detail = ctx.client.get_video_performance_detail(ext, start, end)
+        rows, overall = m.map_video_detail(detail, vid, pids, day, ctx.now)
+        if rows:
+            upsert(ctx.session, VideoProductMetric, rows, ["video_id", "product_id", "metric_date"])
+        if overall:
+            ctx.session.execute(update(VideoMetric).where(VideoMetric.video_id == vid,
+                                                          VideoMetric.metric_date == day,
+                                                          VideoMetric.metric_hour.is_(None))
+                                .values(**overall))
+        n_videos += 1
+        n_rows += len(rows)
+    return {"videos": n_videos, "video_product_metrics": n_rows}
+
+
+def upsert_video_products(session: Session, rows: list[dict]) -> int:
+    """first_seen keeps the earliest day, last_seen the latest (upsert per (video, product))."""
+    if not rows:
+        return 0
+    from sqlalchemy.dialects.postgresql import insert
+    stmt = insert(VideoProduct).values(rows)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["video_id", "product_id"],
+        set_={"first_seen": func.least(VideoProduct.first_seen, stmt.excluded.first_seen),
+              "last_seen": func.greatest(VideoProduct.last_seen, stmt.excluded.last_seen)})
+    session.execute(stmt)
+    return len(rows)
+
+
+def backfill_video_products(session: Session, shop_id: int) -> dict[str, int]:
+    """Rebuild video_products from stored raw `video_performance` payloads (no API calls)."""
+    from src.db.models import RawApiResponse
+    vids, pids = video_ids(session, shop_id), product_ids(session, shop_id)
+    rows_by_key: dict[tuple[int, int], dict] = {}
+    q = select(RawApiResponse).where(RawApiResponse.resource == "video_performance",
+                                     RawApiResponse.shop_id == shop_id)
+    n_raw = 0
+    for raw in session.scalars(q):
+        n_raw += 1
+        meta = raw.request_meta or {}
+        day = _meta_day(meta) or raw.fetched_at.date()
+        for v in ((raw.payload or {}).get("data") or {}).get("videos") or []:
+            vid = vids.get(str(v.get("id")))
+            if vid is None:
+                continue
+            for r in m.map_video_products(v, vid, pids, day):
+                k = (r["video_id"], r["product_id"])
+                cur = rows_by_key.get(k)
+                if cur is None:
+                    rows_by_key[k] = r
+                else:
+                    cur["first_seen"] = min(cur["first_seen"], day)
+                    cur["last_seen"] = max(cur["last_seen"], day)
+    n = upsert_video_products(session, list(rows_by_key.values()))
+    session.commit()
+    return {"raw_responses": n_raw, "links": n}
+
+
+def _meta_day(meta: dict) -> date | None:
+    for k in ("start_date_ge", "start_date", "date", "day"):
+        v = meta.get(k) or (meta.get("params") or {}).get(k)
+        if isinstance(v, str) and len(v) >= 10:
+            try:
+                return date.fromisoformat(v[:10])
+            except ValueError:
+                pass
+    return None
 
 
 def sync_product_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
@@ -338,8 +420,9 @@ def sync_shop_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
     return {"shop_metrics": 1}
 
 
-_METRIC_JOBS = {"video_metrics": sync_video_metrics, "product_metrics": sync_product_metrics,
-                "sku_metrics": sync_sku_metrics, "shop_metrics": sync_shop_metrics}
+_METRIC_JOBS = {"video_metrics": sync_video_metrics, "video_product_metrics": sync_video_product_metrics,
+                "product_metrics": sync_product_metrics, "sku_metrics": sync_sku_metrics,
+                "shop_metrics": sync_shop_metrics}
 
 
 def sync_metrics(ctx: IngestContext, days: int = 60, resources: tuple[str, ...] = tuple(_METRIC_JOBS)

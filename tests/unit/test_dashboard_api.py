@@ -31,7 +31,7 @@ def patches():
             patch.object(A.L, "today_local", lambda shop: date(2026, 8, 31)),
             patch.object(A.L, "shop_daily", lambda s, sid, a, b: [_row(date(2026, 8, k)) for k in range(1, 6)
                                                                   if a <= date(2026, 8, k) <= b]),
-            patch.object(A.L, "shop_funnel_by_day", lambda s, sid, a, b: {date(2026, 8, 1): (1000, 50)}),
+            patch.object(A.L, "shop_funnel_by_day", lambda s, sid, a, b: {date(2026, 8, 1): (1000, 50, 3)}),
             patch.object(A.L, "current_profits", lambda s, sid, a, b, tz: ([], {}, {})),
             patch.object(A.L, "last_sync", lambda s, sid: (datetime(2026, 8, 31, tzinfo=UTC), 12)),
             patch.object(A.L, "cogs_gaps", lambda s, sid, a, b, tz: (0, 0)),
@@ -42,7 +42,8 @@ def patches():
             patch.object(A.L, "product_daily", lambda s, sid, a, b: []),
             patch.object(A.L, "product_funnel", lambda s, sid, a, b: {}),
             patch.object(A.L, "products", lambda s, sid: {}),
-            patch.object(A.L, "funnel_counts", lambda s, sid, p, tz: C.FunnelCounts(1000, 50, 5, 5, 5))]
+            patch.object(A.L, "video_product_metrics", lambda s, sid, a, b: []),
+            patch.object(A.L, "funnel_counts", lambda s, sid, p, tz: C.FunnelCounts(1000, 50, 3, 5, 5, 5))]
 
 
 def with_patches(fn):
@@ -83,6 +84,7 @@ def _others():
     return {p: c.get(p).json() for p in ("/api/dashboard/trends?from=2026-08-01&to=2026-08-05",
                                           "/api/analytics/products", "/api/analytics/videos",
                                           "/api/analytics/campaigns", "/api/analytics/creators",
+                                          "/api/analytics/video-products",
                                           "/api/dashboard/funnel", "/api/dashboard/insights")}
 
 
@@ -98,6 +100,8 @@ def test_other_endpoints():
     assert out["/api/analytics/creators"]["rows"][0]["creator"].startswith("Affiliate")
     f = out["/api/dashboard/funnel"]
     assert f["stages"][0]["count"] == 1000 and f["waterfall"]["orders"] == 0
+    vp = out["/api/analytics/video-products"]
+    assert vp["shop_split"]["gmv_total"] == "0" and vp["dependency"]["best_lag"] is None and vp["products"] == []
     ins = out["/api/dashboard/insights"]
     assert isinstance(ins["findings"], list) and "opportunities" in ins and "risks" in ins
 

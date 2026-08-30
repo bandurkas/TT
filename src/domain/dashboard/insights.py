@@ -42,14 +42,15 @@ def findings(cur: Totals, prev: Totals, floor: Decimal, products: Sequence[dict[
     # 2. margin vs floor
     m = cur.net_margin
     if m is not None and m < floor and cur.orders >= min_orders:
-        out.append(_f("margin_below_floor", "WARNING", f"Net margin {m} below floor {floor}",
+        out.append(_f("margin_below_floor", "WARNING", f"Net margin {m:.1%} below floor {floor:.0%}",
                       f"{cur.orders} orders, net profit {cur.net_profit} on net revenue "
                       f"{cur.net_seller_revenue}.", cur.net_profit, MEDIUM, "analytics_shop_daily",
                       cur.provisional_orders == 0))
     # 3. refunds
     rr = cur.refund_rate
     if rr is not None and rr >= Decimal("0.10") and cur.orders >= min_orders:
-        out.append(_f("refund_rate_high", "WARNING", f"Refund rate {rr} — {cur.refunded_orders} of {cur.orders}",
+        out.append(_f("refund_rate_high", "WARNING",
+                      f"Refund rate {rr:.1%} — {cur.refunded_orders} of {cur.orders} orders",
                       f"Refunded value {cur.refunds}; fees on refunded orders are usually kept by TikTok.",
                       -cur.refunds, HIGH, "statements", True, {"tab": "products"}))
     # 4. funnel deterioration
@@ -57,7 +58,8 @@ def findings(cur: Totals, prev: Totals, floor: Decimal, products: Sequence[dict[
     if diag:
         out.append(_f("funnel_deterioration", "WARNING",
                       f"Largest drop: {diag['stage_from']} → {diag['stage_to']} "
-                      f"{diag['current_rate']} vs baseline {diag['baseline_rate']} ({diag['delta_pct']})",
+                      f"{diag['current_rate']:.2%} vs baseline {diag['baseline_rate']:.2%} "
+                      f"({diag['delta_pct']:+.1%})",
                       "; ".join(diag["evidence"]) or "conversion below the previous comparable period",
                       diag.get("lost_profit"), MEDIUM, "product_metrics + analytics_order_profit", False,
                       {"zone": "funnel"}))
@@ -84,7 +86,7 @@ def findings(cur: Totals, prev: Totals, floor: Decimal, products: Sequence[dict[
     # 7. period comparison headline
     ch = pct_change(cur.net_profit, prev.net_profit)
     if ch is not None:
-        out.append(_f("profit_vs_previous", "INFO", f"Net profit {ch} vs previous period",
+        out.append(_f("profit_vs_previous", "INFO", f"Net profit {ch:+.1%} vs previous period",
                       f"{cur.net_profit} now vs {prev.net_profit} before.", cur.net_profit - prev.net_profit,
                       MEDIUM if cur.provisional_orders == 0 else LOW, "analytics_shop_daily",
                       cur.provisional_orders == 0))

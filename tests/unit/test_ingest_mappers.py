@@ -177,3 +177,26 @@ def test_map_shop_metric_live_shape():
     assert m["gmv_total"] == Decimal("419408.00") and m["gmv_video"] == Decimal("160978.00")
     assert m["gross_revenue_gmv_max_pct"] == Decimal("0.9995") and m["sku_orders"] == 5
     assert m["gross_revenue_gmv_max"] == Decimal("425632.00") * Decimal("0.9995")
+
+
+def test_map_video_detail_and_products():
+    from datetime import UTC, date, datetime
+    from decimal import Decimal
+
+    from src.domain.ingest.mappers import map_video_detail, map_video_products
+    detail = {"performance": {"intervals": [{"sales": {
+        "breakdowns": [{"ctr": "0.0353", "customers": 2, "gmv": {"amount": "275700.00"}, "items_sold": 3,
+                        "product_clicks": 17, "product_id": "P1", "product_impressions": 481},
+                       {"ctr": "0", "customers": 0, "gmv": {"amount": "0"}, "items_sold": 0, "product_clicks": 0,
+                        "product_id": "UNKNOWN", "product_impressions": 26}],
+        "overall": {"ctr": "0.0011", "product_clicks": 17, "product_impressions": 545}}}]}}
+    now = datetime(2026, 8, 31, tzinfo=UTC)
+    rows, overall = map_video_detail(detail, 7, {"P1": 3}, date(2026, 8, 30), now)
+    assert rows == [{"video_id": 7, "product_id": 3, "metric_date": date(2026, 8, 30), "impressions": 481,
+                     "clicks": 17, "ctr": Decimal("0.0353"), "customers": 2, "units_sold": 3,
+                     "gmv": Decimal("275700.00"), "fetched_at": now}]
+    assert overall == {"impressions": 545, "product_clicks": 17, "ctr": Decimal("0.0011")}
+    assert map_video_detail({}, 7, {}, date(2026, 8, 30), now) == ([], None)
+    links = map_video_products({"products": [{"id": "P1"}, {"id": "P1"}, {"id": "nope"}]}, 7, {"P1": 3},
+                               date(2026, 8, 30))
+    assert links == [{"video_id": 7, "product_id": 3, "first_seen": date(2026, 8, 30), "last_seen": date(2026, 8, 30)}]

@@ -52,19 +52,22 @@ def products(session: Any, shop_id: int) -> dict[int, Any]:
     return {p.id: p for p in session.scalars(select(Product).where(Product.shop_id == shop_id))}
 
 
-def shop_funnel_by_day(session: Any, shop_id: int, start: date, end: date) -> dict[date, tuple[int, int]]:
-    """(views, derived clicks = Σ views × ctr) per day from video_metrics. Product performance API
-    carries no impressions/clicks (verified 2026-08-31), so the funnel top is video traffic only."""
-    q = (select(VideoMetric.metric_date, VideoMetric.views, VideoMetric.product_clicks, VideoMetric.ctr)
+def shop_funnel_by_day(session: Any, shop_id: int, start: date, end: date
+                       ) -> dict[date, tuple[int, int, int]]:
+    """(views, derived clicks = Σ views × ctr, video orders) per day from video_metrics. Product
+    performance API carries no impressions/clicks (verified 2026-08-31): funnel = video traffic only."""
+    q = (select(VideoMetric.metric_date, VideoMetric.views, VideoMetric.product_clicks, VideoMetric.ctr,
+                VideoMetric.orders)
          .join(Video, Video.id == VideoMetric.video_id)
          .where(Video.shop_id == shop_id, VideoMetric.metric_hour.is_(None),
                 VideoMetric.metric_date >= start, VideoMetric.metric_date <= end))
-    out: dict[date, list[int]] = defaultdict(lambda: [0, 0])
-    for d, views, clicks, ctr in session.execute(q):
+    out: dict[date, list[int]] = defaultdict(lambda: [0, 0, 0])
+    for d, views, clicks, ctr, orders in session.execute(q):
         v = int(views or 0)
         out[d][0] += v
         out[d][1] += int(clicks or 0) or int((Decimal(v) * Decimal(str(ctr or 0))).to_integral_value())
-    return {d: (a, b) for d, (a, b) in out.items()}
+        out[d][2] += int(orders or 0)
+    return {d: (a, b, c) for d, (a, b, c) in out.items()}
 
 
 def product_funnel(session: Any, shop_id: int, start: date, end: date
@@ -100,7 +103,8 @@ def current_profits(session: Any, shop_id: int, start: date, end: date, tz: str
 def funnel_counts(session: Any, shop_id: int, period: Period, tz: str) -> FunnelCounts:
     f = shop_funnel_by_day(session, shop_id, period.start, period.end)
     rows, _, completed = current_profits(session, shop_id, period.start, period.end, tz)
-    return FunnelCounts(impressions=sum(v for v, _ in f.values()), clicks=sum(c for _, c in f.values()),
+    return FunnelCounts(impressions=sum(v for v, _, _ in f.values()), clicks=sum(c for _, c, _ in f.values()),
+                        video_orders=sum(o for _, _, o in f.values()),
                         orders=len(rows), completed=sum(completed.values()),
                         settled=sum(1 for p in rows if str(p.profit_status) != "PROVISIONAL"))
 
@@ -168,3 +172,10 @@ def affiliate_totals(profits: Sequence[Any]) -> dict[str, Any]:
     gmv = sum((Decimal(str(p.sale_proceeds)) for p in aff), Decimal(0))
     return {"orders": len(aff), "gmv": gmv, "affiliate_commission": commission,
             "profit_after_commission": profit}
+
+
+def video_product_metrics(session: Any, shop_id: int, start: date, end: date) -> list[Any]:
+    from src.db.models import VideoProductMetric
+    return list(session.scalars(select(VideoProductMetric).join(Video, Video.id == VideoProductMetric.video_id)
+                                .where(Video.shop_id == shop_id, VideoProductMetric.metric_date >= start,
+                                       VideoProductMetric.metric_date <= end)))

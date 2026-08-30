@@ -104,6 +104,7 @@ class Totals:
     refunded_orders: int = 0
     clicks: int = 0
     impressions: int = 0
+    video_orders: int = 0  # orders attributed by the video analytics API (video traffic only)
     days_with_data: int = 0
 
     @property
@@ -120,7 +121,8 @@ class Totals:
 
     @property
     def cvr(self) -> Decimal | None:
-        return ratio(self.orders, self.clicks) if self.clicks else None
+        """Video CVR: video-attributed orders / derived clicks (product-card traffic has no clicks)."""
+        return ratio(self.video_orders, self.clicks) if self.clicks else None
 
     @property
     def ctr(self) -> Decimal | None:
@@ -146,8 +148,9 @@ class Totals:
         return (Decimal(1) / c).quantize(RATIO) if c and c > 0 else None
 
 
-def sum_daily(rows: Iterable[Any], period: Period, funnel: Mapping[date, tuple[int, int]] | None = None,
+def sum_daily(rows: Iterable[Any], period: Period, funnel: Mapping[date, tuple[int, int, int]] | None = None,
               refunded: Mapping[date, int] | None = None) -> Totals:
+    """funnel: day -> (video views, derived clicks, video orders)."""
     t = Totals()
     for r in rows:
         d = r.metric_date
@@ -159,9 +162,10 @@ def sum_daily(rows: Iterable[Any], period: Period, funnel: Mapping[date, tuple[i
             setattr(t, f, getattr(t, f) + (int(v) if isinstance(getattr(t, f), int) else _d(v)))
     for d in (funnel or {}):
         if period.start <= d <= period.end:
-            imp, clk = funnel[d]  # type: ignore[index]
+            imp, clk, vo = funnel[d]  # type: ignore[index]
             t.impressions += imp
             t.clicks += clk
+            t.video_orders += vo
     for d, n in (refunded or {}).items():
         if period.start <= d <= period.end:
             t.refunded_orders += n
@@ -228,7 +232,7 @@ def business_health(cur: Totals, prev: Totals, daily_rows: Sequence[Any], period
             provisional=True),
         kpi("aov", cur.aov, prev.aov, [], status=_status(pct_change(cur.aov, prev.aov), "up")),
         kpi("cvr", cur.cvr, prev.cvr, [], kind="pct", status=_status(pct_change(cur.cvr, prev.cvr), "up"),
-            note="orders / product clicks"),
+            note=f"video CVR: {cur.video_orders} video orders / derived clicks", provisional=True),
         kpi("refund_rate", cur.refund_rate, prev.refund_rate, [], kind="pct",
             status=_status(cur.refund_rate, "down", Decimal("0.10")), note="refunded orders / orders"),
         kpi("settlement_coverage", cur.settlement_coverage, prev.settlement_coverage, [], kind="pct",
@@ -336,7 +340,8 @@ def product_rows(product_daily: Iterable[Any], product_meta: Mapping[int, Any], 
                     "net_seller_revenue": t.net_seller_revenue, "fees": t.fees, "affiliate": t.affiliate,
                     "cogs": t.cogs, "ad_cost": t.ad_cost, "ad_cost_is_estimate": True,
                     "refunds": t.refunds, "net_profit": t.net_profit, "net_margin": t.net_margin,
-                    "cvr": t.cvr, "ctr": t.ctr, "status": st, "status_reason": why})
+                    "cvr": None, "ctr": None, "cvr_note": NOT_AVAILABLE + ": product clicks not in Shop API",
+                    "status": st, "status_reason": why})
     out.sort(key=lambda r: r["net_profit"], reverse=True)
     return out
 
@@ -378,7 +383,9 @@ def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[in
                     "caption": getattr(meta, "caption", None), "published_at": pub,
                     "duration_seconds": getattr(meta, "duration_seconds", None), "age_days": age,
                     "views": a["views"], "impressions": a["impressions"], "clicks": a["clicks"],
-                    "orders": a["orders"], "gmv": a["gmv"], "ctr": res.ctr, "cvr": res.cvr,
+                    "orders": a["orders"], "gmv": a["gmv"],
+                    "ctr": res.ctr.quantize(PCT) if res.ctr is not None else None,
+                    "cvr": res.cvr.quantize(PCT) if res.cvr is not None else None,
                     "gpm": (a["gmv"] / a["views"] * 1000).quantize(Decimal(1)) if a["views"] else None,
                     "ad_spend": None, "net_profit": None, "ad_spend_note": NOT_AVAILABLE + ": Ads API",
                     "classification": res.classification.value, "confidence": res.confidence.value,
@@ -393,27 +400,33 @@ def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[in
 # --- funnel & waterfall -------------------------------------------------------------------------
 @dataclass
 class FunnelCounts:
+    """Video traffic funnel (views -> derived clicks -> video orders) + order pipeline
+    (all orders -> completed -> settled). Product-card traffic has no impressions/clicks in the API."""
     impressions: int = 0
     clicks: int = 0
+    video_orders: int = 0
     orders: int = 0
     completed: int = 0
     settled: int = 0
 
     def stages(self) -> list[FunnelStage]:
-        return [FunnelStage("impression", self.impressions), FunnelStage("click", self.clicks),
-                FunnelStage("order", self.orders), FunnelStage("completed", self.completed),
+        return [FunnelStage("video_view", self.impressions), FunnelStage("video_click", self.clicks),
+                FunnelStage("video_order", self.video_orders)]
+
+    def pipeline(self) -> list[FunnelStage]:
+        return [FunnelStage("order", self.orders), FunnelStage("completed", self.completed),
                 FunnelStage("settled", self.settled)]
 
 
-STAGE_NOTES = {"impression": "video views (Shop API analytics)",
-               "click": "derived: views × click_through_rate (no click count in API)",
-               "order": "orders with a profit row", "completed": "COMPLETED/DELIVERED orders",
-               "settled": "orders with a settled statement (lags 8–10 days; not a conversion)"}
+STAGE_NOTES = {"video_view": "video views (Shop API video analytics)",
+               "video_click": "derived: views × click_through_rate (no click count in API)",
+               "video_order": "orders attributed to videos by TikTok analytics",
+               "order": "all orders with a profit row (incl. product-card traffic)",
+               "completed": "COMPLETED/DELIVERED orders",
+               "settled": "orders with a settled statement (lags 8–10 days; timing, not conversion)"}
 
 
-def funnel_view(cur: FunnelCounts, base: FunnelCounts, avg_profit_per_order: Decimal | None,
-                min_stage_count: int = 30) -> dict[str, Any]:
-    cs, bs = cur.stages(), base.stages()
+def _steps(cs: list[FunnelStage], bs: list[FunnelStage]) -> list[dict[str, Any]]:
     steps = []
     for i in range(1, len(cs)):
         c_rate = ratio(cs[i].count, cs[i - 1].count)
@@ -421,11 +434,25 @@ def funnel_view(cur: FunnelCounts, base: FunnelCounts, avg_profit_per_order: Dec
         steps.append({"from": cs[i - 1].name, "to": cs[i].name, "count": cs[i].count,
                       "rate": c_rate, "baseline_rate": b_rate, "delta_pct": pct_change(c_rate, b_rate),
                       "timing_only": cs[i].name == "settled"})
-    # settlement is a timing stage, never a conversion problem -> excluded from deterioration search
-    diag: FunnelDiagnosis | None = detect_funnel_deterioration(cs[:-1], bs[:-1], avg_profit_per_order,
-                                                               min_stage_count)
+    return steps
+
+
+def funnel_view(cur: FunnelCounts, base: FunnelCounts, avg_profit_per_order: Decimal | None,
+                min_stage_count: int = 30) -> dict[str, Any]:
+    cs, bs = cur.stages(), base.stages()
+    ps, pb = cur.pipeline(), base.pipeline()
+    # deterioration: video funnel + order->completed; settled is a timing stage, never a conversion problem
+    diag: FunnelDiagnosis | None = detect_funnel_deterioration(cs, bs, avg_profit_per_order, min_stage_count,
+                                                               order_stage="video_order")
+    if diag is None:
+        diag = detect_funnel_deterioration(ps[:-1], pb[:-1], avg_profit_per_order, min_stage_count,
+                                           order_stage="order")
     return {"stages": [{"name": s.name, "count": s.count, "note": STAGE_NOTES.get(s.name)} for s in cs],
-            "steps": steps,
+            "steps": _steps(cs, bs),
+            "pipeline": {"stages": [{"name": s.name, "count": s.count, "note": STAGE_NOTES.get(s.name)}
+                                    for s in ps], "steps": _steps(ps, pb)},
+            "coverage_note": "funnel covers video traffic only; product-card impressions/clicks are "
+                             "NOT AVAILABLE in the Shop API",
             "diagnosis": None if diag is None else {
                 "stage_from": diag.stage_from, "stage_to": diag.stage_to,
                 "current_rate": diag.current_rate.quantize(PCT), "baseline_rate": diag.baseline_rate.quantize(PCT),
@@ -486,3 +513,81 @@ class Overview:
     cur: Totals
     prev: Totals
     health: dict[str, Any] = field(default_factory=dict)
+
+
+# --- videos -> product cards (dependency) ---------------------------------------------------------
+def pearson(xs: Sequence[Decimal], ys: Sequence[Decimal]) -> Decimal | None:
+    n = len(xs)
+    if n < 7 or n != len(ys):
+        return None
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=True))
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    if sxx == 0 or syy == 0:
+        return None
+    return (sxy / (sxx.sqrt() * syy.sqrt())).quantize(PCT)
+
+
+def lag_dependency(days: Sequence[dict[str, Any]], max_lag: int = 2) -> dict[str, Any]:
+    """days: [{date, video_views, gmv_product_card}] sorted; correlation of views(t) vs card GMV(t+lag)."""
+    lags = []
+    for lag in range(max_lag + 1):
+        xs = [Decimal(d["video_views"]) for d in days[:len(days) - lag]] if lag else [Decimal(d["video_views"]) for d in days]
+        ys = [_d(d["gmv_product_card"]) for d in days[lag:]]
+        r = pearson(xs, ys)
+        lags.append({"lag_days": lag, "correlation": r, "n": len(ys)})
+    valid = [lg for lg in lags if lg["correlation"] is not None]
+    best = max(valid, key=lambda lg: abs(lg["correlation"]))["lag_days"] if valid else None
+    return {"lags": lags, "best_lag": best,
+            "note": "Pearson correlation of daily video views vs product-card GMV shifted by lag; n = days; "
+                    "|r|<0.3 weak, ≥0.5 strong; correlation ≠ causation"}
+
+
+def video_product_map(vpm: Iterable[Any], product_rows_: Sequence[dict[str, Any]], product_meta: Mapping[int, Any],
+                      video_meta: Mapping[int, Any], video_views: Mapping[int, int],
+                      video_class: Mapping[int, str], period: Period) -> tuple[list[dict], list[dict]]:
+    """video_product_metrics rows -> per-product (videos feeding it) and per-video (products it sells)."""
+    pair: dict[tuple[int, int], dict[str, Any]] = {}
+    for r in vpm:
+        if not (period.start <= r.metric_date <= period.end):
+            continue
+        a = pair.setdefault((r.video_id, r.product_id), {"impressions": 0, "clicks": 0, "units_sold": 0,
+                                                          "gmv": ZERO, "customers": 0})
+        a["impressions"] += int(r.impressions or 0)
+        a["clicks"] += int(r.clicks or 0)
+        a["units_sold"] += int(r.units_sold or 0)
+        a["customers"] += int(r.customers or 0)
+        a["gmv"] += _d(r.gmv)
+    prow = {p["product_id"]: p for p in product_rows_}
+    by_product: dict[int, list[dict]] = {}
+    by_video: dict[int, list[dict]] = {}
+    for (vid, pid), a in pair.items():
+        vm, pm = video_meta.get(vid), product_meta.get(pid)
+        ctr = ratio(a["clicks"], a["impressions"]) if a["impressions"] else None
+        by_product.setdefault(pid, []).append({"video_id": vid, "external_video_id": getattr(vm, "external_video_id", None),
+                                               "caption": getattr(vm, "caption", None), **a, "ctr": ctr})
+        by_video.setdefault(vid, []).append({"product_id": pid, "title": prow.get(pid, {}).get("title")
+                                             or getattr(pm, "title", None) or f"product {pid}",
+                                             **a, "ctr": ctr})
+    products = []
+    for pid in set(by_product) | set(prow):
+        p, vids = prow.get(pid, {}), sorted(by_product.get(pid, []), key=lambda v: -v["gmv"])
+        vg = sum((v["gmv"] for v in vids), ZERO)
+        gmv = p.get("gmv", ZERO)
+        meta = product_meta.get(pid)
+        products.append({"product_id": pid, "title": p.get("title") or getattr(meta, "title", None) or f"product {pid}",
+                         "external_product_id": p.get("external_product_id") or getattr(meta, "external_product_id", None),
+                         "gmv": gmv, "orders": p.get("orders", 0), "net_profit": p.get("net_profit", ZERO),
+                         "status": p.get("status", "NO_SALES"), "video_gmv": vg,
+                         "video_units": sum(v["units_sold"] for v in vids),
+                         "video_share": ratio(vg, gmv) if gmv > 0 else None,
+                         "video_impressions": sum(v["impressions"] for v in vids),
+                         "video_clicks": sum(v["clicks"] for v in vids), "videos": vids})
+    products.sort(key=lambda p: (-p["gmv"], -p["video_gmv"]))
+    videos = [{"video_id": vid, "external_video_id": getattr(video_meta.get(vid), "external_video_id", None),
+               "caption": getattr(video_meta.get(vid), "caption", None), "views": video_views.get(vid, 0),
+               "classification": video_class.get(vid),
+               "products": sorted(prods, key=lambda p: -p["gmv"])} for vid, prods in by_video.items()]
+    videos.sort(key=lambda v: -sum(p["gmv"] for p in v["products"]))
+    return products, videos

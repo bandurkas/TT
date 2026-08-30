@@ -89,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     sp = sub.add_parser("cogs")
     sp.add_argument("--file", default="seed/cogs_seed.csv")
     sub.add_parser("status")
+    sub.add_parser("video-products-backfill")
     a = p.parse_args(argv)
     logging.basicConfig(level=settings.log_level, format="%(asctime)s %(name)s %(message)s")
     try:
@@ -105,6 +106,10 @@ def run_command(a: argparse.Namespace) -> dict:
     with SessionLocal() as session:
         if a.cmd == "status":
             return cmd_status(session)
+        if a.cmd == "video-products-backfill":
+            shop = shop_from_db(session)
+            return {"shop": shop.external_shop_id,
+                    "result": jobs.backfill_video_products(session, shop.id)}
         if a.cmd == "cogs":
             shop = shop_from_db(session)
             return {"shop": shop.external_shop_id,

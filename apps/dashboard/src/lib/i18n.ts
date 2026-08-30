@@ -1,0 +1,90 @@
+"use client";
+import { createContext, useContext } from "react";
+
+export type Lang = "en" | "ru";
+
+// EN is the key; RU map reuses the approved mock strings plus dashboard-specific additions.
+export const RU: Record<string, string> = {
+  "Views": "Просмотры", "Executive": "Руководство", "Performance marketing": "Перформанс-маркетинг",
+  "Creative / video": "Креатив / видео", "Product / commerce": "Товары / магазин", "Finance": "Финансы",
+  "Explore": "Данные", "Campaigns": "Кампании", "Products": "Товары", "Videos": "Видео", "Creators": "Креаторы",
+  "Work": "Работа", "Recommendations": "Рекомендации", "Team board": "Доска команды", "Reconciliation": "Сверка",
+  "Period": "Период", "Compare": "Сравнить с", "Refresh": "Обновить", "Last sync": "Синхронизация",
+  "Data quality": "Качество данных", "PARTIAL": "ЧАСТИЧНО", "OK": "ОК", "POOR": "ПЛОХО",
+  "This month": "Этот месяц", "Last 30 days": "Последние 30 дней", "Custom": "Свой период", "Apply": "Применить",
+  "1 · Business health": "1 · Здоровье бизнеса", "Where the money went": "Куда ушли деньги",
+  "Click any card for its diagnostic": "Клик по карточке — диагностика",
+  "Net profit": "Чистая прибыль", "vs previous": "к пред. периоду", "Losing": "Убыток", "Profitable": "Прибыль",
+  "GMV": "GMV", "units": "шт", "Net seller revenue": "Выручка продавца нетто",
+  "after fees & refunds": "после комиссий и возвратов", "Orders": "Заказы", "refunded": "возвратов",
+  "Ad spend (GMV Max)": "Реклама (GMV Max)", "of net revenue": "выручки нетто", "Net margin": "Маржа нетто",
+  "floor": "порог", "Below floor": "Ниже порога", "Above floor": "Выше порога",
+  "Reported ROAS": "ROAS по TikTok", "Blended ROAS": "Смешанный ROAS", "net revenue / ad spend": "выручка нетто / реклама",
+  "break-even": "безубыточность", "AOV": "Средний чек", "CVR (click→order)": "CVR (клик→заказ)",
+  "orders / product clicks": "заказы / клики по товару", "Refund rate": "Возвраты", "refunded orders / orders": "возвраты / заказы",
+  "Settlement coverage": "Покрытие расчётами", "provisional": "предварительно", "settled": "рассчитано",
+  "Profit health": "Здоровье прибыли", "GOOD": "ХОРОШО", "FAIR": "СРЕДНЕ",
+  "Margin": "Маржа", "Ad efficiency": "Эффективность рекламы", "Conversion": "Конверсия", "Refunds": "Возвраты",
+  "Unit economics · per unit": "Юнит-экономика · на единицу", "Revenue after seller discount": "Выручка после скидки продавца",
+  "TikTok fees (commission, processing, logistics, affiliate)": "Комиссии TikTok (комиссия, обработка, логистика, аффилиат)",
+  "COGS": "Себестоимость", "Contribution before ads": "Контрибуция до рекламы",
+  "Ad cost per unit (blended)": "Реклама на единицу (смешанно)", "Net per unit": "Итог на единицу",
+  "2 · Diagnosis": "2 · Диагноз", "Why": "Почему", "Deterministic rules · no LLM": "Детерминированные правила · без LLM",
+  "confidence shown per finding": "уверенность у каждого вывода", "Impact": "Эффект", "Confidence": "Уверенность",
+  "Source": "Источник", "measured": "измерено", "estimate": "оценка", "Create task": "Создать задачу",
+  "Open products": "Открыть товары", "Open videos": "Открыть видео", "Open campaigns": "Открыть кампании", "Open funnel": "Открыть воронку",
+  "No findings for this period.": "Нет выводов за этот период.",
+  "3 · Sales & profit trend": "3 · Продажи и прибыль", "daily": "по дням", "Net revenue": "Выручка нетто",
+  "Ad deduction": "Списание за рекламу", "Cumulative net profit": "Накопленная прибыль", "◆ event annotation": "◆ событие",
+  "Period totals": "Итоги периода", "Events": "События", "No events in this period.": "Событий за период нет.",
+  "GMV Max deduction": "Списание GMV Max", "new video posted": "новое видео", "GMV by source": "GMV по источникам",
+  "video": "видео", "product card": "карточка товара", "live": "эфир", "latest day": "последний день",
+  "4 · Performance explorer": "4 · Разбор эффективности", "Campaigns · Products · Videos · Creators": "Кампании · Товары · Видео · Креаторы",
+  "Sorted by net profit": "Сортировка по чистой прибыли", "Product": "Товар", "Units": "Шт", "Fees": "Комиссии",
+  "Ads (est.)": "Реклама (оц.)", "Status": "Статус", "Investigate": "Разобраться", "Reduce": "Сократить",
+  "Small sample": "Мало данных", "Scale": "Масштабировать", "Healthy": "Здоров", "Watch": "Наблюдать",
+  "Promising": "Перспективно", "Low attention": "Слабый хук", "Traffic, no sales": "Трафик без продаж",
+  "Insufficient data": "Мало данных", "Winner": "Победитель", "Loser": "Убыточно", "Fatiguing": "Выгорает", "Neutral": "Нейтрально",
+  "Views count": "Просмотры", "Clicks": "Клики", "Ad spend": "Реклама", "Age": "Возраст", "d": "д",
+  "Campaign": "Кампания", "Spend": "Расход", "Adjusted ROAS": "Скорр. ROAS", "AI status": "Статус AI",
+  "Campaign breakdown appears after the TikTok Ads app is approved": "Разбивка по кампаниям появится после одобрения приложения TikTok Ads",
+  "Until then ad cost is shop-level": "Пока реклама — на уровне магазина", "in": "в", "deductions": "списаниях",
+  "Creator": "Креатор", "Affiliate commission": "Комиссия аффилиата", "Profit after commission": "Прибыль после комиссии",
+  "No products in this period.": "Нет товаров за период.", "No videos with metrics in this period.": "Нет видео с метриками за период.",
+  "5 · Funnel & root cause": "5 · Воронка и причины", "Where the drop is, and what it cost": "Где просадка и сколько она стоила",
+  "impression": "Показы", "click": "Клики", "order": "Заказы", "completed": "Завершено", "settled": "Рассчитано",
+  "Largest deterioration": "Сильнейшая просадка", "vs baseline": "против базы", "Est.": "Оценка:", "lost orders": "потерянных заказов",
+  "contribution": "контрибуции", "No funnel deterioration vs the previous comparable period.": "Ухудшения воронки к предыдущему периоду нет.",
+  "baseline = previous comparable period": "база = предыдущий сопоставимый период", "timing only": "только тайминг",
+  "Profit waterfall": "Водопад прибыли", "revenue_after_seller_discounts": "Выручка после скидок продавца",
+  "refunds": "Возвраты", "tiktok_fees": "Комиссии TikTok", "affiliate_commission": "Комиссия аффилиатов",
+  "taxes_adjustments_subsidies": "Налоги / корректировки / субсидии", "net_seller_revenue": "Выручка продавца нетто",
+  "cogs": "Себестоимость", "contribution_before_ads": "Контрибуция до рекламы", "ad_deductions_blended": "Списания GMV Max (смешанно)",
+  "net_profit": "Чистая прибыль", "est.": "оц.", "orders": "заказов",
+  "6 · Opportunities & leakage": "6 · Возможности и утечки", "Ranked by money, not percentages": "Ранжировано по деньгам, не по процентам",
+  "Opportunities": "Возможности", "Leakage / risks": "Утечки / риски", "None detected.": "Не обнаружено.",
+  "7 · Team action board": "7 · Доска задач команды", "Accept · edit · assign · measure after 72 h": "Принять · править · назначить · измерить через 72 ч",
+  "Today": "Сегодня", "In progress": "В работе", "Review": "Проверка", "Done · measured": "Готово · измерено",
+  "Performance": "Перформанс", "Video": "Видео", "Design": "Дизайн", "Management": "Менеджмент",
+  "Owner": "Владелец", "Deadline": "Срок", "Done": "Готово", "Result": "Результат", "New task": "Новая задача",
+  "Title": "Название", "Detail": "Описание", "Team": "Команда", "Priority": "Приоритет", "Cancel": "Отмена", "Save": "Сохранить",
+  "Saving…": "Сохраняю…", "Move to": "Перевести в", "No tasks.": "Задач нет.", "Evidence": "Основание",
+  "API unreachable": "API недоступен", "Retry": "Повторить", "Loading…": "Загрузка…", "Failed to load": "Не удалось загрузить",
+  "Not available": "Недоступно", "NOT AVAILABLE — Ads API pending": "НЕДОСТУПНО — ждём Ads API",
+  "BLENDED estimate · LOW confidence": "СМЕШАННАЯ оценка · НИЗКАЯ уверенность", "derived (views × CTR)": "расчётно (просмотры × CTR)",
+  "provisional ≠ settled": "предварительно ≠ рассчитано", "HIGH": "ВЫСОКАЯ", "MEDIUM": "СРЕДНЯЯ", "LOW": "НИЗКАЯ",
+  "CRITICAL": "КРИТИЧНО", "WARNING": "ВНИМАНИЕ", "OPPORTUNITY": "ВОЗМОЖНОСТЬ", "INFO": "ИНФО",
+  "Ad spend = GMV Max payout deductions, BLENDED over trailing 7 days (estimate, LOW).": "Реклама = списания GMV Max из выплат, СМЕШАННО за 7 дней (оценка, НИЗКАЯ уверенность).",
+  "Provisional orders: fees estimated from trailing settled ratio; not final.": "Предварительные заказы: комиссии оценены по доле рассчитанных; не финал.",
+  "Reported ROAS / per-campaign cost: NOT AVAILABLE until the TikTok Ads app is approved.": "ROAS по TikTok / расход по кампаниям: НЕДОСТУПНО до одобрения приложения TikTok Ads.",
+  "Notes": "Примечания", "Generated": "Сформировано", "Keep": "Оставить", "Reduce priority": "Снизить приоритет",
+};
+
+export const t = (lang: Lang, key: string): string => (lang === "ru" ? RU[key] ?? key : key);
+
+export const LangContext = createContext<Lang>("en");
+export const useLang = (): Lang => useContext(LangContext);
+export const useT = () => {
+  const lang = useLang();
+  return (key: string) => t(lang, key);
+};

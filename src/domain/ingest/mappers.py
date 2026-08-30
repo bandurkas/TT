@@ -1,6 +1,7 @@
 """Pure API-dict -> model-kwargs mappers. Money = Decimal. Field names: statement transactions
 verified live (fixture); orders/statements/withdrawals/analytics field names UNVERIFIED — see
 docs/tiktok-api-capability-matrix.md; getters accept aliases and {amount,currency} dicts."""
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -189,6 +190,43 @@ def map_video(api: dict, shop_id: int) -> dict:
             "account_type": "unknown", "published_at": ts(api.get("video_post_time")),
             "duration_seconds": to_int(api.get("duration")), "caption": api.get("title"),
             "video_reference": api.get("username")}
+
+
+def map_video_products(api: dict, video_id: int, product_ids: Mapping[str, int], day: date) -> list[dict]:
+    """`products[]` of a video row -> video_products rows (unknown product ids skipped)."""
+    out, seen = [], set()
+    for p in api.get("products") or []:
+        pid = product_ids.get(str(p.get("id")))
+        if pid is None or pid in seen:
+            continue
+        seen.add(pid)
+        out.append({"video_id": video_id, "product_id": pid, "first_seen": day, "last_seen": day})
+    return out
+
+
+def map_video_detail(detail: dict, video_id: int, product_ids: Mapping[str, int], day: date,
+                     fetched_at: datetime) -> tuple[list[dict], dict | None]:
+    """`shop_videos/{id}/performance` -> (video_product_metrics rows, overall {impressions, clicks, ctr}).
+    Takes the first interval (one day requested)."""
+    intervals = ((detail.get("performance") or {}).get("intervals")) or []
+    if not intervals:
+        return [], None
+    sales = intervals[0].get("sales") or {}
+    rows = []
+    for b in sales.get("breakdowns") or []:
+        pid = product_ids.get(str(b.get("product_id")))
+        if pid is None:
+            continue
+        rows.append({"video_id": video_id, "product_id": pid, "metric_date": day,
+                     "impressions": to_int(b.get("product_impressions")) or 0,
+                     "clicks": to_int(b.get("product_clicks")) or 0, "ctr": dec(b.get("ctr")),
+                     "customers": to_int(b.get("customers")) or 0,
+                     "units_sold": to_int(b.get("items_sold")) or 0,
+                     "gmv": dec(b.get("gmv")) or Decimal(0), "fetched_at": fetched_at})
+    o = sales.get("overall") or {}
+    overall = {"impressions": to_int(o.get("product_impressions")),
+               "product_clicks": to_int(o.get("product_clicks")) or 0, "ctr": dec(o.get("ctr"))} if o else None
+    return rows, overall
 
 
 def map_video_metric(api: dict, video_id: int, day: date, fetched_at: datetime) -> dict:

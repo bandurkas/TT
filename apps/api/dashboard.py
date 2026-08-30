@@ -133,6 +133,42 @@ def videos(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
                "ad_spend_note": C.NOT_AVAILABLE + ": per-video ad cost needs Ads API"})
 
 
+@router.get("/analytics/video-products")
+def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
+    """Videos -> product cards: per video × product measured impressions/clicks/GMV + shop-level split
+    (video vs product-card GMV) + lagged dependency of product-card GMV on video views."""
+    pd = L.product_daily(c.session, c.shop.id, c.period.start, c.period.end)
+    pf = L.product_funnel(c.session, c.shop.id, c.period.start, c.period.end)
+    pmeta = L.products(c.session, c.shop.id)
+    prows = C.product_rows(pd, pmeta, c.period, pf, c.floor, c.min_orders)
+    daily, vmeta = L.videos_with_metrics(c.session, c.shop.id, c.period.start, c.period.end)
+    cards = C.video_cards(daily, vmeta, c.period, c.today, ScoringConfig(minimum_net_margin=c.floor,
+                                                                          minimum_sample_orders=c.min_orders))
+    views = {vid: sum(int(r.views or 0) for r in rows) for vid, rows in daily.items()}
+    vclass = {cd["video_id"]: cd["classification"] for cd in cards}
+    vpm = L.video_product_metrics(c.session, c.shop.id, c.period.start, c.period.end)
+    products, videos = C.video_product_map(vpm, prows, pmeta, vmeta, views, vclass, c.period)
+    sm = L.shop_metrics(c.session, c.shop.id, c.period.start, c.period.end)
+    views_by_day: dict[date, int] = {}
+    for rows in daily.values():
+        for r in rows:
+            views_by_day[r.metric_date] = views_by_day.get(r.metric_date, 0) + int(r.views or 0)
+    days = [{"date": m.metric_date, "gmv_video": C._d(m.gmv_video), "gmv_product_card": C._d(m.gmv_product_card),
+             "gmv_live": C._d(m.gmv_live), "video_views": views_by_day.get(m.metric_date, 0)} for m in sm]
+    gv = sum((d["gmv_video"] for d in days), Decimal(0))
+    gpc = sum((d["gmv_product_card"] for d in days), Decimal(0))
+    gl = sum((d["gmv_live"] for d in days), Decimal(0))
+    tot = gv + gpc + gl
+    return _n({**c.meta(),
+               "shop_split": {"gmv_video": gv, "gmv_product_card": gpc, "gmv_live": gl, "gmv_total": tot,
+                              "video_share": C.ratio(gv, tot) if tot else None, "days": days},
+               "dependency": C.lag_dependency(days), "products": products, "videos": videos,
+               "notes": ["per video × product impressions/clicks/GMV are measured by TikTok video analytics",
+                         ("product-card GMV without a video is organic/search/GMV Max product-card traffic; "
+                         "its impressions are NOT AVAILABLE"),
+                         "shop split from shop_metrics (gmv_video / gmv_product_card / gmv_live)"]})
+
+
 @router.get("/analytics/campaigns")
 def campaigns(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     ded = L.ad_deductions(c.session, c.shop.id, c.period.start, c.period.end, c.tz)

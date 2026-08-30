@@ -226,6 +226,33 @@ class Payout(PKMixin, Base):
 
 
 # --- metrics (time series snapshots) ---------------------------------------
+class VideoProduct(PKMixin, Base):
+    """Video -> product links from video performance API `products[]` (which listings a video sells)."""
+    __tablename__ = "video_products"
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    first_seen: Mapped[date] = mapped_column(Date)
+    last_seen: Mapped[date] = mapped_column(Date)
+    __table_args__ = (UniqueConstraint("video_id", "product_id"),)
+
+
+class VideoProductMetric(PKMixin, Base):
+    """Per video × product × day from `shop_videos/{id}/performance` sales.breakdowns
+    (live-verified 2026-08-31): real product impressions/clicks a video sends to each listing."""
+    __tablename__ = "video_product_metrics"
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    metric_date: Mapped[date] = mapped_column(Date)
+    impressions: Mapped[int] = mapped_column(BigInteger, default=0)
+    clicks: Mapped[int] = mapped_column(BigInteger, default=0)
+    ctr: Mapped[Decimal | None] = mapped_column(Ratio)
+    customers: Mapped[int] = mapped_column(Integer, default=0)
+    units_sold: Mapped[int] = mapped_column(Integer, default=0)
+    gmv: Mapped[Decimal] = mapped_column(Money, default=0)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (UniqueConstraint("video_id", "product_id", "metric_date"),)
+
+
 class VideoMetric(PKMixin, Base):
     __tablename__ = "video_metrics"
     video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"))

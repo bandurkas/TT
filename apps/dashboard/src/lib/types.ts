@@ -1,0 +1,262 @@
+// Shapes mirror apps/api/dashboard.py (+ src/domain/dashboard/*). Money/ratios = Decimal strings.
+export type Dec = string;
+
+export interface Meta {
+  shop: { id: number; name: string; currency: string; timezone: string };
+  period: { start: string; end: string };
+  compare: { start: string; end: string };
+  generated_at: string;
+}
+
+export type CardKind = "money" | "count" | "pct" | "ratio";
+export type Status = "good" | "warn" | "bad" | "neutral";
+
+export interface Card {
+  key: string;
+  kind: CardKind;
+  value: Dec | null;
+  prev: Dec | null;
+  change_abs: Dec | null;
+  change_pct: Dec | null;
+  sparkline: Dec[];
+  status: Status;
+  note: string | null;
+  provisional: boolean;
+}
+
+export interface Health {
+  score: number;
+  grade: "GOOD" | "FAIR" | "POOR";
+  components: Record<string, number | null>;
+}
+
+export interface UnitEconomics {
+  units: number;
+  revenue_per_unit: Dec;
+  fees_per_unit: Dec;
+  cogs_per_unit: Dec;
+  contribution_per_unit: Dec;
+  ad_cost_per_unit: Dec;
+  net_per_unit: Dec;
+  ad_cost_is_estimate: boolean;
+}
+
+export interface DataQuality {
+  score: number;
+  state: "OK" | "PARTIAL" | "POOR";
+  reasons: string[];
+  last_sync: string | null;
+  freshness_minutes: number | null;
+}
+
+export interface Overview extends Meta {
+  cards: Card[];
+  health: Health;
+  unit_economics: UnitEconomics | null;
+  data_quality: DataQuality;
+  totals: Record<string, Dec | number>;
+  notes: string[];
+}
+
+export interface TrendPoint {
+  date: string;
+  gmv: Dec;
+  net_seller_revenue: Dec;
+  ad_cost: Dec;
+  net_profit: Dec;
+  cum_net_profit: Dec;
+  orders: number;
+  settled_orders: number;
+  provisional_orders: number;
+}
+
+export interface TrendEvent {
+  date: string;
+  type: "ad_deduction" | "video_posted" | string;
+  amount: Dec | null;
+  label: string;
+}
+
+export interface GmvSource {
+  date: string;
+  gmv_total: Dec | null;
+  gmv_video: Dec | null;
+  gmv_product_card: Dec | null;
+  gmv_live: Dec | null;
+  gmv_max_pct: Dec | null;
+}
+
+export interface Trends extends Meta {
+  series: TrendPoint[];
+  events: TrendEvent[];
+  gmv_sources: GmvSource[];
+}
+
+export type ProductStatus = "SCALE" | "HEALTHY" | "WATCH" | "INVESTIGATE" | "REDUCE" | "SMALL_SAMPLE";
+
+export interface ProductRow {
+  product_id: number;
+  title: string;
+  external_product_id: string | null;
+  units: number;
+  orders: number;
+  gmv: Dec;
+  net_seller_revenue: Dec;
+  fees: Dec;
+  affiliate: Dec;
+  cogs: Dec;
+  ad_cost: Dec;
+  ad_cost_is_estimate: boolean;
+  refunds: Dec;
+  net_profit: Dec;
+  net_margin: Dec | null;
+  cvr: Dec | null;
+  ctr: Dec | null;
+  status: ProductStatus;
+  status_reason: string;
+}
+
+export interface Products extends Meta {
+  rows: ProductRow[];
+  cvr_note: string;
+  ad_cost_note: string;
+}
+
+export type VideoClass =
+  | "WINNER" | "PROMISING" | "TRAFFIC_NO_SALES" | "LOW_ATTENTION" | "LOSER"
+  | "FATIGUING" | "NEUTRAL" | "WATCH" | "INSUFFICIENT_DATA";
+
+export interface VideoCard {
+  video_id: number;
+  external_video_id: string | null;
+  caption: string | null;
+  published_at: string | null;
+  duration_seconds: number | null;
+  age_days: number;
+  views: number;
+  impressions: number;
+  clicks: number;
+  orders: number;
+  gmv: Dec;
+  ctr: Dec | null;
+  cvr: Dec | null;
+  gpm: Dec | null;
+  ad_spend: null;
+  net_profit: null;
+  ad_spend_note: string;
+  classification: VideoClass;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  reasons: string[];
+}
+
+export interface Videos extends Meta {
+  cards: VideoCard[];
+  clicks_note: string;
+  ad_spend_note: string;
+}
+
+export interface Deduction {
+  date: string;
+  amount: Dec;
+  [k: string]: unknown;
+}
+
+export interface Campaigns extends Meta {
+  available: boolean;
+  reason: string;
+  shop_level_ad_cost: Dec;
+  deductions: Deduction[];
+  rows: unknown[];
+}
+
+export interface CreatorRow {
+  creator: string;
+  orders?: number;
+  gmv?: Dec;
+  affiliate_commission?: Dec;
+  profit_after_commission?: Dec;
+  [k: string]: unknown;
+}
+
+export interface Creators extends Meta {
+  rows: CreatorRow[];
+  note: string;
+}
+
+export interface FunnelStage { name: string; count: number; note: string | null }
+export interface FunnelStep {
+  from: string; to: string; count: number; rate: Dec | null; baseline_rate: Dec | null;
+  delta_pct: Dec | null; timing_only: boolean;
+}
+export interface FunnelDiagnosis {
+  stage_from: string; stage_to: string; current_rate: Dec; baseline_rate: Dec; delta_pct: Dec;
+  lost_orders: Dec; lost_profit: Dec | null; evidence: string[]; estimated: true;
+}
+export interface WaterfallStep { key: string; amount: Dec; measured: boolean; subtotal?: boolean }
+export interface Funnel extends Meta {
+  stages: FunnelStage[];
+  steps: FunnelStep[];
+  diagnosis: FunnelDiagnosis | null;
+  baseline_note: string;
+  waterfall: { orders: number; provisional_orders: number; steps: WaterfallStep[]; note: string };
+}
+
+export type Severity = "CRITICAL" | "WARNING" | "OPPORTUNITY" | "INFO";
+export interface Finding {
+  key: string;
+  kind: "risk" | "opportunity";
+  severity: Severity;
+  title: string;
+  detail: string;
+  impact: Dec | null;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  source: string;
+  measured: boolean;
+  links: { tab?: string; product_id?: number; video_id?: number; zone?: string };
+}
+export interface Insights extends Meta {
+  findings: Finding[];
+  opportunities: Finding[];
+  risks: Finding[];
+  note: string;
+}
+
+export type Team = "performance" | "video" | "design" | "product" | "finance" | "management";
+export type Priority = "P1" | "P2" | "P3";
+export type TaskStatus = "today" | "in_progress" | "review" | "done";
+export const TEAMS: Team[] = ["performance", "video", "design", "product", "finance", "management"];
+export const PRIORITIES: Priority[] = ["P1", "P2", "P3"];
+export const TASK_STATUSES: TaskStatus[] = ["today", "in_progress", "review", "done"];
+
+export interface Task {
+  id: number;
+  shop_id: number;
+  title: string;
+  detail: string | null;
+  team: Team;
+  priority: Priority;
+  status: TaskStatus;
+  owner: string | null;
+  deadline: string | null;
+  impact_note: string | null;
+  source: string | null;
+  evidence: Record<string, unknown>;
+  result_note: string | null;
+  done_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface TaskIn {
+  title: string; detail?: string | null; team: Team; priority?: Priority; status?: TaskStatus;
+  owner?: string | null; deadline?: string | null; impact_note?: string | null; source?: string;
+  evidence?: Record<string, unknown>;
+}
+export interface TaskPatch {
+  title?: string; detail?: string | null; team?: Team; priority?: Priority; status?: TaskStatus;
+  owner?: string | null; deadline?: string | null; impact_note?: string | null; result_note?: string | null;
+}
+export interface Tasks {
+  shop_id: number;
+  tasks: Task[];
+  columns: Record<TaskStatus, Task[]>;
+}
