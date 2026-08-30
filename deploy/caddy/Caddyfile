@@ -1,0 +1,16 @@
+tt.lomiraproduct.com {
+	encode gzip
+	handle /oauth/* {
+		reverse_proxy api:8400
+	}
+	handle /api/* {
+		reverse_proxy api:8400
+	}
+	handle /health {
+		reverse_proxy api:8400
+	}
+	handle {
+		# dashboard (Next.js) lands here later; until then proxy to api
+		reverse_proxy api:8400
+	}
+}

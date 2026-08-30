@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 
+from apps.api.oauth import router as oauth_router
 from src.config.settings import settings
 
 app = FastAPI(title="TikTok Shop Profit Control AI", version="0.0.1")
+app.include_router(oauth_router)
 
 
 @app.get("/health")
