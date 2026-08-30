@@ -1,11 +1,19 @@
+"""Worker: APScheduler loop (finance hourly, withdrawals 6h, metrics daily 03:00 shop time)."""
 import logging
-import time
 
-logging.basicConfig(level="INFO")
+from apps.worker import scheduler
+from apps.worker.cli import build_context, shop_from_db
+from src.config.settings import settings
+from src.db.session import SessionLocal
+
+logging.basicConfig(level=settings.log_level, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("tt.worker")
 
+
+def run(name: str) -> dict:
+    return scheduler.run_job(name, SessionLocal, build_context, shop_from_db)
+
+
 if __name__ == "__main__":
-    # Placeholder until Phase 1 sync jobs exist (Celery beat / APScheduler decision pending)
-    log.info("worker skeleton up; no jobs registered yet")
-    while True:
-        time.sleep(3600)
+    log.info("worker up: jobs=%s tz=%s", list(scheduler.JOBS), settings.shop_timezone)
+    scheduler.build_scheduler(run).start()
