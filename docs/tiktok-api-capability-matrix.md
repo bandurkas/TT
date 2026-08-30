@@ -1,4 +1,36 @@
-# TikTok API Capability Matrix (Deliverable 1) — DRAFT v0.2 (2026-08-30, offline)
+# TikTok API Capability Matrix (Deliverable 1) — v0.3 (2026-08-30, first live verification)
+
+## Live verification 2026-08-30 (shop Lomira.product, region ID, LOCAL seller)
+Authorized scopes granted (26) incl. `seller.order.info`, `seller.product.basic`, `seller.finance.info`,
+`data.shop_analytics.public.read`, `seller.affiliate_collaboration.read`, `seller.return_refund.basic`,
+`seller.promotion.info`, `seller.fulfillment.basic`. Signature algorithm **VERIFIED** (first call OK).
+
+| Data point | Endpoint (live) | Result | Notes |
+|---|---|---|---|
+| Shop info | `GET /authorization/202309/shops` | **AVAILABLE** | cipher, id, code, region, seller_type=LOCAL |
+| Orders | `POST /order/202309/orders/search` | **AVAILABLE** | line_items: sku_id, seller_sku, sale_price, original_price, seller_discount, platform_discount, buyer_service_fee; payment block (sub_total, shipping fees, discounts, tax, total_amount). **No source video / creator on order** → attribution derived. Contains PII (buyer_email, recipient_address) → redacted before raw sink |
+| Order detail | `GET /order/202309/orders?ids=` | **AVAILABLE** | comma-joined ids accepted |
+| Products | `POST /product/202309/products/search` | **AVAILABLE** | skus embedded |
+| Video performance list | `GET /analytics/202509/shop_videos/performance` | **AVAILABLE** | 202405 rejected, 202409 OK (fewer fields), **202509 best**: views, ctr, gmv, gpm, duration, items_sold, sku_orders, avg_customers, hash_tags, products[], username, video_post_time |
+| Video overview | `GET /analytics/202509/shop_videos/overview_performance` | **AVAILABLE** | product_impressions, product_clicks, ctr, gmv, sku_orders, latest_available_date (D-1) |
+| Video detail per product | `GET /analytics/202509/shop_videos/{id}/performance` | **AVAILABLE** | breakdown per product_id: impressions, clicks, ctr, gmv, gpm, customers |
+| Product performance | `GET /analytics/{202405,202509}/shop_products/performance` | **AVAILABLE** | gmv, orders, items_sold, ctr |
+| SKU performance | `GET /analytics/202509/shop_skus/performance` | **AVAILABLE** | 202405/202409 rejected |
+| Shop performance | `GET /analytics/202509/shop/performance` | **AVAILABLE** | gmv breakdown LIVE/VIDEO/PRODUCT_CARD; gross_revenue breakdown **GMV_MAX vs NON_GMV_MAX** (92.9% GMV Max on 23–30 Aug) — key for adjusted ROAS |
+| LIVE performance | `/analytics/*/shop_lives/overview_performance` | **ERROR 36009003** | internal error on all versions tried; shop has 0 LIVE GMV — retry later, low priority |
+| Finance statements | `GET /finance/202309/statements` | **AVAILABLE** | revenue_amount, fee_amount, shipping_cost_amount, adjustment_amount, net_sales_amount, settlement_amount, payment_id/status |
+| Statement transactions | `GET /finance/202309/statements/{id}/statement_transactions` | **AVAILABLE** | per-order lines |
+| Order statement transactions | `GET /finance/202309/orders/{id}/statement_transactions` | **AVAILABLE** | |
+| Payments (payouts) | `GET /finance/202309/payments` | **AVAILABLE** | empty in last 30d for this shop |
+| Withdrawals | `GET /finance/202309/withdrawals` | **AVAILABLE** | amount, type, status |
+| Returns | `POST /return_refund/202309/returns/search` | **AVAILABLE** | refund_amount, return_line_items, reason, status |
+| Affiliate orders/creators | `affiliate_seller/*` | UNKNOWN | scope granted, not yet called |
+| Ads (all rows) | Marketing API v1.3 | PENDING | developer app not created yet |
+
+Data freshness: analytics `latest_available_date` = yesterday (D-1); orders/finance near-real-time.
+
+---
+# Offline draft v0.2 (kept for reference)
 
 Status values: AVAILABLE / NOT AVAILABLE / REQUIRES APPROVAL / REGION LIMITED / UNKNOWN /
 **documented, unverified** (= path found in official doc index or official SDK, never called live).
@@ -18,7 +50,7 @@ param (see `src/integrations/tiktok_shop/signing.py`). Ads base URL:
 |---|---|---|---|---|---|---|---|
 | Shop info (shop_cipher, region) | Shop / Authorization | `GET /authorization/202309/shops` | Shop Authorized Info | per authorized shop | on demand | documented, unverified | Needed first: provides `cipher` for all other calls |
 | Products / SKUs | Shop / Product | `POST /product/202309/products/search` (query page_size/page_token); `GET /product/202309/products/{id}` | Product | product, SKU nested | on demand | documented, unverified | SKU seller_sku expected inside product detail; field names UNKNOWN |
-| Orders | Shop / Order | `POST /order/202309/orders/search`; `GET /order/202309/orders?ids=` | Order | order + line items | near-real-time (webhooks exist) | documented, unverified | Filter names create_time_ge/lt, update_time_ge/lt, order_status UNVERIFIED; sort_field/sort_order in query |
+| Orders | Shop / Order | `POST /order/202309/orders/search`; `GET /order/202309/orders?ids=` | Order | order + line items | near-real-time (webhooks exist) | documented, unverified | Filter names create_time_ge/lt, update_time_ge/lt, order_status UNVERIFIED; sort_field/sort_order in query. **PII present** (recipient_address, buyer_email, phone, name — field names UNVERIFIED): client strips them via `default_redactor` before raw_sink |
 | Video performance | Shop / Data Insights (Analytics) | `GET /analytics/{202405\|202409\|202509}/shop_videos/performance` (list); `/shop_videos/overview_performance`; `/shop_videos/{id}/performance` | Data Insights / Analytics (name UNKNOWN) | per video, daily window (`start_date_ge`/`end_date_lt`) | UNKNOWN (docs mention T+1 style lag; unverified) | documented, unverified | Docv2 lists revisions 202409 and 202509; SDK uses 202405. Which one ID region supports — UNKNOWN |
 | Video-product performance | Shop / Data Insights | `GET /analytics/202405/shop_videos/{video_id}/products/performance` | Data Insights | per video × product | UNKNOWN | documented, unverified | version UNVERIFIED |
 | Product performance | Shop / Data Insights | `GET /analytics/202405/shop_products/performance`; `/shop_products/{id}/performance`; `/shop_skus/performance` | Data Insights | product / SKU, daily window | UNKNOWN | documented, unverified | Docv2 "Shop Product Performance Detail" page exists |
@@ -37,6 +69,8 @@ param (see `src/integrations/tiktok_shop/signing.py`). Ads base URL:
 
 ## UNVERIFIED items (must be confirmed in Deliverable 5)
 - Signature algorithm details (hex case, body inclusion for GET) — from third-party SDK, not read from official page.
+- Get Order Detail `ids`: comma-joined vs repeated query key — client sends comma-joined.
+- bool/array serialisation inside the sign string (client uses `true`/`false` and comma-joined lists, identical to what is sent).
 - `access_token_expire_in` unit (unix seconds assumed) in token responses.
 - All Shop body/query filter field names and response `items` keys (`orders`, `products`, `videos`, `statements`, `transactions`, `payments`, `withdrawals`, `return_orders`, `next_page_token`).
 - Analytics version (202405 vs 202409 vs 202509) and Data Insights scope name for region ID.

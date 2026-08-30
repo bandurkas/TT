@@ -18,6 +18,22 @@ from collections.abc import Mapping
 EXCLUDED = frozenset({"sign", "access_token", "x-tts-access-token"})
 
 
+def normalise_query(query: Mapping[str, object]) -> dict[str, str]:
+    """Canonical string form used for BOTH signing and sending (never sign one, send another).
+    bool -> "true"/"false"; list/tuple -> comma-joined  # UNVERIFIED: list serialisation."""
+    out: dict[str, str] = {}
+    for k, v in query.items():
+        if v is None:
+            continue
+        if isinstance(v, bool):
+            out[k] = "true" if v else "false"
+        elif isinstance(v, (list, tuple)):
+            out[k] = ",".join(str(x) for x in v)
+        else:
+            out[k] = str(v)
+    return out
+
+
 def sign_string(app_secret: str, path: str, query: Mapping[str, object],
                 body: bytes | None) -> str:
     params = "".join(f"{k}{query[k]}" for k in sorted(query) if k not in EXCLUDED)

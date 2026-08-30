@@ -4,20 +4,28 @@ from decimal import ROUND_HALF_UP, Decimal
 
 
 def fmt_idr(amount: Decimal | int) -> str:
+    """Rp 999 / Rp 143k (0 dp) / Rp 1.6m / Rp 1.2b (always 1 dp for m/b). Rounding may
+    promote units (999,999 -> "Rp 1.0m"). Negative -> "-Rp 400". Floats rejected."""
+    if isinstance(amount, float):
+        raise TypeError("fmt_idr: float not allowed, use Decimal")
     a = Decimal(amount)
     sign = "-" if a < 0 else ""
     a = abs(a)
-    if a >= 1_000_000:
-        s = str((a / 1_000_000).quantize(Decimal("0.01"), ROUND_HALF_UP))
-        s = s.removesuffix("0")
-        return f"{sign}Rp {s}m"
-    if a >= 1_000:
-        return f"{sign}Rp {(a / 1_000).quantize(Decimal(1), ROUND_HALF_UP)}k"
-    return f"{sign}Rp {a.quantize(Decimal(1), ROUND_HALF_UP)}"
+    if a < 1_000:
+        return f"{sign}Rp {a.quantize(Decimal(1), ROUND_HALF_UP)}"
+    k = (a / 1_000).quantize(Decimal(1), ROUND_HALF_UP)
+    if k < 1_000:
+        return f"{sign}Rp {k}k"
+    m = (a / 1_000_000).quantize(Decimal("0.1"), ROUND_HALF_UP)
+    if m < 1_000:
+        return f"{sign}Rp {m}m"
+    return f"{sign}Rp {(a / 1_000_000_000).quantize(Decimal('0.1'), ROUND_HALF_UP)}b"
 
 
 def fmt_pct(v: Decimal) -> str:
-    return f"{v.quantize(Decimal('0.1'), ROUND_HALF_UP)}%"
+    """"92%" when integral after rounding to 0.1, else 1 decimal ("92.5%")."""
+    q = v.quantize(Decimal("0.1"), ROUND_HALF_UP)
+    return f"{q.quantize(Decimal(1)) if q == q.to_integral_value() else q}%"
 
 
 def fmt_ratio(v: Decimal | None) -> str:

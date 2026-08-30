@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 
-from src.integrations.tiktok_shop.signing import compute_sign, sign_string
+from src.integrations.tiktok_shop.signing import compute_sign, normalise_query, sign_string
 
 SECRET = "secret123"
 PATH = "/order/202309/orders/search"
@@ -18,6 +18,7 @@ def test_sign_string_layout():
 
 
 def test_fixed_vector():
+    # self-generated, UNVERIFIED — replace with official vector in Deliverable 5
     assert compute_sign(SECRET, PATH, QUERY, BODY) == "d4e1f549555a93abdb481fc6ececcf540380c793456505d54f497a5ac06d5a77"
 
 
@@ -27,3 +28,8 @@ def test_matches_reference_hmac_without_body():
     assert compute_sign(SECRET, "/authorization/202309/shops",
                         {"app_key": "abc", "timestamp": 1}) == ref
     assert len(ref) == 64 and ref == ref.lower()
+
+
+def test_normalise_query_bool_list_none():
+    assert normalise_query({"a": True, "b": False, "c": [1, "x"], "d": None, "e": 5}) == {
+        "a": "true", "b": "false", "c": "1,x", "e": "5"}

@@ -1,5 +1,6 @@
 """TikTok Shop Open API client (read-only). Paths from Partner Center docv2 page slugs and
 EcomPHP/tiktokshop-php resources; every path is `# UNVERIFIED` until Deliverable 5."""
+import fcntl
 import json
 import logging
 import random
@@ -10,18 +11,58 @@ from typing import Any, Protocol
 import httpx
 
 from src.integrations.tiktok_shop.auth import TokenStore, refresh_token
-from src.integrations.tiktok_shop.signing import compute_sign
+from src.integrations.tiktok_shop.signing import compute_sign, normalise_query
 
 log = logging.getLogger("tt.shop")
 BASE_URL = "https://open-api.tiktokglobalshop.com"
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
+RETRY_AFTER_CAP = 30.0
+MAX_PAGES = 500
 RawSink = Callable[[str, dict[str, Any], dict[str, Any]], None]
+Redactor = Callable[[str, dict[str, Any]], dict[str, Any]]
+
+# Buyer PII keys stripped from raw order payloads before raw_sink  # UNVERIFIED field names
+ORDER_PII_KEYS = frozenset({"recipient_address", "buyer_email", "phone", "phone_number",
+                            "name", "buyer_message", "user_id"})
+
+
+def _strip_keys(obj: Any, keys: frozenset[str]) -> Any:
+    if isinstance(obj, dict):
+        return {k: _strip_keys(v, keys) for k, v in obj.items() if k not in keys}
+    if isinstance(obj, list):
+        return [_strip_keys(x, keys) for x in obj]
+    return obj
+
+
+def default_redactor(resource: str, payload: dict[str, Any]) -> dict[str, Any]:
+    if resource in ("orders", "order_detail"):
+        return _strip_keys(payload, ORDER_PII_KEYS)
+    return payload
+
+
+def retry_after_seconds(resp: httpx.Response, fallback: float) -> float:
+    try:
+        ra = float(resp.headers.get("retry-after", ""))
+    except ValueError:
+        return fallback
+    return min(max(ra, 0.0), RETRY_AFTER_CAP)
+
+
+def safe_json(resp: httpx.Response) -> dict[str, Any]:
+    try:
+        payload = resp.json()
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict):
+        return {"_non_json": True, "status": resp.status_code, "text": resp.text[:4000]}
+    return payload
 
 
 class ShopApiError(RuntimeError):
-    def __init__(self, code: object, message: object, request_id: object = None):
-        super().__init__(f"code={code} message={message} request_id={request_id}")
-        self.code, self.message, self.request_id = code, message, request_id
+    def __init__(self, code: object, message: object, request_id: object = None,
+                 status: int | None = None):
+        super().__init__(f"code={code} message={message} request_id={request_id} status={status}")
+        self.code, self.message, self.request_id, self.status = code, message, request_id, status
 
 
 class TokenProvider(Protocol):
@@ -42,31 +83,47 @@ class StaticTokenProvider:
 
 class FileTokenProvider:
     """Wraps TokenStore; refreshes when access_token_expire_in (unix seconds,
-    # UNVERIFIED unit) is within `margin` of now."""
+    # UNVERIFIED unit) is within `margin` of now. Missing/0 expiry => refresh now.
+    Refresh is serialised across processes via flock on a sidecar lock file."""
 
     def __init__(self, store: TokenStore, app_key: str, app_secret: str, *,
                  margin: int = 3600, http: httpx.Client | None = None,
                  now: Callable[[], float] = time.time):
         self.store, self.app_key, self.app_secret = store, app_key, app_secret
         self.margin, self.http, self.now = margin, http, now
+        self.lock_path = store.path.with_name(store.path.name + ".lock")
+
+    def _needs_refresh(self, d: dict) -> bool:
+        exp = int(d.get("access_token_expire_in") or 0)
+        if not exp:
+            log.warning("tiktok-shop token has no expiry; refreshing now")
+            return True
+        return exp - self.now() < self.margin
 
     def get_access_token(self) -> str:
         d = self.store.load()
         if not d or not d.get("access_token"):
             raise ShopApiError("no_token", "token store empty; authorize first")
-        exp = int(d.get("access_token_expire_in") or 0)
-        if exp and exp - self.now() < self.margin:
+        if self._needs_refresh(d):
             self.refresh()
             d = self.store.load() or d
         return d["access_token"]
 
-    def refresh(self) -> None:
-        d = self.store.load() or {}
-        if not d.get("refresh_token"):
-            raise ShopApiError("no_refresh_token", "cannot refresh")
-        data = refresh_token(self.app_key, self.app_secret, d["refresh_token"], self.http)
-        self.store.save({**d, **data})
-        log.info("tiktok-shop access token refreshed")
+    def refresh(self, force: bool = False) -> None:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.lock_path, "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                d = self.store.load() or {}  # re-read under lock
+                if not force and d.get("access_token") and not self._needs_refresh(d):
+                    return  # another process already refreshed
+                if not d.get("refresh_token"):
+                    raise ShopApiError("no_refresh_token", "cannot refresh")
+                data = refresh_token(self.app_key, self.app_secret, d["refresh_token"], self.http)
+                self.store.save({**d, **data})
+                log.info("tiktok-shop access token refreshed")
+            finally:
+                fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 class TikTokShopClient:
@@ -75,43 +132,62 @@ class TikTokShopClient:
                  raw_sink: RawSink | None = None, http: httpx.Client | None = None,
                  max_retries: int = 4, backoff_base: float = 0.5,
                  sleep: Callable[[float], None] = time.sleep,
-                 now_ms: Callable[[], int] = lambda: int(time.time() * 1000)):
+                 now_ms: Callable[[], int] = lambda: int(time.time() * 1000),
+                 redact: Redactor | None = default_redactor, max_pages: int = MAX_PAGES):
         self.app_key, self.app_secret, self.tokens = app_key, app_secret, token_provider
         self.shop_cipher, self.base_url, self.raw_sink = shop_cipher, base_url.rstrip("/"), raw_sink
         self.http = http or httpx.Client(timeout=30)
         self.max_retries, self.backoff_base, self.sleep, self.now_ms = (
             max_retries, backoff_base, sleep, now_ms)
+        self.redact, self.max_pages = redact, max_pages
 
     # --- core -------------------------------------------------------------------------
+    def _send(self, method: str, url: str, path: str, q: dict[str, str], raw_body: bytes | None,
+              headers: dict[str, str]) -> httpx.Response:
+        for attempt in range(self.max_retries + 1):
+            delay = self.backoff_base * 2 ** attempt * (1 + random.random() * 0.1)
+            try:
+                resp = self.http.request(method, url, params=q, content=raw_body, headers=headers)
+            except httpx.TransportError as e:
+                if attempt >= self.max_retries:
+                    raise ShopApiError("transport", f"{type(e).__name__}: {e}") from e
+                log.warning("shop %s %s transport error %s, retry in %.2fs", method, path,
+                            type(e).__name__, delay)
+                self.sleep(delay)
+                continue
+            if resp.status_code in RETRY_STATUS and attempt < self.max_retries:
+                if resp.status_code == 429:
+                    delay = retry_after_seconds(resp, delay)
+                log.warning("shop %s %s -> %s, retry in %.2fs", method, path,
+                            resp.status_code, delay)
+                self.sleep(delay)
+                continue
+            return resp
+        raise AssertionError("unreachable")
+
     def request(self, method: str, path: str, *, query: Mapping[str, Any] | None = None,
                 body: Mapping[str, Any] | None = None, resource: str = "",
                 with_shop_cipher: bool = True) -> dict[str, Any]:
         q: dict[str, Any] = {"app_key": self.app_key, "timestamp": self.now_ms() // 1000}
         if with_shop_cipher and self.shop_cipher:
             q["shop_cipher"] = self.shop_cipher
-        q.update({k: v for k, v in (query or {}).items() if v is not None})
+        q.update(query or {})
+        qs = normalise_query(q)  # signed and sent as the same dict
         raw_body = None if body is None else json.dumps(body, separators=(",", ":")).encode()
-        q["sign"] = compute_sign(self.app_secret, path, q, None if method == "GET" else raw_body)
+        qs["sign"] = compute_sign(self.app_secret, path, qs, None if method == "GET" else raw_body)
         headers = {"x-tts-access-token": self.tokens.get_access_token(),
                    "content-type": "application/json"}
-        url = self.base_url + path
-        for attempt in range(self.max_retries + 1):
-            resp = self.http.request(method, url, params=q, content=raw_body, headers=headers)
-            if resp.status_code in RETRY_STATUS and attempt < self.max_retries:
-                delay = self.backoff_base * 2 ** attempt * (1 + random.random() * 0.1)
-                log.warning("shop %s %s -> %s, retry in %.2fs", method, path,
-                            resp.status_code, delay)
-                self.sleep(delay)
-                continue
-            break
-        payload = resp.json()
-        meta = {"method": method, "path": path, "query": {k: v for k, v in q.items()
+        resp = self._send(method, self.base_url + path, path, qs, raw_body, headers)
+        payload = safe_json(resp)
+        meta = {"method": method, "path": path, "query": {k: v for k, v in qs.items()
                 if k != "sign"}, "status": resp.status_code, "request_id": payload.get("request_id")}
+        res = resource or path
         if self.raw_sink:
-            self.raw_sink(resource or path, meta, payload)
+            self.raw_sink(res, meta, self.redact(res, payload) if self.redact else payload)
         if resp.status_code != 200 or payload.get("code") != 0:
-            raise ShopApiError(payload.get("code", resp.status_code), payload.get("message"),
-                               payload.get("request_id"))
+            raise ShopApiError(payload.get("code", resp.status_code),
+                               payload.get("message") or payload.get("text"),
+                               payload.get("request_id"), status=resp.status_code)
         return payload.get("data") or {}
 
     def paginate(self, method: str, path: str, items_key: str, *,
@@ -119,14 +195,18 @@ class TikTokShopClient:
                  resource: str = "", page_size: int = 50) -> Iterator[dict[str, Any]]:
         q = dict(query or {})
         q["page_size"] = page_size
-        while True:
+        seen: set[str] = set()
+        for _ in range(self.max_pages):
             data = self.request(method, path, query=q, body=body, resource=resource)
             yield from data.get(items_key) or []
             token = data.get("next_page_token")
             if not token:
                 return
+            if token in seen:
+                raise ShopApiError("pagination_loop", f"repeated next_page_token on {path}")
+            seen.add(token)
             q["page_token"] = token
-
+        raise ShopApiError("max_pages", f"exceeded {self.max_pages} pages on {path}")
     # --- authorization ------------------------------------------------------------------
     def get_authorized_shops(self) -> list[dict[str, Any]]:
         # docv2/page/authorization-guide-202309  # UNVERIFIED
@@ -167,7 +247,7 @@ class TikTokShopClient:
     # --- analytics (Data Insights) ------------------------------------------------------
     # Paths from EcomPHP Analytics.php (min version 202405); Partner Center now lists
     # 202409/202509 revisions of the video pages. Version  # UNVERIFIED
-    ANALYTICS_VERSION = "202405"
+    ANALYTICS_VERSION = "202509"  # verified live 2026-08-30 (video/sku/shop perf); 202405 also OK for product perf
 
     def _analytics(self, path: str, resource: str, start_date: str, end_date: str,
                    items_key: str | None, extra: Mapping[str, Any] | None = None,

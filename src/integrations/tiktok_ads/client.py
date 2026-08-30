@@ -12,13 +12,17 @@ import httpx
 log = logging.getLogger("tt.ads")
 BASE_URL = "https://business-api.tiktok.com/open_api/v1.3"
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
+RETRY_AFTER_CAP = 30.0
+MAX_PAGES = 500
+VIDEO_INFO_BATCH = 60
 RawSink = Callable[[str, dict[str, Any], dict[str, Any]], None]
 
 
 class AdsApiError(RuntimeError):
-    def __init__(self, code: object, message: object, request_id: object = None):
-        super().__init__(f"code={code} message={message} request_id={request_id}")
-        self.code, self.message, self.request_id = code, message, request_id
+    def __init__(self, code: object, message: object, request_id: object = None,
+                 status: int | None = None):
+        super().__init__(f"code={code} message={message} request_id={request_id} status={status}")
+        self.code, self.message, self.request_id, self.status = code, message, request_id, status
 
 
 def _encode(params: Mapping[str, Any]) -> dict[str, str]:
@@ -26,51 +30,87 @@ def _encode(params: Mapping[str, Any]) -> dict[str, str]:
     for k, v in params.items():
         if v is None:
             continue
-        out[k] = json.dumps(v, separators=(",", ":")) if isinstance(v, (list, dict)) else str(v)
+        if isinstance(v, bool):
+            out[k] = "true" if v else "false"  # Marketing API expects lowercase
+        elif isinstance(v, (list, dict)):
+            out[k] = json.dumps(v, separators=(",", ":"))
+        else:
+            out[k] = str(v)
     return out
+
+
+def _retry_after(resp: httpx.Response, fallback: float) -> float:
+    try:
+        return min(max(float(resp.headers.get("retry-after", "")), 0.0), RETRY_AFTER_CAP)
+    except ValueError:
+        return fallback
+
+
+def _safe_json(resp: httpx.Response) -> dict[str, Any]:
+    try:
+        payload = resp.json()
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict):
+        return {"_non_json": True, "status": resp.status_code, "text": resp.text[:4000]}
+    return payload
 
 
 class TikTokAdsClient:
     def __init__(self, access_token: str, base_url: str = BASE_URL,
                  raw_sink: RawSink | None = None, http: httpx.Client | None = None,
                  max_retries: int = 4, backoff_base: float = 0.5,
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep, max_pages: int = MAX_PAGES):
         self.access_token, self.base_url, self.raw_sink = access_token, base_url.rstrip("/"), raw_sink
         self.http = http or httpx.Client(timeout=60)
         self.max_retries, self.backoff_base, self.sleep = max_retries, backoff_base, sleep
+        self.max_pages = max_pages
 
-    def request(self, path: str, params: Mapping[str, Any], resource: str = "") -> dict[str, Any]:
-        q = _encode(params)
-        headers = {"Access-Token": self.access_token}
+    def _send(self, path: str, q: dict[str, str], headers: dict[str, str]) -> httpx.Response:
         url = self.base_url + path
         for attempt in range(self.max_retries + 1):
-            resp = self.http.get(url, params=q, headers=headers)
+            delay = self.backoff_base * 2 ** attempt * (1 + random.random() * 0.1)
+            try:
+                resp = self.http.get(url, params=q, headers=headers)
+            except httpx.TransportError as e:
+                if attempt >= self.max_retries:
+                    raise AdsApiError("transport", f"{type(e).__name__}: {e}") from e
+                log.warning("ads GET %s transport error %s, retry in %.2fs", path,
+                            type(e).__name__, delay)
+                self.sleep(delay)
+                continue
             if resp.status_code in RETRY_STATUS and attempt < self.max_retries:
-                delay = self.backoff_base * 2 ** attempt * (1 + random.random() * 0.1)
+                if resp.status_code == 429:
+                    delay = _retry_after(resp, delay)
                 log.warning("ads GET %s -> %s, retry in %.2fs", path, resp.status_code, delay)
                 self.sleep(delay)
                 continue
-            break
-        payload = resp.json()
+            return resp
+        raise AssertionError("unreachable")
+
+    def request(self, path: str, params: Mapping[str, Any], resource: str = "") -> dict[str, Any]:
+        q = _encode(params)
+        resp = self._send(path, q, {"Access-Token": self.access_token})
+        payload = _safe_json(resp)
         meta = {"method": "GET", "path": path, "query": q, "status": resp.status_code,
                 "request_id": payload.get("request_id")}
         if self.raw_sink:
             self.raw_sink(resource or path, meta, payload)
         if resp.status_code != 200 or payload.get("code") != 0:
-            raise AdsApiError(payload.get("code", resp.status_code), payload.get("message"),
-                              payload.get("request_id"))
+            raise AdsApiError(payload.get("code", resp.status_code),
+                              payload.get("message") or payload.get("text"),
+                              payload.get("request_id"), status=resp.status_code)
         return payload.get("data") or {}
 
     def paginate(self, path: str, params: Mapping[str, Any], resource: str = "",
                  page_size: int = 100) -> Iterator[dict[str, Any]]:
-        page = 1
-        while True:
+        for page in range(1, self.max_pages + 1):
             data = self.request(path, {**params, "page": page, "page_size": page_size}, resource)
             yield from data.get("list") or []
             info = data.get("page_info") or {}
             if page >= int(info.get("total_page") or 1):
                 return
-            page += 1
+        raise AdsApiError("max_pages", f"exceeded {self.max_pages} pages on {path}")
 
     def get_advertiser_info(self, advertiser_ids: list[str],
                             fields: list[str] | None = None) -> list[dict[str, Any]]:
@@ -104,9 +144,13 @@ class TikTokAdsClient:
                              page_size=100)
 
     def get_video_info(self, advertiser_id: str, video_ids: list[str]) -> list[dict[str, Any]]:
-        data = self.request("/file/video/ad/info/", {"advertiser_id": advertiser_id,
-                                                     "video_ids": video_ids[:60]}, "video_info")
-        return data.get("list") or []
+        out: list[dict[str, Any]] = []
+        for i in range(0, len(video_ids), VIDEO_INFO_BATCH):
+            data = self.request("/file/video/ad/info/", {
+                "advertiser_id": advertiser_id,
+                "video_ids": video_ids[i:i + VIDEO_INFO_BATCH]}, "video_info")
+            out += data.get("list") or []
+        return out
 
     def get_report(self, advertiser_id: str, level: str, dimensions: list[str],
                    metrics: list[str], start: str, end: str, page: int = 1, page_size: int = 100,
@@ -121,13 +165,12 @@ class TikTokAdsClient:
             "page": page, "page_size": page_size}, "report")
 
     def iter_report(self, *args: Any, **kwargs: Any) -> Iterator[dict[str, Any]]:
-        page = 1
-        while True:
+        for page in range(1, self.max_pages + 1):
             data = self.get_report(*args, page=page, **kwargs)
             yield from data.get("list") or []
             if page >= int((data.get("page_info") or {}).get("total_page") or 1):
                 return
-            page += 1
+        raise AdsApiError("max_pages", f"exceeded {self.max_pages} report pages")
 
     def get_gmv_max_report(self, advertiser_id: str, store_ids: list[str], dimensions: list[str],
                            metrics: list[str], start: str, end: str, page: int = 1,

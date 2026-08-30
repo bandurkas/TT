@@ -59,6 +59,86 @@ def test_retry_on_500_and_raw_sink():
     assert len(calls) == 2 and got == ["advertiser_info"]
 
 
+def test_bool_encoded_lowercase():
+    seen = {}
+
+    def handler(req):
+        seen["q"] = dict(req.url.params)
+        return ok({"list": [], "page_info": {"total_page": 1}})
+
+    list(make(handler).paginate("/x/", {"flag": True, "off": False}))
+    assert seen["q"]["flag"] == "true" and seen["q"]["off"] == "false"
+
+
+def test_non_json_502_raw_sink_then_error():
+    got = []
+    c = make(lambda r: httpx.Response(502, text="<html>oops</html>"),
+             raw_sink=lambda r, m, p: got.append(p), max_retries=0)
+    with pytest.raises(AdsApiError) as e:
+        c.get_advertiser_info(["1"])
+    assert len(got) == 1 and got[0]["_non_json"] and got[0]["status"] == 502
+    assert e.value.status == 502 and e.value.code == 502
+
+
+def test_retry_exhausted_call_count():
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(503, json={"code": 503, "message": "down"})
+
+    with pytest.raises(AdsApiError):
+        make(handler, max_retries=2).get_advertiser_info(["1"])
+    assert len(calls) == 3
+
+
+def test_retry_after_header_capped():
+    calls, slept = [], []
+
+    def handler(req):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(429, headers={"Retry-After": "120"}, json={"code": 429})
+        return ok({"list": []})
+
+    c = TikTokAdsClient("T", http=httpx.Client(transport=httpx.MockTransport(handler)),
+                        sleep=slept.append)
+    c.get_advertiser_info(["1"])
+    assert slept == [30.0]
+
+
+def test_transport_error_retried():
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        if len(calls) == 1:
+            raise httpx.ConnectError("boom")
+        return ok({"list": [{"advertiser_id": "1"}]})
+
+    assert make(handler).get_advertiser_info(["1"]) == [{"advertiser_id": "1"}]
+    assert len(calls) == 2
+
+
+def test_pagination_max_pages_cap():
+    def handler(req):
+        return ok({"list": [{"i": 1}], "page_info": {"total_page": 10_000}})
+
+    with pytest.raises(AdsApiError, match="max_pages"):
+        list(make(handler, max_pages=3).get_campaigns("1"))
+
+
+def test_video_info_batched_by_60():
+    batches = []
+
+    def handler(req):
+        batches.append(len(json.loads(req.url.params["video_ids"])))
+        return ok({"list": [{"n": batches[-1]}]})
+
+    rows = make(handler).get_video_info("1", [str(i) for i in range(130)])
+    assert batches == [60, 60, 10] and len(rows) == 3
+
+
 def test_error_code_raises():
     def handler(req):
         return httpx.Response(200, json={"code": 40105, "message": "token", "request_id": "x"})
