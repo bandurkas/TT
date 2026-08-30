@@ -284,6 +284,9 @@ def classify_video(
     if not refund_ok and m.net_profit <= 0:
         c.reasons.append(f"non-positive contribution with high refunds: {m.net_profit}")
         return _result(c, Classification.LOSER, conf)
+    if m.ad_spend == 0 and m.net_profit < 0:
+        c.reasons.append(f"negative profit without ad spend: {m.net_profit}")
+        return _result(c, Classification.WATCH, _downgrade(conf))
 
     if ctr_low:
         c.reasons.append("CTR significantly below median with enough impressions")

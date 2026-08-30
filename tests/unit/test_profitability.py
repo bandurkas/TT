@@ -188,6 +188,12 @@ def test_adjustment_inside_same_settlement_is_not_post_settlement() -> None:
     assert r.revenue.adjustments == D(-500)
 
 
+def test_unsettled_fee_after_settled_sale_is_provisional() -> None:
+    txns = SPEC_TXNS + [txn("f2", "service_fee", 1000)]
+    r = order_profit("o", ORDER_DATE, [item()], txns, [cost()], ADS)
+    assert r.profit_status is ProfitStatus.PROVISIONAL
+
+
 def test_missing_settlement_is_provisional() -> None:
     txns = [txn("t1", "sale", 75000), txn("t2", "platform_commission", 8000)]
     r = order_profit("o", ORDER_DATE, [item()], txns, [cost()], ADS)

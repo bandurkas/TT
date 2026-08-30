@@ -291,19 +291,21 @@ def _sum_costs(parts: Iterable[InternalCosts]) -> InternalCosts:
 
 def derive_profit_status(txns: Sequence[FinanceTxn], revenue: RevenueBreakdown) -> ProfitStatus:
     """Precedence: REFUNDED > ADJUSTED > PAID > SETTLED > PROVISIONAL.
-    ADJUSTED: any adjustment- or REDUCES-type txn (refund, fee, ...) outside the sale's settlements."""
+    ADJUSTED: any adjustment-type txn outside the sale's settlements (incl. unsettled), or a
+    REDUCES-type txn (refund, fee, ...) in a *different* settlement. A REDUCES txn with no
+    settlement_id is an unsettled fee → PROVISIONAL."""
     sales = [t for t in txns if t.ntype is NormalizedType.SALE_PROCEEDS]
     if revenue.sale_proceeds > ZERO and revenue.refunds >= revenue.sale_proceeds:
         return ProfitStatus.REFUNDED
     if not sales or any(t.settlement_id is None for t in sales):
         return ProfitStatus.PROVISIONAL
     sale_settlements = {t.settlement_id for t in sales}
-    post_settlement = [
-        t for t in txns
-        if (t.ntype in ADJUSTMENT_TYPES or SIGN_RULES[t.ntype] is SignRule.REDUCES)
-        and t.settlement_id not in sale_settlements
-    ]
-    if post_settlement:
+    adjustments = [t for t in txns if t.ntype in ADJUSTMENT_TYPES]
+    reducers = [t for t in txns
+                if t.ntype not in ADJUSTMENT_TYPES and SIGN_RULES[t.ntype] is SignRule.REDUCES]
+    if any(t.settlement_id is None for t in reducers):
+        return ProfitStatus.PROVISIONAL
+    if any(t.settlement_id not in sale_settlements for t in adjustments + reducers):
         return ProfitStatus.ADJUSTED
     if all(t.payout_id is not None for t in sales):
         return ProfitStatus.PAID

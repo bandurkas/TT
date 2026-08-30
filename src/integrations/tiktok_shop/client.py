@@ -1,5 +1,8 @@
 """TikTok Shop Open API client (read-only). Paths from Partner Center docv2 page slugs and
-EcomPHP/tiktokshop-php resources; every path is `# UNVERIFIED` until Deliverable 5."""
+EcomPHP/tiktokshop-php resources. Live-verified 2026-08-30 on shop Lomira.product (ID): shops, orders,
+order detail, products, analytics 202509 (video list/overview/detail, product, sku, shop), finance
+(statements, statement/order transactions, payments, withdrawals), returns. Still UNVERIFIED:
+video×products performance, LIVE performance, affiliate — see docs/tiktok-api-capability-matrix.md."""
 import fcntl
 import json
 import logging
@@ -246,7 +249,7 @@ class TikTokShopClient:
 
     # --- analytics (Data Insights) ------------------------------------------------------
     # Paths from EcomPHP Analytics.php (min version 202405); Partner Center now lists
-    # 202409/202509 revisions of the video pages. Version  # UNVERIFIED
+    # 202409/202509 revisions of the video pages.
     ANALYTICS_VERSION = "202509"  # verified live 2026-08-30 (video/sku/shop perf); 202405 also OK for product perf
 
     def _analytics(self, path: str, resource: str, start_date: str, end_date: str,
@@ -263,7 +266,7 @@ class TikTokShopClient:
         return self._analytics("/shop/performance", "shop_performance", start_date, end_date, None)
 
     def get_video_performance(self, start_date: str, end_date: str) -> Iterator[dict[str, Any]]:
-        # docv2/page/get-shop-video-performance-list-202509; items_key  # UNVERIFIED
+        # docv2/page/get-shop-video-performance-list-202509; live-verified
         return self._analytics("/shop_videos/performance", "video_performance",
                                start_date, end_date, "videos")
 
