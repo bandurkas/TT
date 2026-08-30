@@ -105,7 +105,7 @@ def product_daily(profits: Iterable[Any], order_dates: Mapping[int, date]) -> di
             continue
         fees = _d(p.platform_fees) + _d(p.seller_shipping) + _d(p.taxes)
         prov = p.profit_status == ProfitStatus.PROVISIONAL
-        weights = {str(n): _d(i.get("gross_item_value")) for n, i in enumerate(items)}
+        weights = {str(n): max(_d(i.get("gross_item_value")), ZERO) for n, i in enumerate(items)}
         cur = getattr(p, "currency", None) or "IDR"
         split = {k: allocate_proportionally(v, weights, cur)
                  for k, v in (("fees", fees), ("aff", _d(p.affiliate_commission)),
@@ -171,10 +171,15 @@ def recompute_daily(session: Any, shop_id: int, dates: Sequence[date] | None = N
     upsert(session, ShopDaily, rows, ["shop_id", "metric_date"])
     prows = [{"product_id": pid, "metric_date": d, **a.as_row(now)}
              for (pid, d), a in product_daily(profits, order_dates).items()]
+    shop_products = select(Product.id).where(Product.shop_id == shop_id)
     if days:  # stale rows (product no longer sold that day after recompute) must not linger
-        shop_products = select(Product.id).where(Product.shop_id == shop_id)
         session.execute(delete(ProductDaily).where(ProductDaily.product_id.in_(shop_products),
                                                    ProductDaily.metric_date.in_(days)))
+    if dates is None:  # full run: days without any current profit row must not keep old aggregates
+        session.execute(delete(ShopDaily).where(ShopDaily.shop_id == shop_id,
+                                                ShopDaily.metric_date.not_in(days)))
+        session.execute(delete(ProductDaily).where(ProductDaily.product_id.in_(shop_products),
+                                                   ProductDaily.metric_date.not_in(days)))
     upsert(session, ProductDaily, prows, ["product_id", "metric_date"])
     session.commit()
     log.info("aggregates: shop=%s days=%d product_rows=%d", shop_id, len(rows), len(prows))

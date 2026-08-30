@@ -1,0 +1,401 @@
+<title>Lomira Profit Control</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F5F4F0;--surface:#FFFFFF;--surface2:#FAF9F6;--line:#E4E2DB;--ink:#17191F;--ink2:#4A4F5A;--muted:#7C818C;
+  --accent:#2E56E8;--accent-soft:#E8EDFD;
+  --good:#1B8F5A;--good-soft:#E3F4EB;--bad:#D23D37;--bad-soft:#FBE7E5;--warn:#C97C0A;--warn-soft:#FCF0DA;--info:#2E56E8;--info-soft:#E8EDFD;--gray-soft:#ECEBE6;
+  --shadow:0 1px 2px rgba(23,25,31,.05),0 1px 0 rgba(23,25,31,.03);
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121318;--surface:#1B1D24;--surface2:#20232B;--line:#2C2F39;--ink:#EEEEF2;--ink2:#C4C7D0;--muted:#8B90A0;
+  --accent:#6C8CFF;--accent-soft:#232C4A;
+  --good:#3FC286;--good-soft:#173327;--bad:#F06A63;--bad-soft:#3A1F1E;--warn:#E8A33A;--warn-soft:#3A2D14;--info:#6C8CFF;--info-soft:#232C4A;--gray-soft:#262932;
+  --shadow:none;
+}}
+:root[data-theme="dark"]{
+  --bg:#121318;--surface:#1B1D24;--surface2:#20232B;--line:#2C2F39;--ink:#EEEEF2;--ink2:#C4C7D0;--muted:#8B90A0;
+  --accent:#6C8CFF;--accent-soft:#232C4A;
+  --good:#3FC286;--good-soft:#173327;--bad:#F06A63;--bad-soft:#3A1F1E;--warn:#E8A33A;--warn-soft:#3A2D14;--info:#6C8CFF;--info-soft:#232C4A;--gray-soft:#262932;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:Manrope,"IBM Plex Sans",sans-serif;margin:0;text-wrap:balance}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+a{color:var(--accent)}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.rail{background:var(--surface);border-right:1px solid var(--line);padding:18px 14px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 6px 18px}
+.brand .mark{width:28px;height:28px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:#fff;font:800 13px Manrope}
+.brand b{font:700 15px Manrope}
+.brand small{display:block;color:var(--muted);font-size:11px}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;color:var(--ink2);text-decoration:none;font-weight:500}
+.nav a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav .lbl{margin:16px 10px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.main{min-width:0}
+.head{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-size:13px;color:var(--ink2)}
+.chip b{color:var(--ink);font-weight:600}
+.chip .v{opacity:.5;font-size:10px}
+.head .sp{flex:1}
+.sync{font-size:12px;color:var(--muted);display:flex;gap:14px;align-items:center}
+.dq{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;background:var(--warn-soft);color:var(--warn);font-weight:600;font-size:12px}
+.btn{padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer}
+.lang{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.lang button{border:0;background:var(--surface);padding:6px 10px;font:700 12px "IBM Plex Sans";color:var(--muted);cursor:pointer}.lang button.on{background:var(--accent);color:#fff}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+.wrap{padding:20px 24px 60px;display:flex;flex-direction:column;gap:22px;max-width:1440px}
+.zone{display:flex;flex-direction:column;gap:10px}
+.zone>header{display:flex;align-items:baseline;gap:12px}
+.zone>header h2{font-size:15px;font-weight:700}
+.zone>header .eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.zone>header .hint{color:var(--muted);font-size:12px;margin-left:auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.kpi{padding:14px 14px 12px;display:flex;flex-direction:column;gap:6px;cursor:pointer;position:relative}
+.kpi:hover{border-color:var(--accent)}
+.kpi .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.kpi .n{font:700 22px/1.1 Manrope;letter-spacing:-.01em}
+.kpi .d{font-size:12px;display:flex;gap:8px;align-items:center}
+.up{color:var(--good)}.dn{color:var(--bad)}
+.kpi svg{width:100%;height:28px;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.02em}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.p-good{background:var(--good-soft);color:var(--good)}.p-bad{background:var(--bad-soft);color:var(--bad)}.p-warn{background:var(--warn-soft);color:var(--warn)}.p-info{background:var(--info-soft);color:var(--info)}.p-gray{background:var(--gray-soft);color:var(--muted)}
+.sec{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.sec .kpi{padding:10px 12px}.sec .n{font-size:17px}
+.health{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.score{padding:16px;display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.ring{width:84px;height:84px;position:relative}
+.ring .c{position:absolute;inset:0;display:grid;place-items:center;font:800 24px Manrope}
+.bars{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.bar{display:grid;grid-template-columns:96px 1fr 30px;gap:8px;align-items:center}
+.bar i{display:block;height:6px;border-radius:3px;background:var(--gray-soft);overflow:hidden}
+.bar i b{display:block;height:100%;background:var(--accent)}
+.diag{padding:16px 18px;border-left:3px solid var(--accent)}
+.diag h3{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.diag .lead{font:600 16px Manrope;margin-bottom:12px}
+.f{display:grid;grid-template-columns:24px 1fr auto;gap:10px;padding:10px 0;border-top:1px solid var(--line);align-items:start}
+.f .no{font:700 12px "IBM Plex Mono";color:var(--muted);padding-top:3px}
+.f .t{font-weight:600}
+.f .e{color:var(--ink2);font-size:13px;margin-top:2px}
+.f .m{font-size:12px;color:var(--muted);margin-top:4px;display:flex;gap:10px;flex-wrap:wrap}
+.f .m b{color:var(--ink)}
+.f .a{display:flex;gap:6px}
+.btn.sm{padding:5px 9px;font-size:12px}
+.trend{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.chart{padding:14px 16px}
+.chart .legend{display:flex;gap:14px;font-size:12px;color:var(--ink2);margin-bottom:8px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+canvas{width:100%;height:220px;display:block}
+.pace{padding:16px}
+.pace .big{font:700 28px Manrope}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 6px}
+.tabs button{background:none;border:0;padding:10px 12px;font:600 13px "IBM Plex Sans";color:var(--muted);border-bottom:2px solid transparent;cursor:pointer}
+.tabs button.on{color:var(--accent);border-color:var(--accent)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td.r,.tbl th.r{text-align:right}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--surface2)}
+.scroll{overflow-x:auto}
+.gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px}
+.vcard{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
+.thumb{aspect-ratio:9/12;background:linear-gradient(160deg,var(--gray-soft),var(--surface2));display:grid;place-items:center;color:var(--muted);font-size:12px;position:relative}
+.thumb .pill{position:absolute;top:8px;left:8px}
+.vb{padding:10px 12px;display:grid;grid-template-columns:1fr auto;row-gap:3px;font-size:12px}
+.vb .k{color:var(--muted)}.vb .v{text-align:right;font-weight:600}
+.vb .id{grid-column:1/-1;font:600 13px Manrope;margin-bottom:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.funnel{padding:16px}
+.step{display:grid;grid-template-columns:150px 1fr 90px 90px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.step:first-of-type{border-top:0}
+.step .l{font-weight:600}
+.step .bar{display:block;height:20px;border-radius:4px;background:var(--accent-soft);position:relative}
+.step .bar b{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.step .cv{text-align:right;color:var(--muted)}
+.step .cv.bad{color:var(--bad);font-weight:700}
+.wf{padding:16px}
+.wrow{display:grid;grid-template-columns:200px 1fr 110px;gap:10px;align-items:center;padding:6px 0;font-size:13px}
+.wrow .lab{color:var(--ink2)}
+.wrow .lab.tot{font-weight:700;color:var(--ink)}
+.wrow .val{text-align:right;font-weight:600}
+.wrow .g{position:relative;height:16px}
+.wrow .g b{position:absolute;top:2px;height:12px;border-radius:3px}
+.list{padding:6px 16px 10px}
+.item{display:grid;grid-template-columns:24px 1fr auto;gap:10px;padding:10px 0;border-top:1px solid var(--line);align-items:start}
+.item:first-child{border-top:0}
+.item .no{font:700 12px "IBM Plex Mono";color:var(--muted);padding-top:2px}
+.item .t{font-weight:600}.item .s{font-size:12px;color:var(--muted)}
+.item .amt{font:700 14px Manrope;text-align:right}
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.col{background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+.col h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
+.task{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+.task .h{display:flex;gap:6px;align-items:center}
+.task .p{font:700 11px "IBM Plex Mono";padding:1px 6px;border-radius:4px;background:var(--bad-soft);color:var(--bad)}
+.task .p.p2{background:var(--warn-soft);color:var(--warn)}
+.task .team{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.task .tt{font-weight:600;font-size:13px;color:var(--ink)}
+.task .why{color:var(--ink2)}
+.task .ft{display:flex;justify-content:space-between;color:var(--muted);padding-top:4px;border-top:1px dashed var(--line)}
+.note{font-size:12px;color:var(--muted);padding:10px 14px;border:1px dashed var(--line);border-radius:var(--r);background:var(--surface2)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:1100px){.kpis,.sec{grid-template-columns:repeat(3,1fr)}.gallery,.board{grid-template-columns:repeat(2,1fr)}.trend,.health,.two{grid-template-columns:1fr}}
+@media (max-width:760px){.app{grid-template-columns:1fr}.rail{display:none}.kpis,.sec{grid-template-columns:repeat(2,1fr)}.gallery,.board{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+<aside class="rail">
+  <div class="brand"><div class="mark">L</div><div><b>Profit Control</b><small>Lomira.product · TikTok Shop ID</small></div></div>
+  <nav class="nav">
+    <div class="lbl">Views</div>
+    <a class="on" href="#">Executive <span class="mono" style="font-size:11px;opacity:.6">⌘1</span></a>
+    <a href="#">Performance marketing</a>
+    <a href="#">Creative / video</a>
+    <a href="#">Product / commerce</a>
+    <a href="#">Finance</a>
+    <div class="lbl">Explore</div>
+    <a href="#">Campaigns</a><a href="#">Products</a><a href="#">Videos</a><a href="#">Creators</a>
+    <div class="lbl">Work</div>
+    <a href="#">Recommendations <span class="pill p-info">6</span></a>
+    <a href="#">Team board <span class="pill p-warn">4</span></a>
+    <a href="#">Reconciliation <span class="pill p-good">12/12</span></a>
+  </nav>
+</aside>
+
+<div class="main">
+<div class="head">
+  <span class="chip"><b>Lomira.product</b><span class="v">▼</span></span>
+  <span class="chip">Period <b>August 2026</b><span class="v">▼</span></span>
+  <span class="chip">Compare <b>July 2026</b><span class="v">▼</span></span>
+  <span class="chip">Product <b>All</b><span class="v">▼</span></span>
+  <span class="chip">Source <b>Paid · Organic · Affiliate</b><span class="v">▼</span></span>
+  <span class="chip">Class <b>Any</b><span class="v">▼</span></span>
+  <span class="sp"></span>
+  <span class="sync">Last sync 30 Aug 22:58 <span class="dq">Data quality 84% · PARTIAL</span></span>
+  <button class="btn">Refresh</button>
+  <span class="lang"><button class="on" data-lang="en">EN</button><button data-lang="ru">RU</button></span>
+</div>
+
+<div class="wrap">
+
+<div class="note">Mock-up on real August 2026 data (Seller Center income export + Shop API). Ad spend is the total GMV Max deduction from payouts; per-campaign and per-video ad cost appear once the Ads API is connected — those cells are marked <b>est.</b></div>
+
+<!-- ZONE 1 -->
+<section class="zone">
+  <header><span class="eyebrow">1 · Business health</span><h2>Where the money went in August</h2><span class="hint">Click any card for its diagnostic</span></header>
+  <div class="kpis">
+    <div class="card kpi"><span class="k">Net profit</span><span class="n dn">−Rp 894k</span><span class="d"><span class="dn">▼ vs July</span><span class="pill p-bad">Losing</span></span><svg viewBox="0 0 100 28" preserveAspectRatio="none"><path d="M0 8 L14 10 L28 9 L42 14 L56 12 L70 20 L84 18 L100 26" fill="none" stroke="var(--bad)" stroke-width="2"/></svg></div>
+    <div class="card kpi"><span class="k">GMV</span><span class="n">Rp 3.20m</span><span class="d">32 units · 5-pair packs</span><svg viewBox="0 0 100 28" preserveAspectRatio="none"><path d="M0 20 L14 18 L28 22 L42 12 L56 14 L70 8 L84 12 L100 6" fill="none" stroke="var(--accent)" stroke-width="2"/></svg></div>
+    <div class="card kpi"><span class="k">Net seller revenue</span><span class="n">Rp 2.40m</span><span class="d">after fees &amp; refunds</span><svg viewBox="0 0 100 28" preserveAspectRatio="none"><path d="M0 20 L14 19 L28 21 L42 14 L56 15 L70 10 L84 13 L100 8" fill="none" stroke="var(--accent)" stroke-width="2"/></svg></div>
+    <div class="card kpi"><span class="k">Orders</span><span class="n">33</span><span class="d">4 refunded · 12.1% refund rate</span><svg viewBox="0 0 100 28" preserveAspectRatio="none"><path d="M0 22 L14 20 L28 21 L42 16 L56 18 L70 12 L84 14 L100 10" fill="none" stroke="var(--accent)" stroke-width="2"/></svg></div>
+    <div class="card kpi"><span class="k">Ad spend (GMV Max)</span><span class="n">Rp 2.23m</span><span class="d"><span class="dn">93% of revenue</span></span><svg viewBox="0 0 100 28" preserveAspectRatio="none"><path d="M0 24 L14 22 L28 23 L42 20 L56 12 L70 14 L84 4 L100 8" fill="none" stroke="var(--bad)" stroke-width="2"/></svg></div>
+    <div class="card kpi"><span class="k">Net margin</span><span class="n dn">−27.9%</span><span class="d">floor 10% <span class="pill p-bad">Below floor</span></span><svg viewBox="0 0 100 28" preserveAspectRatio="none"><path d="M0 10 L14 12 L28 10 L42 16 L56 15 L70 22 L84 20 L100 26" fill="none" stroke="var(--bad)" stroke-width="2"/></svg></div>
+  </div>
+  <div class="sec">
+    <div class="card kpi"><span class="k">Reported ROAS</span><span class="n">1.43</span><span class="d">TikTok Ads</span></div>
+    <div class="card kpi"><span class="k">Blended ROAS</span><span class="n">1.08</span><span class="d">net revenue / ad spend</span></div>
+    <div class="card kpi"><span class="k">AOV</span><span class="n">Rp 97k</span><span class="d">list 85–100k</span></div>
+    <div class="card kpi"><span class="k">CVR (click→order)</span><span class="n">10.5%</span><span class="d">video traffic</span></div>
+    <div class="card kpi"><span class="k">Settled payout</span><span class="n dn">−Rp 94k</span><span class="d">Aug statements</span></div>
+    <div class="card kpi"><span class="k">Settlement coverage</span><span class="n">92%</span><span class="d"><span class="pill p-warn">8% provisional</span></span></div>
+  </div>
+  <div class="health">
+    <div class="card score">
+      <div class="ring"><svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" fill="none" stroke="var(--gray-soft)" stroke-width="8"/><circle cx="42" cy="42" r="36" fill="none" stroke="var(--bad)" stroke-width="8" stroke-dasharray="226" stroke-dashoffset="150" stroke-linecap="round" transform="rotate(-90 42 42)"/></svg><div class="c">34</div></div>
+      <div>
+        <div style="font:700 15px Manrope;margin-bottom:8px">Profit health 34/100 · <span class="dn">POOR</span></div>
+        <div class="bars">
+          <div class="bar"><span>Margin</span><i><b style="width:12%;background:var(--bad)"></b></i><span>12</span></div>
+          <div class="bar"><span>Ad efficiency</span><i><b style="width:21%;background:var(--bad)"></b></i><span>21</span></div>
+          <div class="bar"><span>Conversion</span><i><b style="width:64%"></b></i><span>64</span></div>
+          <div class="bar"><span>Refunds</span><i><b style="width:58%;background:var(--warn)"></b></i><span>58</span></div>
+          <div class="bar"><span>Data quality</span><i><b style="width:84%;background:var(--good)"></b></i><span>84</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card pace">
+      <div class="k" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600">Unit economics · one 5-pair pack</div>
+      <table class="tbl" style="margin-top:6px">
+        <tr><td>Revenue after seller discount</td><td class="r">Rp 96,700</td></tr>
+        <tr><td>TikTok fees (commission, processing, logistics, affiliate)</td><td class="r dn">−Rp 12,050</td></tr>
+        <tr><td>COGS</td><td class="r dn">−Rp 25,000</td></tr>
+        <tr><td><b>Contribution before ads</b></td><td class="r"><b>Rp 59,650</b></td></tr>
+        <tr><td>Ad cost per unit (blended)</td><td class="r dn">−Rp 69,720</td></tr>
+        <tr><td><b>Net per unit</b></td><td class="r dn"><b>−Rp 10,070</b></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ZONE 2 -->
+<section class="zone">
+  <header><span class="eyebrow">2 · AI diagnosis</span><h2>Why</h2><span class="hint">Deterministic analytics first, explanation second · confidence shown per finding</span></header>
+  <div class="card diag">
+    <div class="lead"><span class="dn">Every pack sold in August cost more in ads than it earned.</span> Contribution per unit is healthy (Rp 59.6k); the loss is entirely in GMV Max spend of Rp 69.7k per unit sold.</div>
+    <div class="f"><span class="no">1</span><div><div class="t">GMV Max spend Rp 2.23m for ~32 units — blended ROAS 1.08, break-even needs ≥ 1.62</div><div class="e">Ad deductions on 23 Aug (Rp 1.11m) and 27 Aug (Rp 0.70m) were not matched by orders on those days.</div><div class="m"><span>Impact <b>−Rp 894k</b></span><span>Confidence <b>HIGH</b></span><span>Source: payout deductions + statements</span></div></div><div class="a"><button class="btn sm">Open campaign</button><button class="btn sm pri">Create task</button></div></div>
+    <div class="f"><span class="no">2</span><div><div class="t">Video traffic converts (CTR 0.82% → CVR 10.5%) but product-card traffic carries 80% of GMV</div><div class="e">Only Rp 491k of Rp 2.52m GMV (23–30 Aug) came from videos. Ad budget is buying product-card impressions with weak creative support.</div><div class="m"><span>Impact <b>est. −Rp 320k</b></span><span>Confidence <b>MEDIUM</b></span></div></div><div class="a"><button class="btn sm">Open videos</button><button class="btn sm pri">Create task</button></div></div>
+    <div class="f"><span class="no">3</span><div><div class="t">Refund rate 12.1% — 4 of 33 orders; one full refund still charged Rp 10,250 in fees</div><div class="e">Refunds cluster on Tokopedia-sourced orders (2 of 3). Check size/variant mismatch on 41–47.</div><div class="m"><span>Impact <b>−Rp 78k</b></span><span>Confidence <b>MEDIUM</b></span></div></div><div class="a"><button class="btn sm">Open product</button></div></div>
+    <div class="f"><span class="no">✓</span><div><div class="t" style="color:var(--good)">Opportunity: video 7670…1922 — CTR 1.65% (2× shop median), GPM Rp 69k</div><div class="e">Hashtags #kaoskaki #foryou, 15 s. Small sample (1 order) — PROMISING, not yet a winner.</div><div class="m"><span>Potential <b>+Rp 120–250k / wk</b></span><span>Confidence <b>LOW</b> (sample)</span></div></div><div class="a"><button class="btn sm pri">Brief 3 variants</button></div></div>
+  </div>
+</section>
+
+<!-- ZONE 3 -->
+<section class="zone">
+  <header><span class="eyebrow">3 · Sales &amp; profit trend</span><h2>August, daily</h2><span class="hint">Hour · <b>Day</b> · Week · Month</span></header>
+  <div class="trend">
+    <div class="card chart">
+      <div class="legend"><span><i style="background:var(--accent)"></i>GMV</span><span><i style="background:var(--good)"></i>Net revenue</span><span><i style="background:var(--bad)"></i>Ad deduction</span><span><i style="background:var(--ink)"></i>Cumulative net profit</span><span style="margin-left:auto">◆ event annotation</span></div>
+      <canvas id="trend" width="900" height="220"></canvas>
+    </div>
+    <div class="card pace">
+      <div class="k" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600">Today · 30 Aug, 22:58 WIB</div>
+      <div class="big">2 orders</div>
+      <div style="color:var(--ink2)">Expected by now from the last 4 Saturdays: <b>1.5</b></div>
+      <div class="pill p-good" style="margin:8px 0 14px">Pace +33%</div>
+      <div class="k" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600">Events this week</div>
+      <div style="font-size:12px;color:var(--ink2);display:flex;flex-direction:column;gap:4px;margin-top:6px">
+        <span>◆ 27 Aug — GMV Max deduction Rp 699k (4 charges)</span>
+        <span>◆ 27 Aug — new video posted (7670…1922)</span>
+        <span>◆ 29 Aug — statement settled: 12 orders, Rp 833k</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ZONE 4 -->
+<section class="zone">
+  <header><span class="eyebrow">4 · Performance explorer</span><h2>Campaigns · Products · Videos · Creators</h2><span class="hint">Sort by profit, leakage, opportunity</span></header>
+  <div class="card">
+    <div class="tabs"><button class="on" data-t="t1">Products</button><button data-t="t2">Videos</button><button data-t="t3">Campaigns</button><button data-t="t4">Creators</button></div>
+    <div id="t1" class="scroll"><table class="tbl">
+      <tr><th>Product</th><th class="r">Units</th><th class="r">GMV</th><th class="r">Net revenue</th><th class="r">Fees</th><th class="r">COGS</th><th class="r">Ads (est.)</th><th class="r">Net profit</th><th class="r">Margin</th><th class="r">CVR</th><th>Status</th></tr>
+      <tr><td>Socks Kaos Kaki Pria Hitam 5 Pasang</td><td class="r">21</td><td class="r">Rp 2.00m</td><td class="r">Rp 1.82m</td><td class="r">−Rp 253k</td><td class="r">−Rp 525k</td><td class="r">−Rp 1.46m</td><td class="r dn">−Rp 168k</td><td class="r dn">−8.4%</td><td class="r">11.2%</td><td><span class="pill p-warn">Investigate</span></td></tr>
+      <tr><td>Kaos Kaki Abu-Abu 5 pasang</td><td class="r">6</td><td class="r">Rp 510k</td><td class="r">Rp 464k</td><td class="r">−Rp 61k</td><td class="r">−Rp 150k</td><td class="r">−Rp 418k</td><td class="r dn">−Rp 104k</td><td class="r dn">−20%</td><td class="r">8.9%</td><td><span class="pill p-bad">Reduce</span></td></tr>
+      <tr><td>Kaos Kaki Wanita Putih 5 Pasang</td><td class="r">4</td><td class="r">Rp 340k</td><td class="r">Rp 310k</td><td class="r">−Rp 41k</td><td class="r">−Rp 100k</td><td class="r">−Rp 279k</td><td class="r dn">−Rp 69k</td><td class="r dn">−20%</td><td class="r">9.1%</td><td><span class="pill p-gray">Small sample</span></td></tr>
+      <tr><td>Kaos Kaki Anak Putih Isi 10 Pasang</td><td class="r">1</td><td class="r">Rp 150k</td><td class="r">Rp 137k</td><td class="r">−Rp 18k</td><td class="r">−Rp 50k</td><td class="r">−Rp 70k</td><td class="r dn">−Rp 1k</td><td class="r">−0.7%</td><td class="r">—</td><td><span class="pill p-gray">Small sample</span></td></tr>
+    </table></div>
+    <div id="t2" class="gallery" hidden>
+      <div class="vcard"><div class="thumb"><span class="pill p-info">Promising</span>15 s · #kaoskaki #foryou</div><div class="vb"><span class="id">Video 7670…1922</span><span class="k">Views</span><span class="v">1,152</span><span class="k">CTR</span><span class="v up">1.65%</span><span class="k">Orders</span><span class="v">1</span><span class="k">GMV</span><span class="v">Rp 80k</span><span class="k">GPM</span><span class="v">Rp 69k</span><span class="k">Ad spend</span><span class="v">est. —</span></div></div>
+      <div class="vcard"><div class="thumb"><span class="pill p-warn">Low attention</span>22 s</div><div class="vb"><span class="id">Video 7668…4410</span><span class="k">Views</span><span class="v">2,340</span><span class="k">CTR</span><span class="v dn">0.41%</span><span class="k">Orders</span><span class="v">1</span><span class="k">GMV</span><span class="v">Rp 100k</span><span class="k">GPM</span><span class="v">Rp 43k</span><span class="k">Ad spend</span><span class="v">est. —</span></div></div>
+      <div class="vcard"><div class="thumb"><span class="pill p-bad">Traffic, no sales</span>18 s</div><div class="vb"><span class="id">Video 7665…0871</span><span class="k">Views</span><span class="v">1,890</span><span class="k">CTR</span><span class="v">0.95%</span><span class="k">Orders</span><span class="v dn">0</span><span class="k">GMV</span><span class="v">Rp 0</span><span class="k">GPM</span><span class="v">Rp 0</span><span class="k">Ad spend</span><span class="v">est. —</span></div></div>
+      <div class="vcard"><div class="thumb"><span class="pill p-gray">Insufficient data</span>12 s</div><div class="vb"><span class="id">Video 7671…0033</span><span class="k">Views</span><span class="v">310</span><span class="k">CTR</span><span class="v">1.2%</span><span class="k">Orders</span><span class="v">0</span><span class="k">GMV</span><span class="v">Rp 0</span><span class="k">GPM</span><span class="v">—</span><span class="k">Age</span><span class="v">2 d</span></div></div>
+    </div>
+    <div id="t3" class="scroll" hidden><table class="tbl">
+      <tr><th>Campaign</th><th>Status</th><th class="r">Spend</th><th class="r">Orders</th><th class="r">GMV</th><th class="r">Reported ROAS</th><th class="r">Adjusted ROAS</th><th class="r">Net profit</th><th>AI status</th></tr>
+      <tr><td colspan="9" style="color:var(--muted);padding:26px;text-align:center">Campaign breakdown appears after the TikTok Ads app is approved (pending review). Until then ad cost is shop-level: Rp 2,231,033 in 6 deductions.</td></tr>
+    </table></div>
+    <div id="t4" class="scroll" hidden><table class="tbl">
+      <tr><th>Creator</th><th class="r">Videos</th><th class="r">Orders</th><th class="r">GMV</th><th class="r">Affiliate commission</th><th class="r">Profit after commission</th><th>Priority</th></tr>
+      <tr><td>Affiliate (aggregated)</td><td class="r">—</td><td class="r">7</td><td class="r">Rp 700k</td><td class="r dn">−Rp 54k</td><td class="r">Rp 383k</td><td><span class="pill p-good">Keep</span></td></tr>
+    </table></div>
+  </div>
+</section>
+
+<!-- ZONE 5 -->
+<section class="zone">
+  <header><span class="eyebrow">5 · Funnel &amp; root cause</span><h2>Where the drop is, and what it cost</h2></header>
+  <div class="two">
+    <div class="card funnel">
+      <div class="step"><span class="l">Product impressions</span><span class="bar"><b style="width:100%"></b></span><span class="cv">6,972</span><span class="cv"></span></div>
+      <div class="step"><span class="l">Product clicks</span><span class="bar"><b style="width:38%"></b></span><span class="cv">57</span><span class="cv bad">0.82%</span></div>
+      <div class="step"><span class="l">Orders</span><span class="bar"><b style="width:22%"></b></span><span class="cv">6</span><span class="cv">10.5%</span></div>
+      <div class="step"><span class="l">Completed</span><span class="bar"><b style="width:19%"></b></span><span class="cv">5</span><span class="cv">83%</span></div>
+      <div class="step"><span class="l">Settled</span><span class="bar"><b style="width:17%"></b></span><span class="cv">5</span><span class="cv">100%</span></div>
+      <div style="margin-top:12px;padding:10px 12px;background:var(--bad-soft);border-radius:8px;font-size:12px"><b style="color:var(--bad)">Largest deterioration: impression → click</b> · 0.82% vs shop 30-day baseline 1.4% (−41%). Est. −40 clicks, −4 orders, <b>−Rp 240k</b> contribution. Likely cause: creative hook (video traffic), not the product page — CVR after click is stable.</div>
+    </div>
+    <div class="card wf">
+      <div class="k" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px">Profit waterfall · August</div>
+      <div class="wrow"><span class="lab tot">Revenue after seller discounts</span><span class="g"><b style="left:0;width:100%;background:var(--accent)"></b></span><span class="val">Rp 2.76m</span></div>
+      <div class="wrow"><span class="lab">Refunds</span><span class="g"><b style="left:86%;width:14%;background:var(--bad)"></b></span><span class="val dn">−Rp 391k</span></div>
+      <div class="wrow"><span class="lab">TikTok fees</span><span class="g"><b style="left:73%;width:13%;background:var(--bad)"></b></span><span class="val dn">−Rp 354k</span></div>
+      <div class="wrow"><span class="lab">Other adjustments / tax</span><span class="g"><b style="left:64%;width:9%;background:var(--bad)"></b></span><span class="val dn">−Rp 267k</span></div>
+      <div class="wrow"><span class="lab">COGS (32 × 25k)</span><span class="g"><b style="left:35%;width:29%;background:var(--warn)"></b></span><span class="val dn">−Rp 800k</span></div>
+      <div class="wrow"><span class="lab tot">Contribution before ads</span><span class="g"><b style="left:0;width:35%;background:var(--good)"></b></span><span class="val">Rp 948k</span></div>
+      <div class="wrow"><span class="lab">GMV Max ad deductions</span><span class="g"><b style="left:0;width:81%;background:var(--bad)"></b></span><span class="val dn">−Rp 2.23m</span></div>
+      <div class="wrow" style="border-top:1px solid var(--line);margin-top:4px;padding-top:8px"><span class="lab tot">Net profit</span><span class="g"><b style="left:0;width:32%;background:var(--bad)"></b></span><span class="val dn"><b>−Rp 1.28m</b></span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Measured: revenue, refunds, fees, deductions (statements). Estimated: none. Note: settled payout −Rp 94k differs from net profit by COGS + timing of unsettled orders.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ZONE 6 -->
+<section class="zone">
+  <header><span class="eyebrow">6 · Opportunities &amp; leakage</span><h2>Ranked by money, not percentages</h2></header>
+  <div class="two">
+    <div class="card"><div class="list">
+      <div class="item"><span class="no">1</span><div><div class="t">Cap GMV Max daily budget to break-even ROAS 1.62</div><div class="s">Recommend only — no automatic change. Requires Ads API for per-day pacing.</div></div><div class="amt up">+Rp 600–900k / mo</div></div>
+      <div class="item"><span class="no">2</span><div><div class="t">Brief 3 variants of video 7670…1922 (hook, pack-count, CTA)</div><div class="s">PROMISING · confidence LOW until ≥ 5 orders</div></div><div class="amt up">+Rp 120–250k / wk</div></div>
+      <div class="item"><span class="no">3</span><div><div class="t">Shift Abu-Abu budget to Pria Hitam (CVR 11.2% vs 8.9%)</div><div class="s">Same COGS, higher conversion</div></div><div class="amt up">+Rp 80k / mo</div></div>
+    </div></div>
+    <div class="card"><div class="list">
+      <div class="item"><span class="no">1</span><div><div class="t">GMV Max spend above break-even</div><div class="s">Rp 2.23m spend for Rp 2.40m net revenue</div></div><div class="amt dn">−Rp 1.28m / mo</div></div>
+      <div class="item"><span class="no">2</span><div><div class="t">Refunds on Tokopedia-sourced orders</div><div class="s">Fees kept on refund: Rp 10,250 per case</div></div><div class="amt dn">−Rp 78k / mo</div></div>
+      <div class="item"><span class="no">3</span><div><div class="t">Video 7665…0871: traffic without sales</div><div class="s">1,890 views · 0 orders · TRAFFIC_NO_SALES</div></div><div class="amt dn">est. −Rp 45k / wk</div></div>
+    </div></div>
+  </div>
+</section>
+
+<!-- ZONE 7 -->
+<section class="zone">
+  <header><span class="eyebrow">7 · Today's team action board</span><h2>Generated 30 Aug · max 3 per team</h2><span class="hint">Accept · edit · assign · measure after 72 h</span></header>
+  <div class="board">
+    <div class="col"><h3>Today <span>3</span></h3>
+      <div class="task"><div class="h"><span class="p">P1</span><span class="team">Performance</span></div><div class="tt">Review GMV Max budget vs break-even ROAS 1.62</div><div class="why">Aug: Rp 2.23m spend, blended ROAS 1.08. Do not change campaigns automatically — review targeting and daily cap.</div><div class="ft"><span>Owner: Sergei</span><span>Impact +Rp 600–900k/mo</span></div></div>
+      <div class="task"><div class="h"><span class="p">P1</span><span class="team">Video</span></div><div class="tt">Shoot 3 variants of 7670…1922</div><div class="why">Keep: product in first 2 s, 15 s length, #kaoskaki. Test: 3 opening hooks; say "5 pasang" in the first line.</div><div class="ft"><span>Owner: Videographer</span><span>Deadline: Mon 16:00</span></div></div>
+      <div class="task"><div class="h"><span class="p p2">P2</span><span class="team">Product</span></div><div class="tt">Check size chart 41–47 on Pria Hitam listing</div><div class="why">2 of 4 refunds on this SKU; both Tokopedia-sourced.</div><div class="ft"><span>Owner: Shop ops</span><span>Impact −Rp 78k/mo</span></div></div>
+    </div>
+    <div class="col"><h3>In progress <span>1</span></h3>
+      <div class="task"><div class="h"><span class="p p2">P2</span><span class="team">Design</span></div><div class="tt">New cover for Kaos Kaki Abu-Abu</div><div class="why">CVR 8.9% vs 11.2% on Hitam with same traffic mix.</div><div class="ft"><span>Owner: Designer</span><span>Started 29 Aug</span></div></div>
+    </div>
+    <div class="col"><h3>Review <span>0</span></h3></div>
+    <div class="col"><h3>Done · measured <span>1</span></h3>
+      <div class="task"><div class="h"><span class="pill p-good">Success</span><span class="team">Finance</span></div><div class="tt">Reconcile August statements</div><div class="why">12/12 orders match Seller Center exactly. Formulas verified.</div><div class="ft"><span>Done 30 Aug</span><span>Confidence HIGH</span></div></div>
+    </div>
+  </div>
+</section>
+
+</div></div></div>
+
+<script>
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['t1','t2','t3','t4'].forEach(id=>document.getElementById(id).hidden=(id!==b.dataset.t));
+}));
+(function(){
+  const c=document.getElementById('trend'),x=c.getContext('2d');
+  const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const W=c.width,H=c.height,P={l:44,r:12,t:12,b:24};
+  const days=30;
+  const gmv=[0,100,0,200,100,0,200,100,100,0,100,200,0,100,100,0,200,100,100,200,0,100,100,0,200,100,100,200,100,100];
+  const ads=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1110,0,0,0,699,0,422,0];
+  const net=gmv.map(v=>v*0.87);
+  let cum=[],acc=0;for(let i=0;i<days;i++){acc+=net[i]-ads[i]-gmv[i]*0.25;cum.push(acc);}
+  const maxY=1200,minY=-1400;
+  const X=i=>P.l+(W-P.l-P.r)*i/(days-1), Y=v=>P.t+(H-P.t-P.b)*(1-(v-minY)/(maxY-minY));
+  x.clearRect(0,0,W,H);
+  x.strokeStyle=css('--line');x.lineWidth=1;x.font='11px IBM Plex Sans';x.fillStyle=css('--muted');
+  [-1000,-500,0,500,1000].forEach(v=>{x.beginPath();x.moveTo(P.l,Y(v));x.lineTo(W-P.r,Y(v));x.stroke();x.fillText((v/1000).toFixed(1)+'m',4,Y(v)+4);});
+  [1,8,15,22,29].forEach(d=>x.fillText(d+' Aug',X(d-1)-12,H-6));
+  const bar=(arr,col,sign)=>{x.fillStyle=col;arr.forEach((v,i)=>{if(!v)return;const h=(H-P.t-P.b)*v/(maxY-minY);x.fillRect(X(i)-4,sign>0?Y(v):Y(0),8,h);});};
+  bar(gmv,css('--accent')+'99',1);bar(ads,css('--bad'),-1);
+  const line=(arr,col,w)=>{x.strokeStyle=col;x.lineWidth=w;x.beginPath();arr.forEach((v,i)=>i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v)));x.stroke();};
+  line(cum,css('--ink'),2);
+  x.fillStyle=css('--ink');x.beginPath();x.arc(X(days-1),Y(cum[days-1]),3.5,0,7);x.fill();
+  [[22,'◆'],[26,'◆'],[28,'◆']].forEach(([i])=>{x.fillStyle=css('--bad');x.font='12px sans-serif';x.fillText('◆',X(i)-5,Y(-ads[i])+16);});
+})();
+</script>
+<script>
+const RU={"Views": "Просмотры", "Executive": "Руководство", "Performance marketing": "Перформанс-маркетинг", "Creative / video": "Креатив / видео", "Product / commerce": "Товары / магазин", "Finance": "Финансы", "Explore": "Данные", "Campaigns": "Кампании", "Products": "Товары", "Videos": "Видео", "Creators": "Креаторы", "Work": "Работа", "Recommendations ": "Рекомендации ", "Team board ": "Доска команды ", "Reconciliation ": "Сверка ", "Period ": "Период ", "August 2026": "Август 2026", "Compare ": "Сравнить с ", "July 2026": "Июль 2026", "Product ": "Товар ", "All": "Все", "Source ": "Источник ", "Paid · Organic · Affiliate": "Платный · Органика · Аффилиаты", "Class ": "Класс ", "Any": "Любой", "Last sync 30 Aug 22:58 ": "Синхронизация 30 авг 22:58 ", "Data quality 84% · PARTIAL": "Качество данных 84% · ЧАСТИЧНО", "Refresh": "Обновить", "Mock-up on real August 2026 data (Seller Center income export + Shop API). Ad spend is the total GMV Max deduction from payouts; per-campaign and per-video ad cost appear once the Ads API is connected — those cells are marked ": "Макет на реальных данных августа 2026 (выгрузка Seller Center + Shop API). Расходы на рекламу — суммарные списания GMV Max из выплат; разбивка по кампаниям и видео появится после подключения Ads API — такие ячейки помечены ", "1 · Business health": "1 · Здоровье бизнеса", "Where the money went in August": "Куда ушли деньги в августе", "Click any card for its diagnostic": "Клик по карточке — диагностика", "Net profit": "Чистая прибыль", "▼ vs July": "▼ к июлю", "Losing": "Убыток", "GMV": "GMV", "32 units · 5-pair packs": "32 шт · пакеты по 5 пар", "Net seller revenue": "Выручка продавца нетто", "after fees & refunds": "после комиссий и возвратов", "Orders": "Заказы", "4 refunded · 12.1% refund rate": "4 возврата · 12,1%", "Ad spend (GMV Max)": "Реклама (GMV Max)", "93% of revenue": "93% выручки", "Net margin": "Маржа нетто", "floor 10% ": "порог 10% ", "Below floor": "Ниже порога", "Reported ROAS": "ROAS по TikTok", "TikTok Ads": "TikTok Ads", "Blended ROAS": "Смешанный ROAS", "net revenue / ad spend": "выручка нетто / реклама", "AOV": "Средний чек", "list 85–100k": "прайс 85–100k", "CVR (click→order)": "CVR (клик→заказ)", "video traffic": "трафик из видео", "Settled payout": "Выплата (settled)", "Aug statements": "стейтменты августа", "Settlement coverage": "Покрытие расчётами", "8% provisional": "8% предварительно", "Profit health 34/100 · ": "Здоровье прибыли 34/100 · ", "POOR": "ПЛОХО", "Margin": "Маржа", "Ad efficiency": "Эффективность рекламы", "Conversion": "Конверсия", "Refunds": "Возвраты", "Data quality": "Качество данных", "Unit economics · one 5-pair pack": "Юнит-экономика · один пакет 5 пар", "Revenue after seller discount": "Выручка после скидки продавца", "TikTok fees (commission, processing, logistics, affiliate)": "Комиссии TikTok (комиссия, обработка, логистика, аффилиат)", "COGS": "Себестоимость", "Contribution before ads": "Контрибуция до рекламы", "Ad cost per unit (blended)": "Реклама на единицу (смешанно)", "Net per unit": "Итог на единицу", "2 · AI diagnosis": "2 · Диагноз AI", "Why": "Почему", "Deterministic analytics first, explanation second · confidence shown per finding": "Сначала детерминированная аналитика, потом объяснение · уверенность у каждого вывода", "Every pack sold in August cost more in ads than it earned.": "Каждый проданный в августе пакет стоил в рекламе больше, чем принёс.", " Contribution per unit is healthy (Rp 59.6k); the loss is entirely in GMV Max spend of Rp 69.7k per unit sold.": " Контрибуция на единицу здоровая (Rp 59,6k); весь убыток — в расходах GMV Max Rp 69,7k на проданную единицу.", "GMV Max spend Rp 2.23m for ~32 units — blended ROAS 1.08, break-even needs ≥ 1.62": "Расход GMV Max Rp 2,23m на ~32 единицы — смешанный ROAS 1,08, безубыточность требует ≥ 1,62", "Ad deductions on 23 Aug (Rp 1.11m) and 27 Aug (Rp 0.70m) were not matched by orders on those days.": "Списания 23 авг (Rp 1,11m) и 27 авг (Rp 0,70m) не подкреплены заказами в эти дни.", "Impact ": "Эффект ", "Confidence ": "Уверенность ", "Source: payout deductions + statements": "Источник: списания из выплат + стейтменты", "Open campaign": "Открыть кампанию", "Create task": "Создать задачу", "Video traffic converts (CTR 0.82% → CVR 10.5%) but product-card traffic carries 80% of GMV": "Видео-трафик конвертирует (CTR 0,82% → CVR 10,5%), но 80% GMV идёт с карточек товара", "Only Rp 491k of Rp 2.52m GMV (23–30 Aug) came from videos. Ad budget is buying product-card impressions with weak creative support.": "Только Rp 491k из Rp 2,52m GMV (23–30 авг) пришли из видео. Бюджет покупает показы карточек без поддержки креативом.", "Open videos": "Открыть видео", "Refund rate 12.1% — 4 of 33 orders; one full refund still charged Rp 10,250 in fees": "Возвраты 12,1% — 4 из 33 заказов; один полный возврат всё равно стоил Rp 10 250 комиссий", "Refunds cluster on Tokopedia-sourced orders (2 of 3). Check size/variant mismatch on 41–47.": "Возвраты сгруппированы на заказах из Tokopedia (2 из 3). Проверить несоответствие размера 41–47.", "Open product": "Открыть товар", "Opportunity: video 7670…1922 — CTR 1.65% (2× shop median), GPM Rp 69k": "Возможность: видео 7670…1922 — CTR 1,65% (2× медианы магазина), GPM Rp 69k", "Hashtags #kaoskaki #foryou, 15 s. Small sample (1 order) — PROMISING, not yet a winner.": "Хэштеги #kaoskaki #foryou, 15 с. Малая выборка (1 заказ) — ПЕРСПЕКТИВНО, ещё не победитель.", "Potential ": "Потенциал ", " (sample)": " (выборка)", "Brief 3 variants": "Бриф на 3 варианта", "3 · Sales & profit trend": "3 · Продажи и прибыль", "August, daily": "Август, по дням", "Net revenue": "Выручка нетто", "Ad deduction": "Списание за рекламу", "Cumulative net profit": "Накопленная прибыль", "◆ event annotation": "◆ событие", "Today · 30 Aug, 22:58 WIB": "Сегодня · 30 авг, 22:58 WIB", "2 orders": "2 заказа", "Expected by now from the last 4 Saturdays: ": "Ожидалось к этому часу по последним 4 субботам: ", "Pace +33%": "Темп +33%", "Events this week": "События недели", "◆ 27 Aug — GMV Max deduction Rp 699k (4 charges)": "◆ 27 авг — списание GMV Max Rp 699k (4 платежа)", "◆ 27 Aug — new video posted (7670…1922)": "◆ 27 авг — новое видео (7670…1922)", "◆ 29 Aug — statement settled: 12 orders, Rp 833k": "◆ 29 авг — стейтмент закрыт: 12 заказов, Rp 833k", "4 · Performance explorer": "4 · Разбор эффективности", "Campaigns · Products · Videos · Creators": "Кампании · Товары · Видео · Креаторы", "Sort by profit, leakage, opportunity": "Сортировка по прибыли, утечке, потенциалу", "Product": "Товар", "Units": "Шт", "Fees": "Комиссии", "Ads (est.)": "Реклама (оц.)", "Status": "Статус", "Investigate": "Разобраться", "Reduce": "Сократить", "Small sample": "Мало данных", "Promising": "Перспективно", "Low attention": "Слабый хук", "Traffic, no sales": "Трафик без продаж", "Insufficient data": "Мало данных", "Ad spend": "Реклама", "Age": "Возраст", "Campaign": "Кампания", "Spend": "Расход", "Adjusted ROAS": "Скорр. ROAS", "AI status": "Статус AI", "Campaign breakdown appears after the TikTok Ads app is approved (pending review). Until then ad cost is shop-level: Rp 2,231,033 in 6 deductions.": "Разбивка по кампаниям появится после одобрения приложения TikTok Ads (на ревью). Пока реклама — на уровне магазина: Rp 2 231 033 в 6 списаниях.", "Creator": "Креатор", "Affiliate commission": "Комиссия аффилиата", "Profit after commission": "Прибыль после комиссии", "Priority": "Приоритет", "Affiliate (aggregated)": "Аффилиаты (суммарно)", "Keep": "Оставить", "5 · Funnel & root cause": "5 · Воронка и причины", "Where the drop is, and what it cost": "Где просадка и сколько она стоила", "Product impressions": "Показы товара", "Product clicks": "Клики по товару", "Completed": "Завершено", "Settled": "Рассчитано", "Largest deterioration: impression → click": "Сильнейшая просадка: показ → клик", " · 0.82% vs shop 30-day baseline 1.4% (−41%). Est. −40 clicks, −4 orders, ": " · 0,82% против 30-дневной базы 1,4% (−41%). Оценка: −40 кликов, −4 заказа, ", " contribution. Likely cause: creative hook (video traffic), not the product page — CVR after click is stable.": " контрибуции. Вероятная причина: хук в видео, не карточка — CVR после клика стабилен.", "Profit waterfall · August": "Водопад прибыли · август", "Revenue after seller discounts": "Выручка после скидок продавца", "TikTok fees": "Комиссии TikTok", "Other adjustments / tax": "Прочие корректировки / налог", "COGS (32 × 25k)": "Себестоимость (32 × 25k)", "GMV Max ad deductions": "Списания GMV Max", "Measured: revenue, refunds, fees, deductions (statements). Estimated: none. Note: settled payout −Rp 94k differs from net profit by COGS + timing of unsettled orders.": "Измерено: выручка, возвраты, комиссии, списания (стейтменты). Оценочно: ничего. Выплата −Rp 94k отличается от прибыли на себестоимость и незакрытые заказы.", "6 · Opportunities & leakage": "6 · Возможности и утечки", "Ranked by money, not percentages": "Ранжировано по деньгам, не по процентам", "Cap GMV Max daily budget to break-even ROAS 1.62": "Ограничить дневной бюджет GMV Max порогом ROAS 1,62", "Recommend only — no automatic change. Requires Ads API for per-day pacing.": "Только рекомендация — без автоизменений. Нужен Ads API для дневного темпа.", "Brief 3 variants of video 7670…1922 (hook, pack-count, CTA)": "Бриф на 3 варианта видео 7670…1922 (хук, число пар, CTA)", "PROMISING · confidence LOW until ≥ 5 orders": "ПЕРСПЕКТИВНО · уверенность НИЗКАЯ до ≥ 5 заказов", "Shift Abu-Abu budget to Pria Hitam (CVR 11.2% vs 8.9%)": "Перенести бюджет с Abu-Abu на Pria Hitam (CVR 11,2% vs 8,9%)", "Same COGS, higher conversion": "Та же себестоимость, выше конверсия", "GMV Max spend above break-even": "Расход GMV Max выше безубыточности", "Rp 2.23m spend for Rp 2.40m net revenue": "Rp 2,23m расхода на Rp 2,40m выручки нетто", "Refunds on Tokopedia-sourced orders": "Возвраты по заказам из Tokopedia", "Fees kept on refund: Rp 10,250 per case": "Комиссии при возврате не возвращаются: Rp 10 250 за случай", "Video 7665…0871: traffic without sales": "Видео 7665…0871: трафик без продаж", "1,890 views · 0 orders · TRAFFIC_NO_SALES": "1 890 просмотров · 0 заказов", "7 · Today's team action board": "7 · Доска задач на сегодня", "Generated 30 Aug · max 3 per team": "Сформировано 30 авг · до 3 на команду", "Accept · edit · assign · measure after 72 h": "Принять · править · назначить · измерить через 72 ч", "Today ": "Сегодня ", "In progress ": "В работе ", "Review ": "Проверка ", "Done · measured ": "Готово · измерено ", "Performance": "Перформанс", "Video": "Видео", "Design": "Дизайн", "Success": "Успех", "Review GMV Max budget vs break-even ROAS 1.62": "Пересмотреть бюджет GMV Max против порога ROAS 1,62", "Aug: Rp 2.23m spend, blended ROAS 1.08. Do not change campaigns automatically — review targeting and daily cap.": "Август: Rp 2,23m расхода, смешанный ROAS 1,08. Кампании не менять автоматически — проверить таргетинг и дневной лимит.", "Owner: Sergei": "Владелец: Сергей", "Impact +Rp 600–900k/mo": "Эффект +Rp 600–900k/мес", "Shoot 3 variants of 7670…1922": "Снять 3 варианта 7670…1922", "Keep: product in first 2 s, 15 s length, #kaoskaki. Test: 3 opening hooks; say \"5 pasang\" in the first line.": "Сохранить: товар в первые 2 с, длина 15 с, #kaoskaki. Тест: 3 хука; «5 pasang» в первой фразе.", "Owner: Videographer": "Владелец: Видеограф", "Deadline: Mon 16:00": "Срок: пн 16:00", "Check size chart 41–47 on Pria Hitam listing": "Проверить размерную сетку 41–47 в карточке Pria Hitam", "2 of 4 refunds on this SKU; both Tokopedia-sourced.": "2 из 4 возвратов на этом SKU; оба из Tokopedia.", "Owner: Shop ops": "Владелец: Опер. магазина", "Impact −Rp 78k/mo": "Эффект −Rp 78k/мес", "New cover for Kaos Kaki Abu-Abu": "Новая обложка для Kaos Kaki Abu-Abu", "CVR 8.9% vs 11.2% on Hitam with same traffic mix.": "CVR 8,9% против 11,2% у Hitam при том же трафике.", "Owner: Designer": "Владелец: Дизайнер", "Started 29 Aug": "Начато 29 авг", "Reconcile August statements": "Сверить стейтменты августа", "12/12 orders match Seller Center exactly. Formulas verified.": "12/12 заказов совпали с Seller Center точно. Формулы подтверждены.", "Done 30 Aug": "Готово 30 авг", "Confidence HIGH": "Уверенность ВЫСОКАЯ"};
+const nodes=[];(function walk(n){for(const c of n.childNodes){if(c.nodeType===3&&c.nodeValue.trim())nodes.push([c,c.nodeValue]);else if(c.nodeType===1&&c.tagName!=='SCRIPT'&&c.tagName!=='STYLE')walk(c);}})(document.body);
+function setLang(l){document.documentElement.lang=l;nodes.forEach(([n,en])=>{if(l==='ru'){const k=en.trim();const lead=en.match(/^\s*/)[0],trail=en.match(/\s*$/)[0];n.nodeValue=(k in RU)?lead+RU[k]+trail:en;}else n.nodeValue=en;});
+document.querySelectorAll('.lang button').forEach(b=>b.classList.toggle('on',b.dataset.lang===l));try{localStorage.setItem('tt-lang',l)}catch(e){}}
+document.querySelectorAll('.lang button').forEach(b=>b.addEventListener('click',()=>setLang(b.dataset.lang)));
+let saved='en';try{saved=localStorage.getItem('tt-lang')||'en'}catch(e){}if(saved==='ru')setLang('ru');
+</script>
+</body></html>

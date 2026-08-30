@@ -200,7 +200,8 @@ def build_placeholder_txns(ctx: OrderCtx) -> tuple[list[FinanceTxn], list[str]] 
     """Unsettled statement record (statement_id "") with real pre-settlement amounts -> PROVISIONAL
     txns (no settlement_id). None when absent or revenue is zero (caller falls back to ratio)."""
     ph = ctx.placeholder
-    if ph is None or _dec(getattr(ph, "revenue_amount", None)) == ZERO:
+    if ph is None or _dec(getattr(ph, "revenue_amount", None)) == ZERO or any(
+            getattr(ph, f, None) is None for f in ("settlement_amount", "fee_amount")):
         return None
     rec = record_to_dict(ph, ctx.placeholder_skus)
     rec["statement_id"] = None
@@ -435,6 +436,7 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None,
         log.warning("%s", w)
     if unallocated:
         log.warning("shop %s: unallocated ad spend %s", inp.shop_id, unallocated)
+    dropped = ZERO
 
     out: list[OrderProfitCalc] = []
     for ctx, d, items, txns, versions, warns, est, source in prepared:
@@ -446,6 +448,7 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None,
             p = order_profit(key, d, items, txns, versions, allocated)
         except Exception as e:  # noqa: BLE001
             _skip(ctx, e, errors)
+            dropped += ads.get(key, ZERO)
             continue
         p = EngineProfit(**{**p.__dict__, "warnings": tuple(warns) + p.warnings})
         item_rows = [{
@@ -474,6 +477,9 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None,
         }
         snap["hash"] = snapshot_hash(snap)
         out.append(OrderProfitCalc(ctx.order.id, ctx.order.external_order_id, d, p, snap, est, item_rows))
+    if dropped:
+        log.warning("shop %s: ad spend %s allocated to skipped orders is unallocated", inp.shop_id,
+                    _ds(dropped))
     return out
 
 
@@ -528,11 +534,12 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
         start = datetime.combine(since - timedelta(days=AD_WINDOW_DAYS), datetime.min.time(),
                                  tzinfo=ZoneInfo(tz))
         q = q.where(Order.order_created_at >= start)
-    orders = list(session.scalars(q.order_by(Order.order_created_at)))
+    orders = list(session.scalars(q.order_by(Order.order_created_at, Order.id)))
     ids = [o.id for o in orders]
     items: dict[int, list[Any]] = defaultdict(list)
     if ids:
-        for it in session.scalars(select(OrderItem).where(OrderItem.order_id.in_(ids))):
+        for it in session.scalars(select(OrderItem).where(OrderItem.order_id.in_(ids))
+                                  .order_by(OrderItem.id)):
             items[it.order_id].append(it)
     sku_rows = list(session.execute(
         select(Sku.id, Sku.external_sku_id, Sku.product_id).join(Product, Product.id == Sku.product_id)
@@ -542,7 +549,8 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
 
     records = list(session.scalars(select(OrderStatementRecord)
                                    .where(OrderStatementRecord.shop_id == shop_id)))
-    settled = [r for r in records if str(r.status or "").upper() in SETTLED_STATUSES]
+    settled = [r for r in records
+               if str(r.status or "").upper() in SETTLED_STATUSES and (r.statement_id or "")]
     recs_by_order: dict[str, list[Any]] = defaultdict(list)
     for r in sorted(settled, key=lambda r: (r.statement_time or datetime.min.replace(tzinfo=UTC), r.id)):
         recs_by_order[r.external_order_id].append(r)
@@ -554,7 +562,8 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
     rec_ids = [r.id for r in settled] + [r.id for r in placeholder_by_order.values()]
     if rec_ids:
         for s in session.scalars(select(OrderStatementSkuRecord)
-                                 .where(OrderStatementSkuRecord.record_id.in_(rec_ids))):
+                                 .where(OrderStatementSkuRecord.record_id.in_(rec_ids))
+                                 .order_by(OrderStatementSkuRecord.id)):
             sku_recs[s.record_id].append(s)
 
     ctxs = []
