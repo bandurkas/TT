@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     shop_timezone: str = "Asia/Jakarta"
     shop_currency: str = "IDR"
 
+    tiktok_shop_app_key: str = ""
+    tiktok_shop_app_secret: str = ""
+    token_store_dir: str = "data"
+
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
