@@ -25,7 +25,21 @@ def test_health_reports_jobs_and_syncs():
     body = r.json()
     assert body["status"] == "degraded" and body["db"] == "ok"
     assert body["jobs"][0]["resource"] == "job:finance_cycle" and body["jobs"][0]["age_minutes"] == 30
+    assert body["jobs"][0]["stale"] is False
     assert body["syncs"][0]["error"] == "boom" and body["syncs"][0]["last_success"] is None
+
+
+def test_health_stale_job_degrades():
+    old = datetime.now(UTC) - timedelta(hours=5)
+    rows = [NS(integration="tt", resource_type="job:finance_cycle", status="success",
+               last_successful_sync=old, last_attempt=old, error=None)]
+    with patch.object(api, "SessionLocal", lambda: _session(rows)):
+        body = TestClient(api.app).get("/health").json()
+    assert body["status"] == "degraded" and body["jobs"][0]["stale"] is True
+    rows = [NS(integration="tt", resource_type="job:withdrawals", status="running",
+               last_successful_sync=old, last_attempt=old, error=None)]
+    with patch.object(api, "SessionLocal", lambda: _session(rows)):
+        assert TestClient(api.app).get("/health").json()["jobs"][0]["stale"] is False  # < 13h
 
 
 def test_health_db_down():

@@ -1,13 +1,18 @@
 """APScheduler jobs (shop-local time). Each job = one DB session; result/errors recorded in
-integration_sync_state as resource `job:<name>` so /health can report last runs."""
+integration_sync_state as resource `job:<name>` so /health can report last runs.
+Jobs are serialised with a process lock: profit compute must never run twice concurrently."""
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import select
+
 from src.config.settings import settings
+from src.db.models import IntegrationSyncState
 from src.domain.ingest import jobs as ingest
 from src.domain.ingest.state import DbSyncStateStore
 from src.domain.profit import aggregates
@@ -16,6 +21,19 @@ from src.domain.profit import jobs as profit
 log = logging.getLogger("tt.scheduler")
 JOB_INTEGRATION = "tt"
 METRICS_RESYNC_DAYS = 3  # daily analytics: refetch last N days (D-1 restates)
+STATEMENT_POLL_DAYS = 45  # per-order statement re-poll horizon
+_LOCK = threading.Lock()
+
+# fixed slots (shop tz) so restarts never drift the hourly job onto the daily one
+SLOTS: dict[str, dict[str, Any]] = {
+    "finance_cycle": {"minute": 5},
+    "order_statements": {"hour": "*/6", "minute": 40},
+    "withdrawals": {"hour": "*/6", "minute": 20},
+    "daily_metrics": {"hour": 3, "minute": 0},
+}
+# /health: a job older than this (or stuck "running") is stale
+STALE_AFTER = {"finance_cycle": timedelta(hours=3), "order_statements": timedelta(hours=13),
+               "withdrawals": timedelta(hours=13), "daily_metrics": timedelta(hours=27)}
 
 
 def _compute_profit(session: Any, shop: Any) -> dict[str, Any]:
@@ -26,10 +44,17 @@ def _compute_profit(session: Any, shop: Any) -> dict[str, Any]:
 
 
 def finance_cycle(session: Any, build_context: Callable[[Any], Any]) -> dict[str, Any]:
-    """Hourly: orders -> per-order statements -> statements -> profit + aggregates."""
+    """Hourly: orders -> statements -> profit + aggregates."""
     ctx = build_context(session)
-    out = {"orders": ingest.sync_orders(ctx), "order_statements": ingest.sync_order_statements(ctx),
-           "statements": ingest.sync_statements(ctx)}
+    out = {"orders": ingest.sync_orders(ctx), "statements": ingest.sync_statements(ctx)}
+    out.update(_compute_profit(session, ctx.shop))
+    return out
+
+
+def order_statements(session: Any, build_context: Callable[[Any], Any]) -> dict[str, Any]:
+    """6h: per-order statement records (one API call per order needing a poll) + profit."""
+    ctx = build_context(session)
+    out = {"order_statements": ingest.sync_order_statements(ctx, unsettled_days=STATEMENT_POLL_DAYS)}
     out.update(_compute_profit(session, ctx.shop))
     return out
 
@@ -42,19 +67,27 @@ def withdrawals(session: Any, build_context: Callable[[Any], Any]) -> dict[str, 
 def daily_metrics(session: Any, build_context: Callable[[Any], Any]) -> dict[str, Any]:
     """03:00 shop time: catalog + analytics (last METRICS_RESYNC_DAYS) then profit recompute."""
     ctx = build_context(session)
-    out = {"catalog": ingest.sync_catalog(ctx), "metrics": ingest.sync_metrics(ctx, days=METRICS_RESYNC_DAYS)}
+    out = {"catalog": ingest.sync_catalog(ctx),
+           "metrics": ingest.sync_metrics(ctx, days=METRICS_RESYNC_DAYS)}
     out.update(_compute_profit(session, ctx.shop))
     return out
 
 
 JOBS: dict[str, Callable[[Any, Callable[[Any], Any]], dict[str, Any]]] = {
-    "finance_cycle": finance_cycle, "withdrawals": withdrawals, "daily_metrics": daily_metrics,
+    "finance_cycle": finance_cycle, "order_statements": order_statements,
+    "withdrawals": withdrawals, "daily_metrics": daily_metrics,
 }
 
 
 def run_job(name: str, session_factory: Callable[[], Any], build_context: Callable[[Any], Any],
             shop_lookup: Callable[[Any], Any]) -> dict[str, Any]:
-    """Runs one named job in its own session; never raises (scheduler must keep going)."""
+    """Runs one named job in its own session under the process lock; never raises."""
+    with _LOCK:
+        return _run_job(name, session_factory, build_context, shop_lookup)
+
+
+def _run_job(name: str, session_factory: Callable[[], Any], build_context: Callable[[Any], Any],
+             shop_lookup: Callable[[Any], Any]) -> dict[str, Any]:
     fn = JOBS[name]
     started = datetime.now(UTC)
     with session_factory() as session:
@@ -73,8 +106,8 @@ def run_job(name: str, session_factory: Callable[[], Any], build_context: Callab
                     store.mark_error(*key, "; ".join(errors))
                 else:
                     store.mark_success(*key, started.isoformat(timespec="seconds"))
-            log.info("job %s done in %.1fs errors=%d", name, (datetime.now(UTC) - started).total_seconds(),
-                     len(errors))
+            log.info("job %s done in %.1fs errors=%d", name,
+                     (datetime.now(UTC) - started).total_seconds(), len(errors))
             return out
         except Exception as e:
             session.rollback()
@@ -88,29 +121,52 @@ def run_job(name: str, session_factory: Callable[[], Any], build_context: Callab
 
 
 def _collect_errors(out: Any, path: str = "") -> list[str]:
-    """Sub-job dicts return {"error": ...} instead of raising -> surface them in job state."""
+    """Sub-jobs return {"error": str} or {"errors": [..]} instead of raising -> surface in job state."""
     errs: list[str] = []
     if isinstance(out, dict):
-        if "error" in out and isinstance(out["error"], str):
+        if isinstance(out.get("error"), str):
             errs.append(f"{path or 'job'}: {out['error'][:200]}")
+        lst = out.get("errors")
+        if isinstance(lst, list) and lst:
+            errs.append(f"{path or 'job'}: {len(lst)} errors: {str(lst[0])[:120]}")
         for k, v in out.items():
-            if k != "error":
+            if k not in ("error", "errors"):
                 errs += _collect_errors(v, f"{path}.{k}" if path else str(k))
     return errs
 
 
-def build_scheduler(runner: Callable[[str], Any], tz: str | None = None):
+def reset_stuck_jobs(session: Any, now: datetime | None = None) -> int:
+    """Worker start: job rows left "running" by a killed process -> error (interrupted)."""
+    now = now or datetime.now(UTC)
+    n = 0
+    for r in session.scalars(select(IntegrationSyncState).where(
+            IntegrationSyncState.integration == JOB_INTEGRATION,
+            IntegrationSyncState.status == "running")):
+        r.status, r.error = "error", f"interrupted (worker restarted {now.isoformat(timespec='seconds')})"
+        n += 1
+    session.commit()
+    return n
+
+
+def finance_due(session: Any, now: datetime | None = None,
+                max_age: timedelta = timedelta(minutes=55)) -> bool:
+    """Run finance_cycle immediately on start only if its last success is older than max_age."""
+    now = now or datetime.now(UTC)
+    r = session.scalar(select(IntegrationSyncState).where(
+        IntegrationSyncState.integration == JOB_INTEGRATION,
+        IntegrationSyncState.resource_type == "job:finance_cycle"))
+    return r is None or r.last_successful_sync is None or now - r.last_successful_sync > max_age
+
+
+def build_scheduler(runner: Callable[[str], Any], tz: str | None = None, immediate: bool = False):
+    from apscheduler.executors.pool import ThreadPoolExecutor
     from apscheduler.schedulers.blocking import BlockingScheduler
     from apscheduler.triggers.cron import CronTrigger
-    from apscheduler.triggers.interval import IntervalTrigger
 
     tz = tz or settings.shop_timezone
     common = {"coalesce": True, "max_instances": 1, "misfire_grace_time": 600}
-    sched = BlockingScheduler(timezone=tz)
-    sched.add_job(runner, IntervalTrigger(hours=1, timezone=tz), args=["finance_cycle"],
-                  id="finance_cycle", next_run_time=datetime.now(UTC), **common)
-    sched.add_job(runner, IntervalTrigger(hours=6, timezone=tz), args=["withdrawals"],
-                  id="withdrawals", next_run_time=datetime.now(UTC), **common)
-    sched.add_job(runner, CronTrigger(hour=3, minute=0, timezone=tz), args=["daily_metrics"],
-                  id="daily_metrics", **common)
+    sched = BlockingScheduler(timezone=tz, executors={"default": ThreadPoolExecutor(1)})
+    for name, slot in SLOTS.items():
+        extra = {"next_run_time": datetime.now(UTC)} if immediate and name == "finance_cycle" else {}
+        sched.add_job(runner, CronTrigger(timezone=tz, **slot), args=[name], id=name, **common, **extra)
     return sched

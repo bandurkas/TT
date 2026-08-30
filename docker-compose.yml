@@ -33,6 +33,8 @@ services:
     build: .
     env_file: .env
     command: ["python", "-m", "apps.worker.main"]
+    volumes:
+      - ./data:/app/data
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_started }

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from sqlalchemy import select, text
 
 from apps.api.oauth import router as oauth_router
+from apps.worker.scheduler import STALE_AFTER
 from src.config.settings import settings
 from src.db.models import IntegrationSyncState
 from src.db.session import SessionLocal
@@ -18,12 +19,15 @@ def sync_summary(session) -> list[dict]:
     now = datetime.now(UTC)
     out = []
     for s in rows:
-        ok = s.last_successful_sync
+        ok, att = s.last_successful_sync, s.last_attempt
+        limit = STALE_AFTER.get(s.resource_type.removeprefix("job:"))
+        stale = bool(limit) and ((ok is None or now - ok > limit) or
+                                 (s.status == "running" and att is not None and now - att > limit))
         out.append({"integration": s.integration, "resource": s.resource_type, "status": s.status,
                     "last_success": ok.isoformat(timespec="seconds") if ok else None,
                     "age_minutes": int((now - ok).total_seconds() // 60) if ok else None,
-                    "last_attempt": s.last_attempt.isoformat(timespec="seconds") if s.last_attempt else None,
-                    "error": (s.error or "")[:200] or None})
+                    "last_attempt": att.isoformat(timespec="seconds") if att else None,
+                    "stale": stale, "error": (s.error or "")[:200] or None})
     return out
 
 
@@ -37,7 +41,7 @@ def health() -> dict:
     except Exception as e:  # noqa: BLE001
         db, syncs = f"error: {type(e).__name__}", []
     jobs = [s for s in syncs if s["resource"].startswith("job:")]
-    degraded = db != "ok" or any(s["status"] == "error" for s in syncs)
+    degraded = db != "ok" or any(s["status"] == "error" or s["stale"] for s in syncs)
     return {"status": "degraded" if degraded else "ok", "env": settings.app_env, "db": db,
             "jobs": jobs, "syncs": [s for s in syncs if not s["resource"].startswith("job:")]}
 

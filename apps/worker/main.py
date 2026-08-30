@@ -1,5 +1,6 @@
-"""Worker: APScheduler loop (finance hourly, withdrawals 6h, metrics daily 03:00 shop time)."""
+"""Worker: APScheduler loop (finance hourly, statements/withdrawals 6h, metrics daily 03:00 shop tz)."""
 import logging
+import signal
 
 from apps.worker import scheduler
 from apps.worker.cli import build_context, shop_from_db
@@ -15,5 +16,11 @@ def run(name: str) -> dict:
 
 
 if __name__ == "__main__":
-    log.info("worker up: jobs=%s tz=%s", list(scheduler.JOBS), settings.shop_timezone)
-    scheduler.build_scheduler(run).start()
+    with SessionLocal() as s:
+        stuck = scheduler.reset_stuck_jobs(s)
+        immediate = scheduler.finance_due(s)
+    log.info("worker up: jobs=%s tz=%s reset_stuck=%d immediate_finance=%s",
+             list(scheduler.JOBS), settings.shop_timezone, stuck, immediate)
+    sched = scheduler.build_scheduler(run, immediate=immediate)
+    signal.signal(signal.SIGTERM, lambda *_: sched.shutdown(wait=False))
+    sched.start()
