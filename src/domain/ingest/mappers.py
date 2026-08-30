@@ -37,7 +37,7 @@ def ts(v: Any) -> datetime | None:
     if v in (None, "", 0, "0"):
         return None
     if isinstance(v, str) and not v.strip().lstrip("-").isdigit():
-        d = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+        d = datetime.fromisoformat(v.strip())
         return (d if d.tzinfo else d.replace(tzinfo=SHOP_TZ)).astimezone(UTC)
     n = int(v)
     if n > 10**11:  # milliseconds
@@ -229,24 +229,27 @@ def _breakdown(items: Any) -> dict[str, Decimal]:
 
 
 def map_shop_metric(api: dict, shop_id: int, day: date, fetched_at: datetime) -> dict:
-    perf = api
-    ivs = api.get("intervals") or api.get("performance")
-    if isinstance(ivs, list) and ivs:
-        perf = ivs[0]
-    elif isinstance(ivs, dict):
-        perf = ivs
-    gmv_b = _breakdown(pick(perf, "gmv_breakdowns", "gmv_breakdown"))
-    gr_b = _breakdown(pick(perf, "gross_revenue_breakdowns", "gross_revenue_breakdown"))
-    gmv_max, non = gr_b.get("GMV_MAX"), gr_b.get("NON_GMV_MAX")
-    pct = None
-    if gmv_max is not None and non is not None and gmv_max + non:
-        pct = (gmv_max / (gmv_max + non)).quantize(Decimal("0.000001"))
+    """Shape verified live 2026-08-30: performance.intervals[0].sales{gmv{overall,breakdowns[{gmv,type}]},
+    gross_revenue{overall,breakdowns[{type,percentage}]}, refunds, items_sold, orders_count,
+    sku_orders_count, avg_customers_count}, traffic{avg_visitors, avg_page_views, avg_conversation_rate}."""
+    perf = api.get("performance", api)
+    ivs = perf.get("intervals") if isinstance(perf, dict) else None
+    iv = ivs[0] if isinstance(ivs, list) and ivs else perf
+    sales = iv.get("sales", iv)
+    gmv = sales.get("gmv") or {}
+    gmv_b = {b.get("type"): dec((b.get("gmv") or {}).get("amount")) for b in gmv.get("breakdowns") or []}
+    gr = sales.get("gross_revenue") or {}
+    gr_total = dec((gr.get("overall") or {}).get("amount"))
+    pcts = {b.get("type"): dec(b.get("percentage")) for b in gr.get("breakdowns") or []}
+    pct = pcts.get("GMV_MAX")
+    gmv_max = (gr_total * pct) if gr_total is not None and pct is not None else None
+    non = (gr_total - gmv_max) if gmv_max is not None else None
     return {"shop_id": shop_id, "metric_date": day,
-            "gmv_total": dec(perf.get("gmv")) or (sum(gmv_b.values()) if gmv_b else None),
+            "gmv_total": dec((gmv.get("overall") or {}).get("amount")),
             "gmv_live": gmv_b.get("LIVE"), "gmv_video": gmv_b.get("VIDEO"),
             "gmv_product_card": gmv_b.get("PRODUCT_CARD"),
             "gross_revenue_gmv_max": gmv_max, "gross_revenue_non_gmv_max": non,
             "gross_revenue_gmv_max_pct": pct,
-            "sku_orders": to_int(pick(perf, "sku_orders", "orders")),
-            "avg_customers": dec(pick(perf, "avg_customers", "customers")),
-            "currency": cur(perf.get("gmv")), "breakdown": api, "fetched_at": fetched_at}
+            "sku_orders": to_int(sales.get("sku_orders_count")),
+            "avg_customers": dec(sales.get("avg_customers_count")),
+            "currency": cur(gmv.get("overall"), "IDR"), "breakdown": api, "fetched_at": fetched_at}

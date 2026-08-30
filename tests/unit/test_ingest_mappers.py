@@ -176,3 +176,23 @@ def test_ts_parses_datetime_string_in_shop_tz():
     assert d == datetime(2026, 7, 4, 2, 16, 58, tzinfo=UTC)
     assert ts("1787356800") == datetime.fromtimestamp(1787356800, UTC)
     assert ts("2026-07-04T09:16:58Z") == datetime(2026, 7, 4, 9, 16, 58, tzinfo=UTC)
+
+
+def test_map_shop_metric_live_shape():
+    from datetime import UTC, date, datetime
+    from decimal import Decimal
+
+    from src.domain.ingest.mappers import map_shop_metric
+    api = {"performance": {"intervals": [{"sales": {"gmv": {"overall": {"amount": "419408.00", "currency": "IDR"},
+            "breakdowns": [{"gmv": {"amount": "0.00", "currency": "IDR"}, "type": "LIVE"},
+                           {"gmv": {"amount": "160978.00", "currency": "IDR"}, "type": "VIDEO"},
+                           {"gmv": {"amount": "258430.00", "currency": "IDR"}, "type": "PRODUCT_CARD"}]},
+            "refunds": {"amount": "0.00", "currency": "IDR"}, "items_sold": 5, "orders_count": 5,
+            "gross_revenue": {"overall": {"amount": "425632.00", "currency": "IDR"},
+                              "breakdowns": [{"type": "GMV_MAX", "percentage": "0.9995"}, {"type": "NON_GMV_MAX", "percentage": "0.0005"}]},
+            "sku_orders_count": 5, "avg_customers_count": 5},
+            "traffic": {"avg_visitors": 36}, "end_date": "2026-08-30", "start_date": "2026-08-29"}]}, "latest_available_date": "2026-08-29"}
+    m = map_shop_metric(api, 1, date(2026, 8, 29), datetime.now(UTC))
+    assert m["gmv_total"] == Decimal("419408.00") and m["gmv_video"] == Decimal("160978.00")
+    assert m["gross_revenue_gmv_max_pct"] == Decimal("0.9995") and m["sku_orders"] == 5
+    assert m["gross_revenue_gmv_max"] == Decimal("425632.00") * Decimal("0.9995")
