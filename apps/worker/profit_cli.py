@@ -32,7 +32,8 @@ def pick_shop(session, shop_id: int | None):
 def cmd_compute(session, shop_id: int | None, since: date | None) -> dict:
     shop = pick_shop(session, shop_id)
     res = jobs.compute_order_profits(session, shop.id, since)
-    agg = aggregates.recompute_daily(session, shop.id, res["dates"] or None, shop.timezone)
+    agg = aggregates.recompute_daily(session, shop.id, res["dates"] or None,
+                                     shop.timezone or jobs.DEFAULT_TZ)
     return {"shop_id": shop.id, **{k: v for k, v in res.items() if k != "dates"},
             "dates": [str(d) for d in res["dates"]], **agg}
 
@@ -87,8 +88,10 @@ def _fmt(v) -> str:
 
 
 def render_table(rows: list[dict]) -> str:
-    hdr = ("date", "orders", "net revenue", "fees", "cogs", "ads (BLENDED/LOW)", "net profit", "margin")
-    keys = ("date", "orders", "net_seller_revenue", "fees", "cogs", "ad_cost", "net_profit", "net_margin")
+    hdr = ("date", "orders", "settled", "prov", "net revenue", "fees", "cogs", "ads (BLENDED/LOW)",
+           "net profit", "margin")
+    keys = ("date", "orders", "settled", "provisional", "net_seller_revenue", "fees", "cogs", "ad_cost",
+            "net_profit", "net_margin")
     body = [[_fmt(r[k]) if k != "net_margin" else (f"{r[k]:.1%}" if r[k] is not None else "-")
              for k in keys] for r in rows + [totals(rows)]]
     widths = [max(len(h), *(len(b[i]) for b in body)) for i, h in enumerate(hdr)]

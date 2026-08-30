@@ -88,7 +88,8 @@ def test_record_to_dict_shapes_api_payload():
 
 def test_build_txns_from_orm_record_matches_settlement():
     c = ctx(order(), rec=record(), skus=[sku_record()])
-    txns = build_txns(c)
+    txns, warns = build_txns(c)
+    assert warns == []
     from src.analytics.profitability import net_seller_revenue
     assert net_seller_revenue(txns) == D(80482)
     assert all(t.settlement_id == "stmt1" for t in txns)
@@ -243,4 +244,107 @@ def test_compute_provisional_order_status_and_snapshot():
     assert b.is_estimate and b.profit.profit_status is ProfitStatus.PROVISIONAL
     assert b.profit.warnings[0] == jobs.PROVISIONAL_LABEL and b.snapshot["estimate"] is True
     assert b.profit.net_seller_revenue == D(91000) - D(10518)
-    assert b.snapshot["fee_ratio"] == "0.115582" and res[0].snapshot["fee_ratio"] is None
+    assert b.snapshot["fee_ratio"] == "0.1156" and res[0].snapshot["fee_ratio"] is None
+
+
+# --- review fixes (2026-08-31) ----------------------------------------------------------------
+def _ctx_multi(o, recs, skus_by_rec=None):
+    c = ctx(o, rec=recs[-1], skus=(skus_by_rec or {}).get(recs[-1].id, []))
+    c.records = list(recs)
+    c.sku_records_by_record = {r.id: (skus_by_rec or {}).get(r.id, []) for r in recs}
+    return c
+
+
+def test_since_allocation_consistent_with_full_run():
+    o1, o2 = order(1, "A", created=jkt(2026, 8, 18)), order(2, "B", created=jkt(2026, 8, 22))
+    sets = [settlement("ad1", jkt(2026, 8, 19), D(-40000)), settlement("ad2", jkt(2026, 8, 23), D(-100000))]
+    orders = [ctx(o1, rec=record("A", 1)), ctx(o2, rec=record("B", 2))]
+    full = {r.external_order_id: r.profit.allocated_ad_cost
+            for r in compute_from_inputs(inputs(orders, sets), NOW)}
+    inc = inputs(orders, sets)
+    inc.since = date(2026, 8, 20)
+    res = compute_from_inputs(inc, NOW)
+    assert [r.external_order_id for r in res] == ["B"]  # look-back order A not persisted
+    assert res[0].profit.allocated_ad_cost == full["B"] == D(50000)
+    assert full["A"] == D(90000)
+
+
+def test_multiple_settled_records_all_used_and_flagged():
+    r1 = record(rid=1)
+    zero = {k: D(0) for k in vars(r1) if k.endswith("_amount")}
+    r2 = record(rid=2, st=jkt(2026, 8, 25), **{**zero, "adjustment_amount": D(-5000),
+                                                "settlement_amount": D(-5000)})
+    res = compute_from_inputs(inputs([_ctx_multi(order(), [r1, r2])]), NOW)
+    p = res[0]
+    assert p.profit.net_seller_revenue == D(75482)
+    assert p.profit.profit_status is ProfitStatus.ADJUSTED
+    assert {t.settlement_id for t in txns_of(p)} == {"stmt1", "stmt2"}
+    assert any("2 settled statements" in w for w in p.profit.warnings)
+
+
+def txns_of(calc):
+    return [NS(settlement_id=t[3]) for t in calc.snapshot["txns"]]
+
+
+def test_mismatch_surfaced_in_warnings_and_snapshot():
+    r = record(settlement_amount=D(80487))  # identity broken -> emitted txns != settlement_amount
+    res = compute_from_inputs(inputs([ctx(order(), rec=r)]), NOW)
+    p = res[0]
+    assert p.snapshot["mismatch"] and "MISMATCH" in p.snapshot["mismatch"][0]
+    assert any(w.startswith("MISMATCH") for w in p.profit.warnings)
+    clean = compute_from_inputs(inputs([ctx(order(), rec=record())]), NOW)[0]
+    assert clean.snapshot["mismatch"] is None and clean.hash != p.hash
+
+
+def test_unsettled_placeholder_record_used_for_provisional():
+    ph = record(rid=9, status="PROCESSING", st=None)
+    ph.statement_id = ""
+    c = ctx(order())
+    c.placeholder = ph
+    res = compute_from_inputs(inputs([c], fee_records=[]), NOW)
+    p = res[0]
+    assert p.is_estimate and p.snapshot["source"] == "unsettled_record"
+    assert p.profit.profit_status is ProfitStatus.PROVISIONAL
+    assert p.profit.net_seller_revenue == D(80482)
+    assert all(t[3] is None for t in p.snapshot["txns"])
+    ph.revenue_amount = D(0)
+    res0 = compute_from_inputs(inputs([c], fee_records=[]), NOW)
+    assert res0[0].snapshot["source"] == "ratio_estimate"
+
+
+def test_engine_error_isolated_per_order():
+    bad_rec = record("B", 2)
+    bad_rec.currency = "USD"
+    bad = ctx(order(2, "B"), rec=bad_rec)
+    errs: list[str] = []
+    res = compute_from_inputs(inputs([ctx(order(1, "A"), rec=record("A", 1)), bad]), NOW, errs)
+    assert [r.external_order_id for r in res] == ["A"]
+    assert len(errs) == 1 and "B" in errs[0]
+
+
+def test_hash_ignores_warning_text_and_decimal_exponent():
+    a = compute_from_inputs(inputs([ctx(order(), rec=record())]), NOW)[0]
+    b = compute_from_inputs(inputs([ctx(order(), rec=record(settlement_amount=D("80482.000000"),
+                                                            gross_sales_amount=D("100000.00")))]), NOW)[0]
+    assert a.hash == b.hash
+    snap = dict(a.snapshot)
+    snap["warnings"] = ["different wording"]
+    assert jobs.snapshot_hash(snap) == a.hash
+    assert jobs._ds(D("25000.000000")) == "25000" and jobs._ds(D("0E-6")) == "0"
+
+
+def test_trailing_fee_ratio_skips_refunded_and_undated():
+    good = record(rid=1, st=jkt(2026, 8, 20))
+    refunded = record(rid=2, st=jkt(2026, 8, 21), revenue_amount=D(0), fee_amount=D(-5000))
+    undated = record(rid=3, st=None)
+    assert trailing_fee_ratio([good, refunded, undated], date(2026, 8, 30), TZ) == \
+        (D(10518) / D(91000)).quantize(D("0.000001"))
+
+
+def test_ad_credit_logged_not_netted(caplog):
+    import logging
+    sets = [settlement("ad", jkt(2026, 8, 23), D(-100000)), settlement("cr", jkt(2026, 8, 24), D(30000))]
+    with caplog.at_level(logging.INFO, logger="tt.profit"):
+        out = jobs.ad_deductions_by_day(sets, TZ)
+    assert out == {date(2026, 8, 23): D(100000)}
+    assert "CREDIT statement cr" in caplog.text and "ad deduction counted: ad" in caplog.text

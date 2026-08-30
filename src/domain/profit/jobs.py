@@ -68,8 +68,12 @@ NO_COGS_VERSION_FROM = date(1970, 1, 1)
 class OrderCtx:
     order: Any  # Order-like: id, external_order_id, order_created_at, order_status, currency, ...
     items: list[Any] = field(default_factory=list)  # OrderItem-like
-    record: Any | None = None  # OrderStatementRecord-like (settled)
-    sku_records: list[Any] = field(default_factory=list)  # OrderStatementSkuRecord-like
+    record: Any | None = None  # latest settled OrderStatementRecord-like
+    sku_records: list[Any] = field(default_factory=list)  # sku records of `record`
+    records: list[Any] = field(default_factory=list)  # ALL settled records (restatements/refunds)
+    sku_records_by_record: dict[int, list[Any]] = field(default_factory=dict)
+    placeholder: Any | None = None  # unsettled record (statement_id "") with pre-settlement amounts
+    placeholder_skus: list[Any] = field(default_factory=list)
     sku_external_by_id: dict[int, str] = field(default_factory=dict)
     product_by_sku_ext: dict[str, int | None] = field(default_factory=dict)
 
@@ -84,6 +88,7 @@ class ProfitInputs:
     settlements: list[Any]  # Settlement-like rows
     fee_ratio_records: list[Any] = field(default_factory=list)  # settled records for fee ratio
     default_cogs: Decimal | None = None  # shop_config.default_cogs_per_unit
+    since: date | None = None  # incremental run: persist orders/deductions with local date >= since
 
 
 @dataclass
@@ -118,6 +123,12 @@ def _s(v: Any) -> str | None:
     return None if v is None else str(v)
 
 
+def _ds(v: Any) -> str:
+    """Decimal -> canonical string (exponent-invariant: 25000 == 25000.000000)."""
+    d = _dec(v)
+    return format(d.normalize() if d != ZERO else ZERO, "f")
+
+
 def record_to_dict(record: Any, sku_records: Iterable[Any] = ()) -> dict[str, Any]:
     """ORM statement record -> flat dict shaped like the Finance API payload."""
     st = getattr(record, "statement_time", None)
@@ -149,16 +160,55 @@ def record_to_dict(record: Any, sku_records: Iterable[Any] = ()) -> dict[str, An
     return out
 
 
-def build_txns(ctx: OrderCtx) -> list[FinanceTxn]:
-    if ctx.record is None:
-        return []
-    rec = record_to_dict(ctx.record, ctx.sku_records)
-    sku_to_item = {}
+def _sku_to_item(ctx: OrderCtx) -> dict[str, str]:
+    sku_to_item: dict[str, str] = {}
     for it in ctx.items:
         ext = ctx.sku_external_by_id.get(getattr(it, "sku_id", None))
         if ext and ext not in sku_to_item:
             sku_to_item[ext] = str(it.id)
-    return _record_to_txns(rec, ctx.order.external_order_id, sku_to_item=sku_to_item)
+    return sku_to_item
+
+
+def _settled_records(ctx: OrderCtx) -> list[tuple[Any, list[Any]]]:
+    if ctx.records:
+        return [(r, ctx.sku_records_by_record.get(r.id, [])) for r in ctx.records]
+    return [(ctx.record, ctx.sku_records)] if ctx.record is not None else []
+
+
+def build_txns(ctx: OrderCtx) -> tuple[list[FinanceTxn], list[str]]:
+    """Txns from ALL settled statement records of the order (later statements = refunds/adjustments
+    -> engine status ADJUSTED/REFUNDED). Returns (txns, warnings incl. mismatch)."""
+    recs = _settled_records(ctx)
+    if not recs:
+        return [], []
+    sku_to_item = _sku_to_item(ctx)
+    txns: list[FinanceTxn] = []
+    warns: list[str] = []
+    for r, skus in recs:
+        out = _record_to_txns(record_to_dict(r, skus), ctx.order.external_order_id,
+                              sku_to_item=sku_to_item)
+        if out.mismatch is not None:
+            warns.append(f"MISMATCH statement {getattr(r, 'statement_id', '?')}: "
+                         f"txns != settlement_amount by {_ds(out.mismatch)}")
+        txns.extend(out)
+    if len(recs) > 1:
+        warns.append(f"{len(recs)} settled statements for order")
+    return txns, warns
+
+
+def build_placeholder_txns(ctx: OrderCtx) -> tuple[list[FinanceTxn], list[str]] | None:
+    """Unsettled statement record (statement_id "") with real pre-settlement amounts -> PROVISIONAL
+    txns (no settlement_id). None when absent or revenue is zero (caller falls back to ratio)."""
+    ph = ctx.placeholder
+    if ph is None or _dec(getattr(ph, "revenue_amount", None)) == ZERO:
+        return None
+    rec = record_to_dict(ph, ctx.placeholder_skus)
+    rec["statement_id"] = None
+    out = _record_to_txns(rec, ctx.order.external_order_id, sku_to_item=_sku_to_item(ctx))
+    warns = ["PROVISIONAL: unsettled statement record; amounts pre-settlement, not final"]
+    if out.mismatch is not None:
+        warns.append(f"MISMATCH unsettled record: txns != settlement_amount by {_ds(out.mismatch)}")
+    return list(out), warns
 
 
 def build_items(ctx: OrderCtx, currency: str) -> list[OrderItemInput]:
@@ -222,11 +272,19 @@ def is_ad_deduction(settlement: Any) -> bool:
 
 
 def ad_deductions_by_day(settlements: Iterable[Any], tz: str) -> dict[date, Decimal]:
-    """Positive ad spend per shop-local settlement day."""
+    """Positive ad spend per shop-local settlement day. Counted rows are logged (UNVERIFIED
+    classification: any adjustment-only negative statement); positive adjustment-only rows
+    (possible ad credits) are logged and NOT netted."""
     out: dict[date, Decimal] = defaultdict(lambda: ZERO)
     for s in settlements:
         if not is_ad_deduction(s):
+            g, n = getattr(s, "gross_amount", None), getattr(s, "net_amount", None)
+            if g is not None and n is not None and _dec(g) == ZERO and _dec(n) > ZERO:
+                log.warning("adjustment-only CREDIT statement %s %s ignored (not netted vs ads)",
+                            getattr(s, "external_settlement_id", "?"), _ds(n))
             continue
+        log.info("ad deduction counted: %s %s %s", getattr(s, "external_settlement_id", "?"),
+                 getattr(s, "settlement_at", None), _ds(getattr(s, "net_amount", None)))
         d = local_date(getattr(s, "settlement_at", None), tz)
         if d is None:
             log.warning("ad deduction %s has no settlement_at; skipped",
@@ -273,9 +331,12 @@ def trailing_fee_ratio(records: Iterable[Any], as_of: date | None, tz: str,
         if str(getattr(r, "status", "") or "").upper() not in SETTLED_STATUSES:
             continue
         d = local_date(getattr(r, "statement_time", None), tz)
-        if as_of is not None and d is not None and not (as_of - timedelta(days=days) <= d <= as_of):
+        if d is None or (as_of is not None and not (as_of - timedelta(days=days) <= d <= as_of)):
             continue
-        rev += _dec(getattr(r, "revenue_amount", None))
+        r_rev = _dec(getattr(r, "revenue_amount", None))
+        if r_rev <= ZERO:  # refunded orders: fees remain, revenue ~0 -> would inflate the ratio
+            continue
+        rev += r_rev
         fees += abs(_dec(getattr(r, "fee_amount", None)))
     return (fees / rev).quantize(RATIO_PLACES) if rev > ZERO else None
 
@@ -303,9 +364,13 @@ def estimate_provisional(order: Any, items: Sequence[OrderItemInput], fee_ratio:
 
 
 # --- compute ----------------------------------------------------------------------------------
+HASH_KEYS = ("estimate", "fee_ratio", "txns", "items", "cost_versions", "ad_cost", "ad_method",
+             "ad_window_days", "status", "local_date", "mismatch", "source")
+
+
 def snapshot_hash(snapshot: Mapping[str, Any]) -> str:
-    body = json.dumps({k: v for k, v in snapshot.items() if k != "hash"}, sort_keys=True,
-                      default=str)
+    """Hash of material inputs only (warnings text excluded -> no version churn on wording)."""
+    body = json.dumps({k: snapshot.get(k) for k in HASH_KEYS}, sort_keys=True, default=str)
     return hashlib.sha256(body.encode()).hexdigest()
 
 
@@ -316,16 +381,27 @@ def _order_local_date(ctx: OrderCtx, tz: str) -> date:
     return d or local_date(datetime.now(UTC), tz)  # type: ignore[return-value]
 
 
-def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None) -> list[OrderProfitCalc]:
+def _skip(ctx: OrderCtx, e: Exception, errors: list[str] | None) -> None:
+    msg = f"order {ctx.order.external_order_id}: {type(e).__name__}: {e}"
+    log.error("profit: skipped %s", msg)
+    if errors is not None:
+        errors.append(msg)
+
+
+def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None,
+                        errors: list[str] | None = None) -> list[OrderProfitCalc]:
+    """errors (optional out-param) collects per-order engine failures; such orders are skipped."""
     now = now or datetime.now(UTC)
     tz = inp.timezone or DEFAULT_TZ
     cur = inp.currency
+    since = inp.since
     as_of = max((d for d in (local_date(getattr(r, "statement_time", None), tz)
                              for r in inp.fee_ratio_records) if d), default=None)
     fee_ratio = trailing_fee_ratio(inp.fee_ratio_records, as_of, tz)
 
     prepared: list[tuple[OrderCtx, date, list[OrderItemInput], list[FinanceTxn], list[CostVersion],
-                         list[str], bool]] = []
+                         list[str], bool, str]] = []
+    net_by_order: dict[str, tuple[date, Decimal]] = {}
     for ctx in inp.orders:
         status = str(getattr(ctx.order, "order_status", "") or "").upper()
         if ctx.record is None and status in SKIP_ORDER_STATUSES:
@@ -335,17 +411,25 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None) -> list[
         if not items:
             log.warning("order %s has no items/sku records; skipped", ctx.order.external_order_id)
             continue
-        if ctx.record is not None:
-            txns, warns, est = build_txns(ctx), [], False
-        else:
-            txns, warns = estimate_provisional(ctx.order, items, fee_ratio, cur)
-            est = True
+        try:
+            if ctx.record is not None or ctx.records:
+                (txns, warns), est, source = build_txns(ctx), False, "settled"
+            elif (ph := build_placeholder_txns(ctx)) is not None:
+                (txns, warns), est, source = ph, True, "unsettled_record"
+            else:
+                txns, warns = estimate_provisional(ctx.order, items, fee_ratio, cur)
+                est, source = True, "ratio_estimate"
+            net_by_order[str(ctx.order.id)] = (d, revenue_breakdown(txns, cur).net_seller_revenue)
+        except Exception as e:  # noqa: BLE001 - one bad order must not abort the shop run
+            _skip(ctx, e, errors)
+            continue
         versions, cw = cost_versions_with_fallback(inp.cost_versions, items, d, cur, inp.default_cogs)
-        prepared.append((ctx, d, items, txns, versions, warns + cw, est))
+        prepared.append((ctx, d, items, txns, versions, warns + cw, est, source))
 
-    net_by_order = {str(ctx.order.id): (d, revenue_breakdown(txns, cur).net_seller_revenue)
-                    for ctx, d, _, txns, _, _, _ in prepared}
     spend_by_day = ad_deductions_by_day(inp.settlements, tz)
+    if since is not None:
+        # incremental: only deductions on/after `since`; look-back orders (< since) are weights only
+        spend_by_day = {day: v for day, v in spend_by_day.items() if day >= since}
     ads, unallocated, ad_warns = allocate_ads_blended(spend_by_day, net_by_order, cur)
     for w in ad_warns:
         log.warning("%s", w)
@@ -353,29 +437,39 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None) -> list[
         log.warning("shop %s: unallocated ad spend %s", inp.shop_id, unallocated)
 
     out: list[OrderProfitCalc] = []
-    for ctx, d, items, txns, versions, warns, est in prepared:
+    for ctx, d, items, txns, versions, warns, est, source in prepared:
+        if since is not None and d < since:
+            continue
         key = str(ctx.order.id)
         allocated = AllocatedAds(ads.get(key, ZERO), cur, AttributionMethod.BLENDED, Confidence.LOW)
-        p = order_profit(key, d, items, txns, versions, allocated)
+        try:
+            p = order_profit(key, d, items, txns, versions, allocated)
+        except Exception as e:  # noqa: BLE001
+            _skip(ctx, e, errors)
+            continue
         p = EngineProfit(**{**p.__dict__, "warnings": tuple(warns) + p.warnings})
         item_rows = [{
             "order_item_id": ip.order_item_id, "sku_id": ip.sku_id,
             "product_id": ctx.product_by_sku_ext.get(ip.sku_id), "quantity": ip.quantity,
-            "gross_item_value": str(ip.gross_item_value),
-            "net_seller_revenue": str(ip.net_seller_revenue), "cogs": str(ip.costs.total),
-            "allocated_ad_cost": str(ip.allocated_ad_cost),
-            "estimated_net_profit": str(ip.estimated_net_profit),
+            "gross_item_value": _ds(ip.gross_item_value),
+            "net_seller_revenue": _ds(ip.net_seller_revenue), "cogs": _ds(ip.costs.total),
+            "allocated_ad_cost": _ds(ip.allocated_ad_cost),
+            "estimated_net_profit": _ds(ip.estimated_net_profit),
         } for ip in p.items]
+        mism = [w for w in warns if w.startswith("MISMATCH")]
         snap: dict[str, Any] = {
-            "estimate": est, "fee_ratio": str(fee_ratio) if est else None,
-            "txns": [(t.external_transaction_id, t.ntype.value, str(t.amount), t.settlement_id)
+            "estimate": est, "source": source,
+            "fee_ratio": _ds(fee_ratio.quantize(Decimal("0.0001"))) if est and fee_ratio is not None
+            else None,
+            "txns": [(t.external_transaction_id, t.ntype.value, _ds(t.amount), t.settlement_id)
                      for t in txns],
             "items": item_rows,
             "cost_versions": sorted({(ip.cost_version.sku_id, str(ip.cost_version.effective_from),
-                                      str(ip.cost_version.cogs_per_unit)) for ip in p.items}),
+                                      _ds(ip.cost_version.cogs_per_unit)) for ip in p.items}),
             "cogs_missing": any(w.startswith("COGS missing") for w in warns),
             "cogs_default_used": any("shop default" in w for w in warns),
-            "ad_cost": str(p.allocated_ad_cost), "ad_method": "BLENDED", "ad_window_days": AD_WINDOW_DAYS,
+            "mismatch": mism or None,
+            "ad_cost": _ds(p.allocated_ad_cost), "ad_method": "BLENDED", "ad_window_days": AD_WINDOW_DAYS,
             "status": p.profit_status.value, "local_date": str(d), "warnings": list(p.warnings),
         }
         snap["hash"] = snapshot_hash(snap)
@@ -449,11 +543,15 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
     records = list(session.scalars(select(OrderStatementRecord)
                                    .where(OrderStatementRecord.shop_id == shop_id)))
     settled = [r for r in records if str(r.status or "").upper() in SETTLED_STATUSES]
-    rec_by_order: dict[str, Any] = {}
-    for r in sorted(settled, key=lambda r: (r.statement_time or datetime.min.replace(tzinfo=UTC))):
-        rec_by_order[r.external_order_id] = r  # latest statement wins
+    recs_by_order: dict[str, list[Any]] = defaultdict(list)
+    for r in sorted(settled, key=lambda r: (r.statement_time or datetime.min.replace(tzinfo=UTC), r.id)):
+        recs_by_order[r.external_order_id].append(r)
+    placeholder_by_order: dict[str, Any] = {}
+    for r in records:
+        if r not in settled and not (r.statement_id or ""):
+            placeholder_by_order[r.external_order_id] = r
     sku_recs: dict[int, list[Any]] = defaultdict(list)
-    rec_ids = [r.id for r in rec_by_order.values()]
+    rec_ids = [r.id for r in settled] + [r.id for r in placeholder_by_order.values()]
     if rec_ids:
         for s in session.scalars(select(OrderStatementSkuRecord)
                                  .where(OrderStatementSkuRecord.record_id.in_(rec_ids))):
@@ -461,9 +559,13 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
 
     ctxs = []
     for o in orders:
-        r = rec_by_order.get(o.external_order_id)
+        rs = recs_by_order.get(o.external_order_id, [])
+        r = rs[-1] if rs else None
+        ph = placeholder_by_order.get(o.external_order_id) if r is None else None
         ctxs.append(OrderCtx(order=o, items=items.get(o.id, []), record=r,
-                             sku_records=sku_recs.get(r.id, []) if r else [],
+                             sku_records=sku_recs.get(r.id, []) if r else [], records=rs,
+                             sku_records_by_record={x.id: sku_recs.get(x.id, []) for x in rs},
+                             placeholder=ph, placeholder_skus=sku_recs.get(ph.id, []) if ph else [],
                              sku_external_by_id=sku_ext, product_by_sku_ext=product_by_ext))
 
     versions = []
@@ -481,7 +583,7 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
     default_cogs = _dec(cfg.default_cogs_per_unit) if cfg and cfg.default_cogs_per_unit is not None else None
     return ProfitInputs(shop_id=shop_id, currency=shop.currency, timezone=tz, orders=ctxs,
                         cost_versions=versions, settlements=settlements, fee_ratio_records=settled,
-                        default_cogs=default_cogs)
+                        default_cogs=default_cogs, since=since)
 
 
 def load_current_rows(session: Any, order_ids: Sequence[int]) -> dict[int, Any]:
@@ -497,21 +599,24 @@ def compute_order_profits(session: Any, shop_id: int, since: date | None = None,
     """Full pipeline for one shop; commits. Returns counts + affected local dates."""
     now = now or datetime.now(UTC)
     inp = load_inputs(session, shop_id, since)
-    calcs = compute_from_inputs(inp, now)
+    errors: list[str] = []
+    calcs = compute_from_inputs(inp, now, errors)
     current = load_current_rows(session, [c.order_id for c in calcs])
     stats = persist_order_profits(session, calcs, current, now)
     session.commit()
     dates = sorted({c.local_date for c in calcs})
     settled = sum(1 for c in calcs if not c.is_estimate)
-    log.info("profit: shop=%s orders=%d settled=%d provisional=%d inserted=%d unchanged=%d",
-             shop_id, len(calcs), settled, len(calcs) - settled, stats["inserted"], stats["unchanged"])
+    mismatches = sum(1 for c in calcs if c.snapshot.get("mismatch"))
+    log.info("profit: shop=%s orders=%d settled=%d provisional=%d inserted=%d unchanged=%d "
+             "skipped=%d mismatches=%d", shop_id, len(calcs), settled, len(calcs) - settled,
+             stats["inserted"], stats["unchanged"], len(errors), mismatches)
     return {**stats, "orders": len(calcs), "settled": settled, "provisional": len(calcs) - settled,
-            "dates": dates}
+            "skipped": len(errors), "errors": errors, "mismatches": mismatches, "dates": dates}
 
 
 __all__ = [
     "AD_WINDOW_DAYS", "PROVISIONAL_LABEL", "OrderCtx", "OrderProfitCalc", "ProfitInputs",
-    "ad_deductions_by_day", "allocate_ads_blended", "build_items", "build_txns",
+    "ad_deductions_by_day", "allocate_ads_blended", "build_items", "build_placeholder_txns", "build_txns",
     "compute_from_inputs", "compute_order_profits", "estimate_provisional", "is_ad_deduction",
     "load_inputs", "local_date", "persist_order_profits", "record_to_dict", "row_from_calc",
     "snapshot_hash", "trailing_fee_ratio",

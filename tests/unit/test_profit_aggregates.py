@@ -62,3 +62,18 @@ def test_product_daily_splits_multi_product_order():
     assert a88.fees == D(2000) and a88.affiliate == D(1000)  # 25% share of order-level fees
     assert a77.fees == D(6000) + D(8518)
     assert a77.contribution + a88.contribution == D(80000) - D(35000) + D(55482)
+
+
+def test_product_daily_fee_split_sums_exactly_to_order():
+    items = [{"product_id": 1, "quantity": 1, "gross_item_value": "33333", "net_seller_revenue": "1",
+              "cogs": "0", "allocated_ad_cost": "0", "estimated_net_profit": "1"},
+             {"product_id": 2, "quantity": 1, "gross_item_value": "33333", "net_seller_revenue": "1",
+              "cogs": "0", "allocated_ad_cost": "0", "estimated_net_profit": "1"},
+             {"product_id": 3, "quantity": 1, "gross_item_value": "33334", "net_seller_revenue": "1",
+              "cogs": "0", "allocated_ad_cost": "0", "estimated_net_profit": "1"}]
+    p = profit(1, fees=D(10001), aff=D(101), refunds=D(7), items=items)
+    p.currency = "IDR"
+    out = product_daily([p], {1: D18})
+    assert sum(a.fees for a in out.values()) == D(10001)
+    assert sum(a.affiliate for a in out.values()) == D(101)
+    assert sum(a.refunds for a in out.values()) == D(7)

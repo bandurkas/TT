@@ -1,7 +1,7 @@
 """analytics_shop_daily, analytics_product_daily (profit job aggregates)
 
 Revision ID: c7f3a9d2e514
-Revises: b4e7a2c91d03
+Revises: c7d2a9f14e58
 Create Date: 2026-08-30 23:30:00
 """
 from collections.abc import Sequence

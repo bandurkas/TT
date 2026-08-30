@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -400,7 +401,9 @@ class OrderProfit(PKMixin, Base):
     currency: Mapped[str] = mapped_column(String(3))
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     inputs_snapshot: Mapped[dict | None] = mapped_column(JSONB)
-    __table_args__ = (Index("ix_order_profit_current", "order_id", "is_current"),)
+    __table_args__ = (Index("ix_order_profit_current", "order_id", "is_current"),
+                      Index("uq_order_profit_one_current", "order_id", unique=True,
+                            postgresql_where=text("is_current")),)
 
 
 class ReconciliationResult(PKMixin, Base):

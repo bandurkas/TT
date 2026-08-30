@@ -9,10 +9,11 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
+from src.analytics.attribution import allocate_proportionally
 from src.analytics.profitability import ProfitStatus
-from src.db.models import Order
+from src.db.models import Order, Product
 from src.db.models import OrderProfit as OrderProfitRow
 from src.db.models_finance import ShopMetric
 from src.db.models_profit import ProductDaily, ShopDaily
@@ -94,24 +95,26 @@ def shop_daily(profits: Iterable[Any], order_dates: Mapping[int, date]) -> dict[
 
 def product_daily(profits: Iterable[Any], order_dates: Mapping[int, date]) -> dict[tuple[int, date], DailyAgg]:
     """Per product per day from the per-item split stored in inputs_snapshot['items'].
-    Fees/affiliate/refunds are not split per item by the engine -> allocated in proportion to item
-    net revenue share is NOT attempted; they are spread by gross_item_value share (deterministic)."""
+    Fees/affiliate/refunds are not split per item by the engine -> spread by gross_item_value share
+    via allocate_proportionally (sum over items == order value exactly)."""
     out: dict[tuple[int, date], DailyAgg] = defaultdict(DailyAgg)
     for p in profits:
         d = order_dates.get(p.order_id)
         items = (p.inputs_snapshot or {}).get("items", [])
         if d is None or not items:
             continue
-        gross_total = sum((_d(i.get("gross_item_value")) for i in items), ZERO)
         fees = _d(p.platform_fees) + _d(p.seller_shipping) + _d(p.taxes)
         prov = p.profit_status == ProfitStatus.PROVISIONAL
-        for i in items:
+        weights = {str(n): _d(i.get("gross_item_value")) for n, i in enumerate(items)}
+        cur = getattr(p, "currency", None) or "IDR"
+        split = {k: allocate_proportionally(v, weights, cur)
+                 for k, v in (("fees", fees), ("aff", _d(p.affiliate_commission)),
+                              ("ref", _d(p.refunds)))}
+        for n, i in enumerate(items):
             pid = i.get("product_id")
             if pid is None:
                 continue
             a = out[(int(pid), d)]
-            share = (_d(i.get("gross_item_value")) / gross_total) if gross_total else \
-                Decimal(1) / len(items)
             key = (p.order_id, p.id if hasattr(p, "id") else None)
             if key not in a._seen:
                 a._seen.add(key)
@@ -125,9 +128,9 @@ def product_daily(profits: Iterable[Any], order_dates: Mapping[int, date]) -> di
             a.ad_cost += _d(i.get("allocated_ad_cost"))
             a.net_profit += _d(i.get("estimated_net_profit"))
             a.contribution += _d(i.get("net_seller_revenue")) - _d(i.get("cogs"))
-            a.fees += (fees * share).quantize(Decimal(1))
-            a.affiliate += (_d(p.affiliate_commission) * share).quantize(Decimal(1))
-            a.refunds += (_d(p.refunds) * share).quantize(Decimal(1))
+            a.fees += split["fees"][str(n)]
+            a.affiliate += split["aff"][str(n)]
+            a.refunds += split["ref"][str(n)]
     return dict(out)
 
 
@@ -168,6 +171,10 @@ def recompute_daily(session: Any, shop_id: int, dates: Sequence[date] | None = N
     upsert(session, ShopDaily, rows, ["shop_id", "metric_date"])
     prows = [{"product_id": pid, "metric_date": d, **a.as_row(now)}
              for (pid, d), a in product_daily(profits, order_dates).items()]
+    if days:  # stale rows (product no longer sold that day after recompute) must not linger
+        shop_products = select(Product.id).where(Product.shop_id == shop_id)
+        session.execute(delete(ProductDaily).where(ProductDaily.product_id.in_(shop_products),
+                                                   ProductDaily.metric_date.in_(days)))
     upsert(session, ProductDaily, prows, ["product_id", "metric_date"])
     session.commit()
     log.info("aggregates: shop=%s days=%d product_rows=%d", shop_id, len(rows), len(prows))

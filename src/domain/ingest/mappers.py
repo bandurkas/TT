@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from src.analytics.finance_fields import classify_statement
 from src.db.models_finance import STATEMENT_AMOUNT_FIELDS
 
 INTEGRATION = "tiktok_shop"
@@ -170,7 +171,8 @@ def map_statement(api: dict, shop_id: int, default_currency: str) -> dict:
             "gross_amount": revenue, "deductions": deductions, "net_amount": net,
             "currency": api.get("currency") or default_currency,
             "status": api.get("payment_status") or api.get("status"),
-            "extra": {k: v for k, v in api.items() if k != "id"}}
+            "extra": {**{k: v for k, v in api.items() if k != "id"},
+                      "classification": classify_statement(api).value}}
 
 
 def map_withdrawal(api: dict, shop_id: int, default_currency: str) -> dict:

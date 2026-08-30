@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from src.analytics.finance_fields import SETTLED_STATUSES
 from src.db.models import (
     Order,
     OrderItem,
@@ -239,7 +240,7 @@ def _orders_needing_statement(ctx: IngestContext, days: int) -> list[str]:
     R = OrderStatementRecord
     agg = select(
         R.external_order_id,
-        func.bool_or(R.status == "SETTLED").label("settled"),
+        func.bool_or(R.status.in_(list(SETTLED_STATUSES))).label("settled"),
         func.max(R.fetched_at).label("fetched"),
         func.max(R.statement_time).label("stmt"),
     ).where(R.shop_id == ctx.shop_id).group_by(R.external_order_id).subquery()

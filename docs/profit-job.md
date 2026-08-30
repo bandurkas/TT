@@ -1,7 +1,7 @@
 # Profit job — real profit from ingested data
 
 Code: `src/domain/profit/jobs.py`, `src/domain/profit/aggregates.py`, `src/db/models_profit.py`,
-CLI `apps/worker/profit_cli.py`, migration `c7f3a9d2e514_profit_daily` (revises `b4e7a2c91d03`).
+CLI `apps/worker/profit_cli.py`, migration `c7f3a9d2e514_profit_daily` (revises `c7d2a9f14e58`); `e2a5c8d1b7f3` adds `shop_config.default_cogs_per_unit` and the partial unique index `uq_order_profit_one_current` (one current row per order).
 Engine and formulas: `docs/profit-calculation.md`; field adapter: `docs/finance-field-mapping.md`;
 attribution: `docs/attribution-model.md`. Decimal only, no LLM.
 
@@ -9,23 +9,37 @@ attribution: `docs/attribution-model.md`. Decimal only, no LLM.
 
 1. **Load** (`load_inputs`): orders (+items) of the shop — with `--since`, from `since − 7 days`
    so the ad window sees full trailing revenue; `order_statement_records` with status
-   `SETTLED|PAID` (latest `statement_time` per order wins) + their SKU records; `sku_cost_versions`
-   keyed by external sku id; all `settlements`.
+   `SETTLED|PAID` — **all** records per order (restatements/refunds land as extra statements;
+   warning `N settled statements for order`) + their SKU records; the unsettled placeholder record
+   (`statement_id ""`) when no settled one exists; `sku_cost_versions` keyed by external sku id;
+   all `settlements`; `shop_config.default_cogs_per_unit`.
+   **Incremental (`--since`)**: only deductions with local day ≥ since are allocated and only orders
+   with local date ≥ since are persisted; look-back orders serve as allocation weights only, so
+   the result equals the full run for those orders.
 2. **Settled orders** → `record_to_dict` (ORM row → API-shaped dict incl.
    `sku_statement_transactions`) → `finance_fields.statement_record_to_txns` → `FinanceTxn`s
-   (`sku_id → order_items.id` mapping). Engine `net_seller_revenue == settlement_amount`.
-3. **Provisional orders** (no settled record, status not `CANCELLED/UNPAID` — names UNVERIFIED)
-   → `estimate_provisional`: sale = `gross_merchandise_value` (or Σ items) − `seller_discount`,
+   (`sku_id → order_items.id` mapping). Engine `net_seller_revenue == settlement_amount`; if the
+   emitted txns do not reproduce it, warning `MISMATCH statement …` + `inputs_snapshot.mismatch`.
+   Txns of all settled statements are concatenated → later adjustments give status `ADJUSTED`.
+3. **Provisional orders** (no settled record, status not `CANCELLED/UNPAID` — names UNVERIFIED):
+   if an unsettled statement record with non-zero `revenue_amount` exists it is mapped like a
+   settled one but without `settlement_id` (`inputs_snapshot.source = unsettled_record`); else
+   → `estimate_provisional` (`source = ratio_estimate`): sale = `gross_merchandise_value` (or Σ items) − `seller_discount`,
    fees = sale × **trailing 30-day fee ratio** (`Σ|fee_amount| / Σ revenue_amount` of settled
-   records, as of the latest statement date). No `settlement_id` → engine status `PROVISIONAL`;
+   records with `revenue_amount > 0` and a `statement_time`, as of the latest statement date). No `settlement_id` → engine status `PROVISIONAL`;
    first warning is always `PROVISIONAL ESTIMATE: …`, `inputs_snapshot.estimate = true`.
    No fee history → fees 0 + warning. This is an estimate, never a settlement figure.
 4. **COGS**: `pick_cost_version(effective_from ≤ order local date)`; quantity from `order_items`
-   (fallback: statement SKU records). Missing version → warning `COGS missing for sku …`,
-   cogs = 0, `inputs_snapshot.cogs_missing = true` (never silently hidden, never raises).
+   (fallback: statement SKU records). Missing version → warning `COGS missing for sku …`;
+   cogs = `shop_config.default_cogs_per_unit` if set (`inputs_snapshot.cogs_default_used = true`,
+   set via `profit_cli config --default-cogs 25000`) else 0; `cogs_missing = true` either way
+   (never silently hidden, never raises). Engine errors (currency mismatch, duplicate txn) skip that
+   order only (`skipped`/`errors` in the CLI result).
 5. **Ad cost** (see below) → `AllocatedAds(BLENDED, LOW)`; `order_profit(...)` per order.
 6. **Persist** (`persist_order_profits`): `analytics_order_profit` is versioned. The
-   `inputs_snapshot` carries a sha256 `hash` of txns/items/cost versions/ad cost/status. If the
+   `inputs_snapshot` carries a sha256 `hash` of material inputs only (txns, items, cost versions,
+   ad cost, status, local date, source, mismatch, fee ratio at 4 dp; Decimal strings are
+   exponent-normalised; warning wording is excluded). If the
    current row has the same hash → no-op; otherwise previous row `is_current=False`, insert
    `version = prev + 1`. `attribution_method='BLENDED'`, `attribution_confidence='LOW'` always
    (no per-campaign data yet). Per-item split (product_id, qty, net revenue, cogs, ads, profit)
