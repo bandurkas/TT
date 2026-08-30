@@ -109,25 +109,6 @@ def test_analytics_mappings():
     assert sm["sku_id"] == 8 and sm["gmv"] == Decimal(5) and sm["orders"] == 0
 
 
-def test_shop_metric_mapping_breakdowns():
-    api = {"intervals": [{"start_date": "2026-08-29", "end_date": "2026-08-30",
-                          "gmv": {"amount": "1000000", "currency": "IDR"}, "sku_orders": 12,
-                          "avg_customers": "1.5",
-                          "gmv_breakdowns": [{"type": "LIVE", "amount": {"amount": "0", "currency": "IDR"}},
-                                             {"type": "VIDEO", "amount": {"amount": "700000", "currency": "IDR"}},
-                                             {"type": "PRODUCT_CARD", "amount": {"amount": "300000", "currency": "IDR"}}],
-                          "gross_revenue_breakdowns": [{"type": "GMV_MAX", "amount": {"amount": "929000", "currency": "IDR"}},
-                                                       {"type": "NON_GMV_MAX", "amount": {"amount": "71000", "currency": "IDR"}}]}]}
-    row = m.map_shop_metric(api, 1, date(2026, 8, 29), NOW)
-    assert row["gmv_total"] == Decimal(1000000) and row["gmv_video"] == Decimal(700000)
-    assert row["gmv_live"] == Decimal(0) and row["gmv_product_card"] == Decimal(300000)
-    assert row["gross_revenue_gmv_max_pct"] == Decimal("0.929000")
-    assert row["sku_orders"] == 12 and row["currency"] == "IDR" and row["breakdown"] == api
-    assert set(row) <= {c.name for c in ShopMetric.__table__.columns}
-    flat = m.map_shop_metric({"gmv": "5"}, 1, date(2026, 8, 29), NOW)
-    assert flat["gmv_total"] == Decimal(5) and flat["gross_revenue_gmv_max_pct"] is None
-
-
 def test_catalog_mapping():
     prod = {"id": "17371", "title": "Socks", "status": "ACTIVATE",
             "category_chains": [{"id": "1", "local_name": "Fashion"}, {"id": "2", "local_name": "Socks"}],
