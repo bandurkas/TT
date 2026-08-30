@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from fastapi import FastAPI
 from sqlalchemy import select, text
 
+from apps.api.dashboard import router as dashboard_router
 from apps.api.oauth import router as oauth_router
 from apps.worker.scheduler import STALE_AFTER
 from src.config.settings import settings
@@ -11,6 +12,7 @@ from src.db.session import SessionLocal
 
 app = FastAPI(title="TikTok Shop Profit Control AI", version="0.0.1")
 app.include_router(oauth_router)
+app.include_router(dashboard_router)
 
 
 def sync_summary(session) -> list[dict]:

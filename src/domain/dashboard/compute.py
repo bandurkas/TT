@@ -7,7 +7,11 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from src.analytics.anomaly_detection import FunnelDiagnosis, FunnelStage, detect_funnel_deterioration
+from src.analytics.anomaly_detection import (
+    FunnelDiagnosis,
+    FunnelStage,
+    detect_funnel_deterioration,
+)
 from src.analytics.creative_scoring import (
     Classification,
     ScoringBaselines,
@@ -237,7 +241,7 @@ def profit_health(cur: Totals, prev: Totals, floor: Decimal, dq: DataQuality) ->
     comp["refunds"] = None if rr is None else clamp(100 - rr / Decimal("0.15") * 50)
     comp["data_quality"] = dq.score
     known = [v for v in comp.values() if v is not None]
-    score = int(round(sum(known) / len(known))) if known else 0
+    score = round(sum(known) / len(known)) if known else 0
     grade = "GOOD" if score >= 75 else "FAIR" if score >= 50 else "POOR"
     return {"score": score, "grade": grade, "components": comp}
 

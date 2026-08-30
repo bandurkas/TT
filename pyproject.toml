@@ -30,6 +30,7 @@ target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B008"]
+"apps/api/**" = ["B008"]  # FastAPI Depends()/Query() defaults
 
 [build-system]
 requires = ["setuptools>=68"]
