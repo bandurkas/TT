@@ -61,6 +61,10 @@ def test_unknown_ad_or_cost_masks_profit_not_only_expense():
     p.inputs_snapshot.update(ad_cost_known=True, cogs_missing=True, cogs_default_used=False)
     out = O.order_row(o, p, [])
     assert out["amounts"]["costs"] is None and out["amounts"]["net_profit"] is None
+    detail = O.breakdown(o, p, [], [])
+    lines = {r['key']: r for r in detail['lines']}
+    assert lines['contribution_profit']['amount'] is None
+    assert lines['net_seller_revenue']['amount'] is not None
 
 
 def test_incomplete_profit_is_hidden_in_waterfall_and_insights():

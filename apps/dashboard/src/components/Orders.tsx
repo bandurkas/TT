@@ -58,6 +58,7 @@ function JournalPage({ path, tick, setOffset, open }: { path: string; tick: numb
     <AdvertisingSource data={d.advertising} currency={currency} />
     {summary && <p className="small muted">{lang === "ru" ? (summary.basis === "calendar" ? "Общий итог: реклама по дате расхода, включая дни без заказов. Сумма прибыли строк может отличаться на нераспределённый расход." : "Включены фильтры: ниже только оценка выбранных заказов. Расход всего магазина показан отдельно выше.") : (summary.basis === "calendar" ? "Calendar total includes advertising on days without orders; row profits exclude unallocated cost." : "Filtered cohort: estimated allocation only; full shop Cost is shown above.")}</p>}
     {d.mixed_currencies && <p className="banner warn">{t("mixed")}</p>}
+    {summary?.basis === "calendar" && summary.unallocated_ad_cost != null && <p className="small muted">{lang === "ru" ? "Реклама без подходящих заказов в тот же день:" : "Advertising without eligible same-day orders:"} <b>{orderMoney(summary.unallocated_ad_cost, lang, currency)}</b>. {lang === "ru" ? "Уже вычтена в общем итоге; не приписывается отдельным заказам." : "Already deducted from the calendar total; not assigned to individual orders."}</p>}
     {summary && <>
       <p className="small muted">{t("totals")}. {t("included")}: {summary.calculated_orders} · {t("missing")}: {summary.missing_orders}</p>
       {summary.uncertain_orders > 0 && <p className="banner warn">{t("uncertain")}: {summary.uncertain_orders}</p>}

@@ -157,10 +157,12 @@ def breakdown(order: Any, p: Any | None, items: list[dict[str, Any]],
         line(key, -v[key], proof=proof)
     line("subsidies", v["subsidies"], proof="unavailable" if source == "ratio_estimate" else evidence)
     line("adjustments", v["adjustments"], proof="unavailable" if source == "ratio_estimate" else evidence)
-    line("net_seller_revenue", v["net_seller_revenue"], subtotal=True)
+    line("net_seller_revenue", v["net_seller_revenue"], subtotal=True,
+         proof="unavailable" if "fees" in out["unconfirmed_fields"] or snap.get("mismatch") else evidence)
     for key in COSTS:
         line(key, -v[key], proof=costs_state)
-    line("contribution_profit", v["contribution_profit"], subtotal=True, proof="calculated")
+    line("contribution_profit", v["contribution_profit"], subtotal=True,
+         proof="calculated" if inputs_known(p) else "unavailable")
     line("allocated_ad_cost", -v["allocated_ad_cost"], proof="estimate" if snap.get("ad_cost_known") else "unavailable")
     line("estimated_net_profit", v["estimated_net_profit"], subtotal=True,
          proof="unavailable" if "net_profit" in out["unconfirmed_fields"] else "estimate")
