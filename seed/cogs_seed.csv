@@ -1,14 +1,14 @@
 product_id,sku_id,seller_sku,product_title,status,list_price_idr,pack_pairs,cogs_per_unit_idr,packaging_per_unit_idr,inbound_logistics_per_unit_idr,effective_from,note
-1737179641669780551,1737179740638708807,,"Subscription Kaos Kaki Premium Putih Abu Hitam Mix, Bahan Katun Mesh, Nyaman, Si",ACTIVATE,82000,,,0,0,2026-01-01,PACK SIZE UNKNOWN — confirm
-1737145385755968583,1737146111625561159,,LOMIRA Kaos Kaki Pria Wanita Premium Mix Putih Hitam Nyaman Adem,ACTIVATE,85000,,,0,0,2026-01-01,PACK SIZE UNKNOWN — confirm
+1737179641669780551,1737179740638708807,,"Subscription Kaos Kaki Premium Putih Abu Hitam Mix, Bahan Katun Mesh, Nyaman, Si",ACTIVATE,82000,5,25000,0,0,2026-01-01,ASSUMED 5 pairs (same price as 5-pair packs) — user to confirm
+1737145385755968583,1737146111625561159,,LOMIRA Kaos Kaki Pria Wanita Premium Mix Putih Hitam Nyaman Adem,ACTIVATE,85000,5,25000,0,0,2026-01-01,ASSUMED 5 pairs (same price as 5-pair packs) — user to confirm
 1736665360313713735,1736823576747869255,2,"Socks Kaos Kaki Pria Hitam 5 Pasang 85% Katun, Anti Bau, Tebal Lembut, Anti Gera",ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736665360313713735,1736823576747934791,2,"Socks Kaos Kaki Pria Hitam 5 Pasang 85% Katun, Anti Bau, Tebal Lembut, Anti Gera",ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736664922058228807,1736823801982452807,,"Kaos Kaki Abu-Abu, 5 pasang, Premium, Unisex, 85% Katun, Anti Bau, Tebal, Lembut",ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736664922058228807,1736823801982518343,,"Kaos Kaki Abu-Abu, 5 pasang, Premium, Unisex, 85% Katun, Anti Bau, Tebal, Lembut",ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736664922058228807,1736823587513205831,,"Kaos Kaki Abu-Abu, 5 pasang, Premium, Unisex, 85% Katun, Anti Bau, Tebal, Lembut",ACTIVATE,85000,5,25000,0,0,2026-01-01,
-1736664758417392711,1736823857525916743,,"Socks Kaos Kaki Premium Putih Abu Hitam Mix, 85% Katun Mesh, Nyaman, Size 36-47 ",ACTIVATE,85000,,,0,0,2026-01-01,PACK SIZE UNKNOWN — confirm
-1736664758417392711,1736823857525982279,,"Socks Kaos Kaki Premium Putih Abu Hitam Mix, 85% Katun Mesh, Nyaman, Size 36-47 ",ACTIVATE,85000,,,0,0,2026-01-01,PACK SIZE UNKNOWN — confirm
-1736571964864431175,1736572165388665927,,Kaos Kaki Anak Putih Premium Isi 10 Pasang - Anti Bau Adem Nyaman untuk Sekolah,ACTIVATE,145000,10,50000,0,0,2026-01-01,
+1736664758417392711,1736823857525916743,,"Socks Kaos Kaki Premium Putih Abu Hitam Mix, 85% Katun Mesh, Nyaman, Size 36-47 ",ACTIVATE,85000,5,25000,0,0,2026-01-01,ASSUMED 5 pairs (same price as 5-pair packs) — user to confirm
+1736664758417392711,1736823857525982279,,"Socks Kaos Kaki Premium Putih Abu Hitam Mix, 85% Katun Mesh, Nyaman, Size 36-47 ",ACTIVATE,85000,5,25000,0,0,2026-01-01,ASSUMED 5 pairs (same price as 5-pair packs) — user to confirm
+1736571964864431175,1736572165388665927,,Kaos Kaki Anak Putih Premium Isi 10 Pasang - Anti Bau Adem Nyaman untuk Sekolah,ACTIVATE,145000,10,50000,0,0,2026-01-01,confirmed by user 2026-08-30
 1736558016127272007,1736823584234374215,,"Kaos Kaki Wanita Putih 5 Pasang, Nyaman Lembut, Tidak Panas, Premium 85% Katun",ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736558016127272007,1736823584234439751,,"Kaos Kaki Wanita Putih 5 Pasang, Nyaman Lembut, Tidak Panas, Premium 85% Katun",ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736557623597827143,1736557662378689607,,"Kaos Kaki 5 pasang, Premium, Unisex, 85% Katun Pria, Wanita, Anak.",ACTIVATE,85000,5,25000,0,0,2026-01-01,
@@ -43,4 +43,4 @@ product_id,sku_id,seller_sku,product_title,status,list_price_idr,pack_pairs,cogs
 1736376427332535367,1736377104982967367,,Socks Kaos Kaki Unisex 5 Pasang 85% Katun Premium Lembut Nyaman Tidak Mudah Mela,ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736376427332535367,1736377104983032903,,Socks Kaos Kaki Unisex 5 Pasang 85% Katun Premium Lembut Nyaman Tidak Mudah Mela,ACTIVATE,85000,5,25000,0,0,2026-01-01,
 1736376427332535367,1736377104983098439,,Socks Kaos Kaki Unisex 5 Pasang 85% Katun Premium Lembut Nyaman Tidak Mudah Mela,ACTIVATE,85000,5,25000,0,0,2026-01-01,
-1736571293765436487,1736571478276015175,,Kaos Kaki Anak Putih Premium Isi 10 Pasang - Anti Bau Adem Nyaman untuk Sekolah,DRAFT,,10,50000,0,0,2026-01-01,
+1736571293765436487,1736571478276015175,,Kaos Kaki Anak Putih Premium Isi 10 Pasang - Anti Bau Adem Nyaman untuk Sekolah,DRAFT,,10,50000,0,0,2026-01-01,confirmed by user 2026-08-30
