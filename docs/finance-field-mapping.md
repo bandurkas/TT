@@ -53,6 +53,7 @@ by name and by the identity (anything that reduces settlement must live inside `
 | `seller_discount_amount` | seller-funded discount | − | SELLER_DISCOUNT | − seller_discounts | Seller discounts |
 | `gross_sales_refund_amount` | refunded item value (before seller discount) | − | REFUND | − refunds | Refund subtotal before seller discounts |
 | `seller_discount_refund_amount` | seller discount returned on refund | + | REFUND_FEE_ADJUSTMENT | + adjustments (signed) | Refund of seller discounts |
+| | **Note:** `RevenueBreakdown.adjustments` therefore = `seller_discount_refund_amount` + `adjustment_amount`; it is **not** the Seller Center "Adjustment amount" column (that column = `adjustment_amount` alone). Seller discount refunds sit under "Refund of seller discounts" in the export. | | | | |
 | `revenue_amount` | Total Revenue (= gross + sdisc + refunds) | ± | — | aggregate, not emitted | Total Revenue |
 | `net_sales_amount` | == revenue_amount in all samples | ± | — | aggregate, not emitted | (Subtotal after seller discounts − refunds) |
 | `after_seller_discounts_subtotal_amount` | buyer-view subtotal incl. customer shipping | + | — | info | Subtotal after seller discounts (+shipping) |

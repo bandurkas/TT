@@ -92,3 +92,4 @@ class ShopMetric(PKMixin, Base):
 # columns added to existing tables (migration adds them in Postgres)
 Settlement.extra = mapped_column(JSONB, nullable=True)  # payment_id, payment_status, raw amounts
 Payout.payout_type = mapped_column(String(32), nullable=True)  # WITHDRAW|SETTLE|TRANSFER|REVERSE
+from src.db import models_profit as _models_profit  # noqa: F401  (profit daily aggregates)

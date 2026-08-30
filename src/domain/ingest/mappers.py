@@ -113,12 +113,17 @@ def map_order(api: dict, shop_id: int, default_currency: str) -> dict:
 
 
 def map_order_items(api: dict, order_id: int) -> list[dict]:
-    """One row per line_item (TikTok emits one line per unit; quantity defaults 1)."""
-    out = []
-    for li in api.get("line_items") or []:
+    """One row per line_item (TikTok emits one line per unit; quantity defaults 1).
+    external_item_id is unique per order: missing or repeated ids -> "<order_id>:<idx>"."""
+    out, seen = [], set()
+    for idx, li in enumerate(api.get("line_items") or []):
         qty = to_int(li.get("quantity")) or 1
         sale = dec(li.get("sale_price"))
-        out.append({"order_id": order_id, "external_item_id": str(li.get("id") or ""),
+        ext = str(li.get("id") or "")
+        if not ext or ext in seen:
+            ext = f"{order_id}:{idx}"
+        seen.add(ext)
+        out.append({"order_id": order_id, "external_item_id": ext,
                     "_external_sku_id": str(li.get("sku_id") or ""),
                     "_external_product_id": str(li.get("product_id") or ""),
                     "quantity": qty, "unit_list_price": dec(li.get("original_price")),

@@ -9,6 +9,9 @@ from src.db.models import RawApiResponse
 
 
 class DbRawSink:
+    """Commits each raw row on its own, so a later rollback in the job (normalized upserts) never
+    discards raw payloads; `last_id` = id of the most recent stored response."""
+
     def __init__(self, session: Session, shop_id: int | None, integration: str = "tiktok_shop"):
         self.session, self.shop_id, self.integration = session, shop_id, integration
         self.last_id: int | None = None

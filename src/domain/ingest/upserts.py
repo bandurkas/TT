@@ -11,7 +11,8 @@ from src.db.models import Order, Product, Shop, Sku, Video
 
 def build_upsert(model: type, rows: Sequence[dict], conflict_cols: Sequence[str],
                  exclude_update: Iterable[str] = ()) -> Insert | None:
-    rows = [{k: v for k, v in r.items() if not k.startswith("_")} for r in rows]
+    rows = dedupe_rows([{k: v for k, v in r.items() if not k.startswith("_")} for r in rows],
+                       conflict_cols)
     if not rows:
         return None
     stmt = insert(model).values(rows)
@@ -21,6 +22,14 @@ def build_upsert(model: type, rows: Sequence[dict], conflict_cols: Sequence[str]
         return stmt.on_conflict_do_nothing(index_elements=list(conflict_cols))
     return stmt.on_conflict_do_update(index_elements=list(conflict_cols),
                                       set_={c: getattr(stmt.excluded, c) for c in cols})
+
+
+def dedupe_rows(rows: Sequence[dict], conflict_cols: Sequence[str]) -> list[dict]:
+    """One row per conflict key, last wins (PG rejects a second hit on the same key in one INSERT)."""
+    by_key: dict[tuple, dict] = {}
+    for r in rows:
+        by_key[tuple(r.get(c) for c in conflict_cols)] = r
+    return list(by_key.values())
 
 
 def upsert(session: Session, model: type, rows: Sequence[dict], conflict_cols: Sequence[str],

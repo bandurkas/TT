@@ -70,6 +70,7 @@ class FinanceTxn:
     order_item_id: str | None = None
     settlement_id: str | None = None
     payout_id: str | None = None
+    note: str | None = None
 
     def __post_init__(self) -> None:
         if self.normalized_type is None:

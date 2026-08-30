@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from src.db.models import (
@@ -65,6 +65,9 @@ class IngestContext:
 
 
 def _run(ctx: IngestContext, resource: str, fn) -> dict[str, Any]:
+    """fn(cursor) -> (new_cursor, counts). One transaction per resource: on error every uncommitted
+    normalized write is rolled back (raw rows are committed by the sink and survive; `sync_metrics`
+    commits per day, so earlier days survive too). Never raises: returns {"error": ...}."""
     key = (INTEGRATION, resource, str(ctx.shop_id))
     ctx.state.start_attempt(*key)
     try:
@@ -75,8 +78,11 @@ def _run(ctx: IngestContext, resource: str, fn) -> dict[str, Any]:
         return counts
     except Exception as e:
         ctx.session.rollback()
-        ctx.state.mark_error(*key, f"{type(e).__name__}: {e}")
         log.exception("%s failed", resource)
+        try:
+            ctx.state.mark_error(*key, f"{type(e).__name__}: {e}")
+        except Exception:
+            log.exception("%s: mark_error failed", resource)
         return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
 
 
@@ -86,7 +92,13 @@ def ensure_shop(session: Session, client: TikTokShopClient, sink: DbRawSink, *,
     shops = client.get_authorized_shops()
     if not shops:
         raise RuntimeError("no authorized shops")
-    chosen = next((s for s in shops if shop_cipher and s.get("cipher") == shop_cipher), shops[0])
+    if shop_cipher:
+        chosen = next((s for s in shops if s.get("cipher") == shop_cipher), None)
+        if chosen is None:
+            raise ValueError(f"configured shop_cipher not among authorized shops "
+                             f"({[str(s.get('id')) for s in shops]})")
+    else:
+        chosen = shops[0]
     rows = [m.map_shop(s, currency=currency, timezone=timezone) for s in shops]
     upsert(session, Shop, rows, ["platform", "external_shop_id"],
            exclude_update=["currency", "timezone", "status"])
@@ -136,27 +148,32 @@ def sync_orders(ctx: IngestContext, since: datetime | None = None,
                 pid = prods.get(it_.pop("_external_product_id"))
                 it_["sku_id"] = sp[0] if sp else None
                 it_["product_id"] = pid or (sp[1] if sp else None)
-            _replace_order_items(ctx.session, oid, items)
+            _upsert_order_items(ctx.session, oid, items)
             seen.append(row["raw_source_updated_at"] or row["order_created_at"])
             n += 1
         return next_cursor(cursor, seen), {"orders": n, "window": [ge, lt]}
     return _run(ctx, "orders", go)
 
 
-def _replace_order_items(session: Session, order_id: int, items: list[dict]) -> None:
-    """order_items has no external unique key (item ids may repeat per unit) -> delete+insert."""
-    session.query(OrderItem).filter(OrderItem.order_id == order_id).delete(synchronize_session=False)
-    if items:
-        session.execute(OrderItem.__table__.insert(),
-                        [{k: v for k, v in i.items() if not k.startswith("_")} for i in items])
+def _upsert_order_items(session: Session, order_id: int, items: list[dict]) -> None:
+    """Upsert on (order_id, external_item_id) — keeps order_items.id stable for finance FKs;
+    rows absent from the new payload are deleted (logged)."""
+    upsert(session, OrderItem, items, ["order_id", "external_item_id"])
+    keep = [i["external_item_id"] for i in items]
+    gone = session.execute(delete(OrderItem).where(
+        OrderItem.order_id == order_id, OrderItem.external_item_id.notin_(keep))).rowcount
+    if gone:
+        log.warning("order %s: %d order_items no longer in payload, deleted", order_id, gone)
 
 
 # --- finance -----------------------------------------------------------------------
 def sync_order_statements(ctx: IngestContext, external_order_ids: list[str] | None = None,
                           unsettled_days: int = 90) -> dict[str, Any]:
-    """Per-order flat statement record. Default: orders in last `unsettled_days` w/o a SETTLED
-    record (statement appears days after completion, so re-poll)."""
-    def go(cursor):
+    """Per-order flat statement record. Default: orders in last `unsettled_days` that still need a
+    (re)poll — see `_orders_needing_statement`. Unsettled records arrive with statement_id "" and are
+    stored as-is (provisional); once a real statement lands for the order, the "" row is deleted.
+    Cursor is just the run time (the order selection is DB-driven, not cursor-driven)."""
+    def go(_cursor):
         ids = external_order_ids if external_order_ids is not None else \
             _orders_needing_statement(ctx, unsettled_days)
         n_rec = n_sku = n_empty = 0
@@ -179,21 +196,62 @@ def sync_order_statements(ctx: IngestContext, external_order_ids: list[str] | No
                 upsert(ctx.session, OrderStatementSkuRecord, skus, ["record_id", "external_sku_id"])
                 n_sku += len(skus)
             n_rec += len(rows)
+            if any(k for k in ids_by_stmt):
+                _drop_placeholder_record(ctx, ext)
         return ctx.now.isoformat(timespec="seconds"), {"orders_polled": len(ids),
                                                        "records": n_rec, "sku_records": n_sku,
                                                        "no_statement_yet": n_empty}
     return _run(ctx, "order_statements", go)
 
 
+def _drop_placeholder_record(ctx: IngestContext, external_order_id: str) -> None:
+    ph = ctx.session.scalar(select(OrderStatementRecord.id).where(
+        OrderStatementRecord.shop_id == ctx.shop_id,
+        OrderStatementRecord.external_order_id == external_order_id,
+        OrderStatementRecord.statement_id == ""))
+    if ph is not None:
+        ctx.session.execute(delete(OrderStatementSkuRecord)
+                            .where(OrderStatementSkuRecord.record_id == ph))
+        ctx.session.execute(delete(OrderStatementRecord).where(OrderStatementRecord.id == ph))
+
+
+RESTATEMENT_WINDOW = timedelta(days=30)
+
+
+def needs_statement_poll(*, order_status: str | None, order_updated_at: datetime | None,
+                         has_settled: bool, max_fetched_at: datetime | None,
+                         latest_statement_time: datetime | None, now: datetime) -> bool:
+    """Only UNPAID is skipped (cancelled orders can still carry fees). Poll when there is no SETTLED
+    record yet, when the order changed after we last fetched its statement (e.g. refund after
+    settlement), or when its latest statement is within RESTATEMENT_WINDOW (late adjustments)."""
+    if (order_status or "").upper() == "UNPAID":
+        return False
+    if not has_settled:
+        return True
+    if order_updated_at is not None and max_fetched_at is not None \
+            and order_updated_at > max_fetched_at:
+        return True
+    return latest_statement_time is not None and latest_statement_time >= now - RESTATEMENT_WINDOW
+
+
 def _orders_needing_statement(ctx: IngestContext, days: int) -> list[str]:
     since = ctx.now - timedelta(days=days)
-    settled = select(OrderStatementRecord.external_order_id).where(
-        OrderStatementRecord.shop_id == ctx.shop_id, OrderStatementRecord.status == "SETTLED")
-    q = select(Order.external_order_id).where(
-        Order.shop_id == ctx.shop_id, Order.order_created_at >= since,
-        Order.order_status.notin_(["CANCELLED", "UNPAID"]),
-        Order.external_order_id.notin_(settled)).order_by(Order.order_created_at)
-    return list(ctx.session.scalars(q))
+    R = OrderStatementRecord
+    agg = select(
+        R.external_order_id,
+        func.bool_or(R.status == "SETTLED").label("settled"),
+        func.max(R.fetched_at).label("fetched"),
+        func.max(R.statement_time).label("stmt"),
+    ).where(R.shop_id == ctx.shop_id).group_by(R.external_order_id).subquery()
+    q = (select(Order.external_order_id, Order.order_status, Order.raw_source_updated_at,
+                agg.c.settled, agg.c.fetched, agg.c.stmt)
+         .outerjoin(agg, agg.c.external_order_id == Order.external_order_id)
+         .where(Order.shop_id == ctx.shop_id, Order.order_created_at >= since)
+         .order_by(Order.order_created_at))
+    return [ext for ext, st, upd, settled, fetched, stmt in ctx.session.execute(q)
+            if needs_statement_poll(order_status=st, order_updated_at=upd,
+                                    has_settled=bool(settled), max_fetched_at=fetched,
+                                    latest_statement_time=stmt, now=ctx.now)]
 
 
 def sync_statements(ctx: IngestContext, since: datetime | None = None,

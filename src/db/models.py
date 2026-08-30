@@ -172,6 +172,8 @@ class OrderItem(PKMixin, Base):
     creator_id: Mapped[int | None] = mapped_column(ForeignKey("creators.id"))
     source_video_id: Mapped[int | None] = mapped_column(ForeignKey("videos.id"))
     attribution_source: Mapped[str | None] = mapped_column(String(32))  # api|derived|none
+    __table_args__ = (UniqueConstraint("order_id", "external_item_id",
+                                       name="uq_order_items_order_item"),)
 
 
 # --- finance ---------------------------------------------------------------
@@ -273,7 +275,10 @@ class ProductMetric(PKMixin, Base):
     gmv: Mapped[Decimal] = mapped_column(Money, default=0)
     refunds: Mapped[Decimal] = mapped_column(Money, default=0)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    __table_args__ = (UniqueConstraint("product_id", "sku_id", "metric_date"),)
+    # PG16 NULLS NOT DISTINCT: product-level rows (sku_id NULL) must conflict on upsert
+    __table_args__ = (UniqueConstraint("product_id", "sku_id", "metric_date",
+                                       name="uq_product_metrics_product_sku_date",
+                                       postgresql_nulls_not_distinct=True),)
 
 
 # --- ads -------------------------------------------------------------------

@@ -10,6 +10,7 @@ from src.analytics.finance_fields import (
     EMITTED_ROLES,
     FIELD_MAP,
     RESIDUAL_FIELD,
+    RESIDUAL_NOTE,
     FieldSpec,
     Role,
     StatementKind,
@@ -343,3 +344,43 @@ def test_reconciliation_august_vs_seller_center(august, caplog):
     assert total_settle == D(832693)
     assert total_cogs == D(25000 * 9 + 50000 * 3)
     assert total_contrib == total_settle - total_cogs
+
+
+# --- review fixes: mismatch / non-finite / id fallback / residual note -------------------
+def test_mismatch_flagged_for_unknown_revenue_side_field(caplog):
+    r = {"id": "t1", "statement_id": "s1", "status": "SETTLED", "currency": "IDR",
+         "gross_sales_amount": "100", "fee_amount": "-10", "revenue_amount": "100",
+         "adjustment_amount": "0", "settlement_amount": "95", "mystery_bonus_amount": "5"}
+    with caplog.at_level(logging.ERROR):
+        txns = statement_record_to_txns(r, "o1")
+    assert txns.mismatch == D(5)
+    assert any(t.native_type == "mystery_bonus_amount" and t.ntype is NormalizedType.UNKNOWN
+               for t in txns)
+    assert "delta 5" in caplog.text
+    clean = {k: v for k, v in r.items() if k != "mystery_bonus_amount"}
+    clean["settlement_amount"] = "90"
+    assert statement_record_to_txns(clean, "o1").mismatch is None
+
+
+def test_dec_rejects_non_finite():
+    r = {"id": "t1", "gross_sales_amount": "NaN", "fee_amount": "Infinity",
+         "settlement_amount": "0"}
+    txns = statement_record_to_txns(r, "o1")
+    assert txns == [] and txns.mismatch is None
+
+
+def test_txn_id_fallback_includes_statement_id():
+    a = {"statement_id": "s1", "status": "SETTLED", "gross_sales_amount": "10",
+         "revenue_amount": "10", "settlement_amount": "10"}
+    b = {**a, "statement_id": "s2"}
+    ids = {t.external_transaction_id for t in statement_record_to_txns(a, "o1")} | \
+        {t.external_transaction_id for t in statement_record_to_txns(b, "o1")}
+    assert ids == {"o1:s1:gross_sales_amount", "o1:s2:gross_sales_amount"}
+    assert statement_record_to_txns({"gross_sales_amount": "1", "settlement_amount": "1"}, "o9")[0] \
+        .external_transaction_id == "o9:gross_sales_amount"
+
+
+def test_residual_txn_carries_note():
+    r = {"id": "t1", "fee_amount": "-7", "settlement_amount": "-7"}
+    txns = statement_record_to_txns(r, "o1")
+    assert [(t.native_type, t.note) for t in txns] == [(RESIDUAL_FIELD, RESIDUAL_NOTE)]

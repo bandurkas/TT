@@ -18,7 +18,7 @@ from enum import StrEnum
 from typing import Any
 
 from src.analytics.profitability import FinanceTxn
-from src.analytics.transaction_types import NormalizedType
+from src.analytics.transaction_types import NormalizedType, revenue_effect
 
 log = logging.getLogger(__name__)
 
@@ -154,13 +154,20 @@ class StatementLinkage:
     settled: bool
 
 
+class TxnList(list[FinanceTxn]):
+    """Emitted txns + `mismatch` = settlement_amount - sum(revenue_effect over non-UNKNOWN txns);
+    None when they agree. Caller persists a non-None value to analytics_reconciliation."""
+    mismatch: Decimal | None = None
+
+
 def _dec(v: Any) -> Decimal | None:
     if v is None or isinstance(v, (bool, dict, list)):
         return None
     try:
-        return Decimal(str(v))
+        d = Decimal(str(v))
     except InvalidOperation:
         return None
+    return d if d.is_finite() else None
 
 
 def amount(record: Mapping[str, Any], field: str) -> Decimal:
@@ -213,7 +220,7 @@ def _emit(
     out: list[FinanceTxn] = []
     fee_components = ZERO
 
-    def add(field: str, nt: NormalizedType, amt: Decimal) -> None:
+    def add(field: str, nt: NormalizedType, amt: Decimal, note: str | None = None) -> None:
         out.append(
             FinanceTxn(
                 external_transaction_id=f"{prefix}:{field}",
@@ -224,6 +231,7 @@ def _emit(
                 order_item_id=order_item_id,
                 settlement_id=settlement_id,
                 payout_id=payout_id,
+                note=note,
             )
         )
 
@@ -253,7 +261,7 @@ def _emit(
 
     residual = amount(record, "fee_amount") - fee_components
     if residual != ZERO:
-        add(RESIDUAL_FIELD, NormalizedType.PLATFORM_COMMISSION, residual)
+        add(RESIDUAL_FIELD, NormalizedType.PLATFORM_COMMISSION, residual, RESIDUAL_NOTE)
     return out
 
 
@@ -263,16 +271,37 @@ def statement_record_to_txns(
     *,
     sku_to_item: Mapping[str, str] | None = None,
     payout_id: str | None = None,
-) -> list[FinanceTxn]:
+) -> TxnList:
     """Flat statement record -> component FinanceTxns; engine net_seller_revenue == settlement_amount.
 
     Per-SKU rows are used when they exactly sum to the order record (order_item_id = sku_to_item[sku]
     or sku_id); otherwise order-level txns are emitted and the engine splits proportionally.
     Residual fee (fee_amount - known components) -> PLATFORM_COMMISSION `fee_residual`.
+    Result `.mismatch` (settlement_amount - sum of non-UNKNOWN revenue effects) is None when the
+    emitted txns reproduce settlement_amount; otherwise logged at ERROR.
     """
+    out = TxnList(_record_txns(record, order_id, sku_to_item=sku_to_item, payout_id=payout_id))
+    total = sum((revenue_effect(t.ntype, t.amount) for t in out
+                 if t.ntype is not NormalizedType.UNKNOWN), ZERO)
+    delta = amount(record, "settlement_amount") - total
+    if delta != ZERO:
+        out.mismatch = delta
+        log.error("finance_fields: order %s emitted txns sum %s != settlement_amount %s (delta %s)",
+                  order_id, total, amount(record, "settlement_amount"), delta)
+    return out
+
+
+def _record_txns(
+    record: Mapping[str, Any],
+    order_id: str,
+    *,
+    sku_to_item: Mapping[str, str] | None,
+    payout_id: str | None,
+) -> list[FinanceTxn]:
     link = statement_linkage(record)
     settlement_id = link.statement_id if link.settled else None
-    prefix = link.record_id or order_id
+    # id fallback: two records for one order (e.g. settled + restated) must not collide
+    prefix = link.record_id or (f"{order_id}:{link.statement_id}" if link.statement_id else order_id)
     currency = link.currency
     if not identity_holds(record):
         log.warning("finance_fields: identity broken for order %s (%s)", order_id, prefix)
@@ -357,6 +386,7 @@ __all__ = [
     "Role",
     "StatementKind",
     "StatementLinkage",
+    "TxnList",
     "amount",
     "classify_statement",
     "identity_holds",
