@@ -2,6 +2,7 @@
 import { EnHint, noteKey, useLang, useT } from "@/lib/i18n";
 import { idr, int, num, pct, ratio } from "@/lib/format";
 import type { Card, Overview } from "@/lib/types";
+import { kpiChange } from "@/lib/kpi";
 import { ErrorNote, Pill, Skeleton, Sparkline, ZoneHeader, statusTone } from "./ui";
 
 const MAIN = ["net_profit", "gmv", "net_seller_revenue", "orders", "ad_spend", "net_margin"];
@@ -12,30 +13,45 @@ const LABEL: Record<string, string> = {
   aov: "AOV", cvr: "CVR (click→order)", refund_rate: "Refund rate", settlement_coverage: "Settlement coverage",
 };
 
+const EXPLAIN: Record<string, string> = {
+  net_profit: "Revenue after TikTok fees and refunds, minus product costs and allocated advertising. Preliminary fees may still change. This is profit by order date, not cash received.",
+  gmv: "Total order value before fees and costs. GMV is sales volume, not profit.",
+  net_seller_revenue: "Revenue after platform fees, refunds and adjustments. Product costs and advertising have not yet been deducted.",
+  orders: "Orders included in the profit calculation, excluding cancelled orders. Refunds are shown separately.",
+  ad_spend: "Shop-level GMV Max deductions from payouts. Allocation to orders is estimated (BLENDED, LOW confidence); spend by campaign requires the Ads API.",
+  net_margin: "Net profit divided by net seller revenue. The threshold describes the current level; the arrow separately shows the change from the comparison period.",
+  reported_roas: "TikTok-reported return on ad spend is unavailable until Ads data is connected. Missing data is not zero.",
+  blended_roas: "Net seller revenue divided by shop ad spend. This includes all shop revenue, so it is not proof that advertising generated every sale. Break-even is the ratio needed to cover recorded costs.",
+  aov: "GMV divided by the number of orders. A larger average order does not necessarily mean more profit.",
+  cvr: "Video-attributed orders divided by estimated video clicks (views × CTR). This does not measure conversion for all shop traffic.",
+  refund_rate: "Refunded orders divided by all orders in the calculation. A rising refund rate is deterioration, even when the current rate is below the warning threshold.",
+  settlement_coverage: "Orders with final settlement data divided by final plus preliminary orders. Fees on preliminary orders are estimated. Final settlement does not mean the money has reached your bank.",
+};
+
 function KpiCard({ c, ov }: { c: Card; ov: Overview }) {
   const lang = useLang(), t = useT();
   const v = num(c.value);
   const fmt = (x: typeof c.value) => c.kind === "money" ? idr(x, lang) : c.kind === "pct" ? pct(x, lang) : c.kind === "ratio" ? ratio(x, lang) : int(x, lang);
   const tone = statusTone(c.status);
   const cls = c.kind === "money" || c.kind === "pct" ? (v !== null && v < 0 ? "dn" : "") : "";
-  const chg = num(c.change_pct);
-  const chgAbs = num(c.change_abs);
-  const na = c.key === "reported_roas";
+  const change = kpiChange(c);
+  const na = c.key === "reported_roas" && v === null;
+  const explanation = EXPLAIN[c.key];
   return (
-    <div className="card kpi" title={c.note ?? undefined}>
+    <div className="card kpi">
       <span className="k">{t(LABEL[c.key] ?? c.key)}</span>
       <span className={`n ${cls}`}>{na ? "—" : fmt(c.value)}</span>
-      <span className="d">
-        {na ? <Pill tone="gray">{t("NOT AVAILABLE — Ads API pending")}</Pill> : <>
-          {chg !== null ? (
-            <span className={tone === "good" ? "up" : tone === "bad" ? "dn" : "muted"}>{chg >= 0 ? "▲" : "▼"} {pct(c.change_pct, lang, { sign: true })} {t("vs previous")}</span>
-          ) : chgAbs !== null && c.kind === "pct" ? (
-            <span className={tone === "good" ? "up" : tone === "bad" ? "dn" : "muted"}>{chgAbs >= 0 ? "▲" : "▼"} {pct(c.change_abs, lang, { sign: true })}</span>
-          ) : null}
-          <Note c={c} ov={ov} />
-        </>}
-      </span>
+      {change && !na && <div className={`kpi-change ${change.tone}`}>
+        {change.direction > 0 ? "▲" : change.direction < 0 ? "▼" : "="}{" "}
+        {change.points ? `${pct(change.raw, lang, { sign: true }).replace("%", "")} ${t("pp")}` : pct(change.raw, lang, { sign: true })} {t("vs previous")}
+      </div>}
+      {!na && c.prev !== null && <div className="kpi-previous">{t("Previously")}: {fmt(c.prev)}</div>}
+      <div className="d">{na ? <Pill tone="gray">{t("Ads data not connected")}</Pill> : <Note c={c} ov={ov} />}</div>
       {c.sparkline.length > 1 && <Sparkline values={c.sparkline} tone={tone === "bad" ? "bad" : tone === "good" ? "good" : "accent"} />}
+      {explanation && <details className="kpi-help">
+        <summary aria-label={`${t("How to read this")}: ${t(LABEL[c.key] ?? c.key)}`}>{t("How to read this")}</summary>
+        <p>{t(explanation)}</p>
+      </details>}
     </div>
   );
 }
@@ -44,13 +60,13 @@ function Note({ c, ov }: { c: Card; ov: Overview }) {
   const lang = useLang(), t = useT();
   const tone = statusTone(c.status);
   switch (c.key) {
-    case "net_profit": return <>{tone === "bad" ? <Pill tone="bad">{t("Losing")}</Pill> : tone === "good" ? <Pill tone="good">{t("Profitable")}</Pill> : null}<span className="tiny">{c.provisional ? t("provisional ≠ settled") : ""}</span></>;
+    case "net_profit": return <>{tone === "bad" ? <Pill tone="bad">{t("Losing")}</Pill> : tone === "good" ? <Pill tone="good">{t("Profitable")}</Pill> : null}{c.provisional && <span>{t("Some fees are preliminary")}</span>}</>;
     case "gmv": return <span>{int(c.meta?.units ?? ov.totals.units, lang)} {t("units")}</span>;
     case "net_seller_revenue": return <span>{t("after fees & refunds")}</span>;
     case "orders": return <span>{int(c.meta?.refunded ?? ov.totals.refunded_orders, lang)} {t("refunded")}</span>;
     case "ad_spend": {
       const share = c.meta?.ad_share ?? null;
-      return <><span className="dn">{share !== null ? `${pct(share, lang)} ${t("of net revenue")}` : ""}</span><Pill tone="warn">{t("BLENDED estimate · LOW confidence")}</Pill></>;
+      return <>{share !== null && <span>{pct(share, lang)} {t("of net revenue")}</span>}<Pill tone="warn">{t("Estimated allocation")}</Pill><span>{t("No campaign breakdown")}</span></>;
     }
     case "net_margin": {
       const floor = c.meta?.floor ?? null;
@@ -62,7 +78,7 @@ function Note({ c, ov }: { c: Card; ov: Overview }) {
     }
     case "cvr": return <span>{t("video orders / derived clicks")}</span>;
     case "refund_rate": return <span>{t("refunded orders / orders")}</span>;
-    case "settlement_coverage": return <Pill tone={tone === "good" ? "good" : "warn"}>{int(c.meta?.settled ?? ov.totals.settled_orders, lang)} {t("settled")} · {int(c.meta?.provisional ?? ov.totals.provisional_orders, lang)} {t("provisional")}</Pill>;
+    case "settlement_coverage": return <><Pill tone={tone === "good" ? "good" : "warn"}>{int(c.meta?.settled ?? ov.totals.settled_orders, lang)} {t("final orders")}</Pill><span>{int(c.meta?.provisional ?? ov.totals.provisional_orders, lang)} {t("preliminary orders")}</span><span>{t("Final fees, not bank payouts")}</span></>;
     default: return c.note ? <span>{t(c.note)}</span> : null;
   }
 }
@@ -78,12 +94,18 @@ export default function Health({ ov, loading, error, reload }: { ov: Overview | 
   const ue = ov?.unit_economics;
   const gradeCls = health?.grade === "POOR" ? "dn" : health?.grade === "GOOD" ? "up" : "";
   const ringColor = health ? barColor(health.score) : "var(--gray-soft)";
+  const previousOrders = num(byKey.get("orders")?.prev);
   return (
     <section className="zone" id="zone1">
-      <ZoneHeader id="z1" eyebrow={t("1 · Business health")} title={t("Where the money went")} hint={t("Click any card for its diagnostic")} />
+      <ZoneHeader id="z1" eyebrow={t("1 · Business health")} title={t("Where the money went")} hint={t("Open “How to read this” for definitions")} />
       {error && <ErrorNote error={error} onRetry={reload} />}
       {loading && !ov ? <Skeleton h={140} /> : ov && (
         <>
+          <div className="note kpi-context">
+            <span>{t("Comparison period")}: {ov.compare.start} — {ov.compare.end}.</span>{" "}
+            <span>{t("Rate changes use percentage points (pp); other changes use percent.")}</span>
+            {previousOrders !== null && previousOrders < 5 && <strong className="kpi-sample">{t("Few orders in the comparison period")}: {int(previousOrders, lang)}. {t("Large changes may reflect a small sample, not a stable trend.")}</strong>}
+          </div>
           <div className="kpis">{MAIN.map((k) => byKey.get(k)).filter((c): c is Card => !!c).map((c) => <KpiCard key={c.key} c={c} ov={ov} />)}</div>
           <div className="sec">{SEC.map((k) => byKey.get(k)).filter((c): c is Card => !!c).map((c) => <KpiCard key={c.key} c={c} ov={ov} />)}</div>
           <div className="health">
