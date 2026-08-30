@@ -280,5 +280,25 @@ export interface VideoProducts extends Meta {
   dependency: { lags: VPLag[]; best_lag: number | null; note: string };
   products: VPProduct[];
   videos: VPVideo[];
+  history?: VPHistory;
   notes: string[];
 }
+
+// history block of /api/analytics/video-products (compute.video_history)
+export interface VPHistDay { date: string; gmv: Dec; orders: number; net_profit: Dec; video_gmv: Dec; non_video_gmv: Dec; video_clicks: number; video_impressions: number; video_units: number }
+export interface VPHistEvent { date: string; video_id: number; external_video_id: string | null; type: "published" }
+export type LiftVerdict = "positive" | "neutral" | "negative" | "insufficient" | "pending";
+export interface VPLift {
+  video_id: number; external_video_id: string | null; published: string;
+  before: { orders: number; gmv: Dec; orders_per_day: Dec };
+  after: { orders: number; gmv: Dec; orders_per_day: Dec; video_gmv: Dec };
+  lift_pct: Dec | null; verdict: LiftVerdict; note: string;
+}
+export interface VPHistProduct { product_id: number; title: string; days: VPHistDay[]; events: VPHistEvent[]; lifts: VPLift[] }
+export interface VPHistVideoDay { date: string; views: number; impressions: number; clicks: number; orders: number; gmv: Dec }
+export type VideoPhase = "rising" | "steady" | "fading" | "insufficient";
+export interface VPHistVideo {
+  video_id: number; external_video_id: string | null; caption: string | null; published_at: string | null;
+  days: VPHistVideoDay[]; peak_day: string; peak_views: number; recent_vs_peak: Dec | null; phase: VideoPhase;
+}
+export interface VPHistory { products: VPHistProduct[]; videos: VPHistVideo[]; notes: string[] }

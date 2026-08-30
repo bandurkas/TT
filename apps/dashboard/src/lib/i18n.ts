@@ -77,6 +77,18 @@ export const RU: Record<string, string> = {
   "Ad spend = GMV Max payout deductions, BLENDED over trailing 7 days (estimate, LOW).": "Реклама = списания GMV Max из выплат, СМЕШАННО за 7 дней (оценка, НИЗКАЯ уверенность).",
   "Provisional orders: fees estimated from trailing settled ratio; not final.": "Предварительные заказы: комиссии оценены по доле рассчитанных; не финал.",
   "Reported ROAS / per-campaign cost: NOT AVAILABLE until the TikTok Ads app is approved.": "ROAS по TikTok / расход по кампаниям: НЕДОСТУПНО до одобрения приложения TikTok Ads.",
+  "4b · Videos → Product cards": "4b · Видео → карточки товара", "Which video drives which listing": "Какое видео продаёт какую карточку",
+  "GMV: video vs product card": "GMV: видео vs карточка товара", "Video views": "Просмотры видео", "Product card GMV": "GMV карточек товара", "Video GMV": "GMV из видео",
+  "video share of GMV": "доля видео в GMV", "Dependency: views → product-card sales": "Зависимость: просмотры → продажи карточек", "same day": "тот же день", "+1 day": "+1 день", "+2 days": "+2 дня",
+  "weak": "слабая", "moderate": "умеренная", "strong": "сильная", "n/a": "н/д", "days": "дней", "best lag": "лучший лаг", "correlation ≠ causation": "корреляция ≠ причинность",
+  "Products ← videos feeding them": "Товары ← видео, которые их продают", "Videos → products they sell": "Видео → товары, которые они продают",
+  "Impressions": "Показы", "Video units": "Шт из видео", "Video GMV share": "Доля GMV из видео", "no video traffic measured": "видео-трафик не измерен",
+  "measured by TikTok video analytics": "измерено аналитикой видео TikTok", "customers": "покупателей",
+  "History · videos → product over time": "История · влияние видео на товар по дням", "non-video GMV": "GMV без видео", "video publish": "публикация видео",
+  "What worked / what needs improvement": "Что сработало / что улучшить", "before": "до", "after": "после", "orders/day": "заказов/день", "published": "опубликовано",
+  "positive": "рост", "negative": "спад", "neutral": "без изменений", "insufficient": "мало данных", "pending": "ждём 7 дней",
+  "rising": "растёт", "steady": "стабильно", "fading": "затухает", "peak": "пик", "recent vs peak": "сейчас к пику", "Video lifecycle": "Жизненный цикл видео",
+  "Association on all traffic, not attribution": "Ассоциация по всему трафику, не атрибуция", "Select product": "Выберите товар", "No history for this period.": "Истории за период нет.",
   "Notes": "Примечания", "Generated": "Сформировано", "Keep": "Оставить", "Reduce priority": "Снизить приоритет",
 };
 

@@ -421,5 +421,1401 @@
   "per video × product impressions/clicks/GMV are measured by TikTok video analytics",
   "product-card GMV without a video is organic/search/GMV Max product-card traffic; its impressions are NOT AVAILABLE",
   "shop split from shop_metrics (gmv_video / gmv_product_card / gmv_live)"
- ]
+ ],
+ "history": {
+  "products": [
+   {
+    "product_id": 1,
+    "title": "Socks Kaos Kaki Pria Hitam 5 Pasang",
+    "days": [
+     {
+      "date": "2026-08-01",
+      "gmv": "95911",
+      "orders": 1,
+      "net_profit": "-11453",
+      "video_gmv": "0",
+      "non_video_gmv": "95911",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-02",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-03",
+      "gmv": "97733",
+      "orders": 1,
+      "net_profit": "-10360",
+      "video_gmv": "0",
+      "non_video_gmv": "97733",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-04",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-05",
+      "gmv": "99555",
+      "orders": 1,
+      "net_profit": "-9267",
+      "video_gmv": "46565",
+      "non_video_gmv": "52990",
+      "video_clicks": 3,
+      "video_impressions": 25,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-06",
+      "gmv": "95466",
+      "orders": 1,
+      "net_profit": "-11720",
+      "video_gmv": "46878",
+      "non_video_gmv": "48588",
+      "video_clicks": 1,
+      "video_impressions": 42,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-07",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 2,
+      "video_impressions": 59,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-08",
+      "gmv": "97288",
+      "orders": 1,
+      "net_profit": "-10627",
+      "video_gmv": "47504",
+      "non_video_gmv": "49784",
+      "video_clicks": 3,
+      "video_impressions": 36,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-09",
+      "gmv": "98199",
+      "orders": 1,
+      "net_profit": "-10081",
+      "video_gmv": "47817",
+      "non_video_gmv": "50382",
+      "video_clicks": 1,
+      "video_impressions": 53,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-10",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 2,
+      "video_impressions": 30,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-11",
+      "gmv": "95021",
+      "orders": 1,
+      "net_profit": "-11987",
+      "video_gmv": "48443",
+      "non_video_gmv": "46578",
+      "video_clicks": 3,
+      "video_impressions": 47,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-12",
+      "gmv": "95932",
+      "orders": 1,
+      "net_profit": "-11441",
+      "video_gmv": "48756",
+      "non_video_gmv": "47176",
+      "video_clicks": 1,
+      "video_impressions": 24,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-13",
+      "gmv": "96843",
+      "orders": 1,
+      "net_profit": "-10894",
+      "video_gmv": "49069",
+      "non_video_gmv": "47774",
+      "video_clicks": 2,
+      "video_impressions": 41,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-14",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 3,
+      "video_impressions": 58,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-15",
+      "gmv": "98665",
+      "orders": 1,
+      "net_profit": "-9801",
+      "video_gmv": "49695",
+      "non_video_gmv": "48970",
+      "video_clicks": 1,
+      "video_impressions": 35,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-16",
+      "gmv": "99576",
+      "orders": 1,
+      "net_profit": "-9254",
+      "video_gmv": "50008",
+      "non_video_gmv": "49568",
+      "video_clicks": 2,
+      "video_impressions": 52,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-17",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 3,
+      "video_impressions": 29,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-18",
+      "gmv": "96398",
+      "orders": 1,
+      "net_profit": "-11161",
+      "video_gmv": "50634",
+      "non_video_gmv": "45764",
+      "video_clicks": 1,
+      "video_impressions": 46,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-19",
+      "gmv": "97309",
+      "orders": 1,
+      "net_profit": "-10615",
+      "video_gmv": "50947",
+      "non_video_gmv": "46362",
+      "video_clicks": 2,
+      "video_impressions": 23,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-20",
+      "gmv": "98220",
+      "orders": 1,
+      "net_profit": "-10068",
+      "video_gmv": "51260",
+      "non_video_gmv": "46960",
+      "video_clicks": 3,
+      "video_impressions": 40,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-21",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-22",
+      "gmv": "95042",
+      "orders": 1,
+      "net_profit": "-11975",
+      "video_gmv": "0",
+      "non_video_gmv": "95042",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-23",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-24",
+      "gmv": "96864",
+      "orders": 1,
+      "net_profit": "-10882",
+      "video_gmv": "0",
+      "non_video_gmv": "96864",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-25",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-26",
+      "gmv": "98686",
+      "orders": 1,
+      "net_profit": "-9788",
+      "video_gmv": "0",
+      "non_video_gmv": "98686",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-27",
+      "gmv": "99597",
+      "orders": 1,
+      "net_profit": "-9242",
+      "video_gmv": "0",
+      "non_video_gmv": "99597",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-28",
+      "gmv": "95508",
+      "orders": 1,
+      "net_profit": "-11695",
+      "video_gmv": "0",
+      "non_video_gmv": "95508",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-29",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 15,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-30",
+      "gmv": "192330",
+      "orders": 2,
+      "net_profit": "-22602",
+      "video_gmv": "30000",
+      "non_video_gmv": "162330",
+      "video_clicks": 0,
+      "video_impressions": 15,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-31",
+      "gmv": "98241",
+      "orders": 1,
+      "net_profit": "-10055",
+      "video_gmv": "30000",
+      "non_video_gmv": "68241",
+      "video_clicks": 0,
+      "video_impressions": 15,
+      "video_units": 1
+     }
+    ],
+    "events": [
+     {
+      "date": "2026-08-04",
+      "video_id": 15,
+      "external_video_id": "7670150890476571922",
+      "type": "published"
+     },
+     {
+      "date": "2026-08-05",
+      "video_id": 11,
+      "external_video_id": "7670679046610570504",
+      "type": "published"
+     },
+     {
+      "date": "2026-08-29",
+      "video_id": 16,
+      "external_video_id": "7679001234567896725",
+      "type": "published"
+     }
+    ],
+    "lifts": [
+     {
+      "video_id": 15,
+      "external_video_id": "7670150890476571922",
+      "published": "2026-08-04",
+      "before": {
+       "orders": 4,
+       "gmv": "380000",
+       "orders_per_day": "0.57"
+      },
+      "after": {
+       "orders": 2,
+       "gmv": "190000",
+       "orders_per_day": "0.29"
+      },
+      "lift_pct": "-0.5",
+      "verdict": "negative",
+      "note": "orders/day 7d after publish vs 7d before, all traffic (association)"
+     },
+     {
+      "video_id": 11,
+      "external_video_id": "7670679046610570504",
+      "published": "2026-08-05",
+      "before": {
+       "orders": 4,
+       "gmv": "380000",
+       "orders_per_day": "0.57"
+      },
+      "after": {
+       "orders": 5,
+       "gmv": "475000",
+       "orders_per_day": "0.71"
+      },
+      "lift_pct": "0.25",
+      "verdict": "positive",
+      "note": "orders/day 7d after publish vs 7d before, all traffic (association)"
+     },
+     {
+      "video_id": 16,
+      "external_video_id": "7679001234567896725",
+      "published": "2026-08-29",
+      "before": {
+       "orders": 3,
+       "gmv": "285000",
+       "orders_per_day": "0.43"
+      },
+      "after": {
+       "orders": 3,
+       "gmv": "285000",
+       "orders_per_day": "0.43"
+      },
+      "lift_pct": null,
+      "verdict": "pending",
+      "note": "orders/day 7d after publish vs 7d before, all traffic (association)"
+     }
+    ]
+   },
+   {
+    "product_id": 2,
+    "title": "Kaos Kaki Abu-Abu 5 pasang",
+    "days": [
+     {
+      "date": "2026-08-01",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-02",
+      "gmv": "85000",
+      "orders": 1,
+      "net_profit": "-23250",
+      "video_gmv": "0",
+      "non_video_gmv": "85000",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-03",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-04",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-05",
+      "gmv": "85000",
+      "orders": 1,
+      "net_profit": "-23250",
+      "video_gmv": "0",
+      "non_video_gmv": "85000",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-06",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-07",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-08",
+      "gmv": "85000",
+      "orders": 1,
+      "net_profit": "-23250",
+      "video_gmv": "0",
+      "non_video_gmv": "85000",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-09",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-10",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-11",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-12",
+      "gmv": "85000",
+      "orders": 1,
+      "net_profit": "-23250",
+      "video_gmv": "0",
+      "non_video_gmv": "85000",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-13",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-14",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-15",
+      "gmv": "85000",
+      "orders": 1,
+      "net_profit": "-23250",
+      "video_gmv": "0",
+      "non_video_gmv": "85000",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-16",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-17",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-18",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 1,
+      "video_impressions": 30,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-19",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 1,
+      "video_impressions": 30,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-20",
+      "gmv": "85000",
+      "orders": 1,
+      "net_profit": "-23250",
+      "video_gmv": "85000",
+      "non_video_gmv": "0",
+      "video_clicks": 1,
+      "video_impressions": 30,
+      "video_units": 1
+     },
+     {
+      "date": "2026-08-21",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 1,
+      "video_impressions": 30,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-22",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 1,
+      "video_impressions": 30,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-23",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 1,
+      "video_impressions": 30,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-24",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 1,
+      "video_impressions": 30,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-25",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-26",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-27",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-28",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-29",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-30",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     },
+     {
+      "date": "2026-08-31",
+      "gmv": "0",
+      "orders": 0,
+      "net_profit": "0",
+      "video_gmv": "0",
+      "non_video_gmv": "0",
+      "video_clicks": 0,
+      "video_impressions": 0,
+      "video_units": 0
+     }
+    ],
+    "events": [
+     {
+      "date": "2026-08-18",
+      "video_id": 12,
+      "external_video_id": "7668123456784410",
+      "type": "published"
+     }
+    ],
+    "lifts": [
+     {
+      "video_id": 12,
+      "external_video_id": "7668123456784410",
+      "published": "2026-08-18",
+      "before": {
+       "orders": 1,
+       "gmv": "85000",
+       "orders_per_day": "0.14"
+      },
+      "after": {
+       "orders": 1,
+       "gmv": "85000",
+       "orders_per_day": "0.14"
+      },
+      "lift_pct": null,
+      "verdict": "insufficient",
+      "note": "orders/day 7d after publish vs 7d before, all traffic (association)"
+     }
+    ]
+   }
+  ],
+  "videos": [
+   {
+    "video_id": 11,
+    "external_video_id": "7670679046610570504",
+    "caption": "#kaoskaki #foryou 5 pasang",
+    "published_at": "2026-08-05T03:10:00Z",
+    "days": [
+     {
+      "date": "2026-08-05",
+      "views": 215,
+      "impressions": 215,
+      "clicks": 3,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-06",
+      "views": 859,
+      "impressions": 859,
+      "clicks": 10,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-07",
+      "views": 1934,
+      "impressions": 1934,
+      "clicks": 23,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-08",
+      "views": 3438,
+      "impressions": 3438,
+      "clicks": 41,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-09",
+      "views": 5371,
+      "impressions": 5371,
+      "clicks": 64,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-10",
+      "views": 7735,
+      "impressions": 7735,
+      "clicks": 93,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-11",
+      "views": 10528,
+      "impressions": 10528,
+      "clicks": 126,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-12",
+      "views": 13751,
+      "impressions": 13751,
+      "clicks": 165,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-13",
+      "views": 10709,
+      "impressions": 10709,
+      "clicks": 129,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-14",
+      "views": 8340,
+      "impressions": 8340,
+      "clicks": 100,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-15",
+      "views": 6496,
+      "impressions": 6496,
+      "clicks": 78,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-16",
+      "views": 5059,
+      "impressions": 5059,
+      "clicks": 61,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-17",
+      "views": 3940,
+      "impressions": 3940,
+      "clicks": 47,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-18",
+      "views": 3068,
+      "impressions": 3068,
+      "clicks": 37,
+      "orders": 1,
+      "gmv": "92000"
+     },
+     {
+      "date": "2026-08-19",
+      "views": 2390,
+      "impressions": 2390,
+      "clicks": 29,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-20",
+      "views": 1861,
+      "impressions": 1861,
+      "clicks": 22,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-21",
+      "views": 1449,
+      "impressions": 1449,
+      "clicks": 17,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-22",
+      "views": 1129,
+      "impressions": 1129,
+      "clicks": 14,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-23",
+      "views": 879,
+      "impressions": 879,
+      "clicks": 11,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-24",
+      "views": 685,
+      "impressions": 685,
+      "clicks": 8,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-25",
+      "views": 533,
+      "impressions": 533,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-26",
+      "views": 415,
+      "impressions": 415,
+      "clicks": 5,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-27",
+      "views": 323,
+      "impressions": 323,
+      "clicks": 4,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-28",
+      "views": 252,
+      "impressions": 252,
+      "clicks": 3,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-29",
+      "views": 196,
+      "impressions": 196,
+      "clicks": 2,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-30",
+      "views": 153,
+      "impressions": 153,
+      "clicks": 2,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-31",
+      "views": 119,
+      "impressions": 119,
+      "clicks": 1,
+      "orders": 0,
+      "gmv": "0"
+     }
+    ],
+    "peak_day": "2026-08-12",
+    "peak_views": 13751,
+    "recent_vs_peak": "0.0113",
+    "phase": "fading"
+   },
+   {
+    "video_id": 15,
+    "external_video_id": "7670150890476571922",
+    "caption": "kaos kaki pria hitam premium",
+    "published_at": "2026-08-04T08:00:00Z",
+    "days": [
+     {
+      "date": "2026-08-04",
+      "views": 29,
+      "impressions": 29,
+      "clicks": 0,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-05",
+      "views": 59,
+      "impressions": 59,
+      "clicks": 1,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-06",
+      "views": 88,
+      "impressions": 88,
+      "clicks": 1,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-07",
+      "views": 117,
+      "impressions": 117,
+      "clicks": 1,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-08",
+      "views": 146,
+      "impressions": 146,
+      "clicks": 2,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-09",
+      "views": 176,
+      "impressions": 176,
+      "clicks": 2,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-10",
+      "views": 205,
+      "impressions": 205,
+      "clicks": 2,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-11",
+      "views": 234,
+      "impressions": 234,
+      "clicks": 3,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-12",
+      "views": 264,
+      "impressions": 264,
+      "clicks": 3,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-13",
+      "views": 293,
+      "impressions": 293,
+      "clicks": 4,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-14",
+      "views": 322,
+      "impressions": 322,
+      "clicks": 4,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-15",
+      "views": 351,
+      "impressions": 351,
+      "clicks": 4,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-16",
+      "views": 381,
+      "impressions": 381,
+      "clicks": 5,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-17",
+      "views": 410,
+      "impressions": 410,
+      "clicks": 5,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-18",
+      "views": 439,
+      "impressions": 439,
+      "clicks": 5,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-19",
+      "views": 469,
+      "impressions": 469,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-20",
+      "views": 498,
+      "impressions": 498,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-21",
+      "views": 527,
+      "impressions": 527,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-22",
+      "views": 556,
+      "impressions": 556,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-23",
+      "views": 586,
+      "impressions": 586,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-24",
+      "views": 615,
+      "impressions": 615,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-25",
+      "views": 644,
+      "impressions": 644,
+      "clicks": 8,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-26",
+      "views": 674,
+      "impressions": 674,
+      "clicks": 8,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-27",
+      "views": 703,
+      "impressions": 703,
+      "clicks": 8,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-28",
+      "views": 732,
+      "impressions": 732,
+      "clicks": 9,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-29",
+      "views": 761,
+      "impressions": 761,
+      "clicks": 9,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-30",
+      "views": 791,
+      "impressions": 791,
+      "clicks": 9,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-31",
+      "views": 820,
+      "impressions": 820,
+      "clicks": 10,
+      "orders": 0,
+      "gmv": "0"
+     }
+    ],
+    "peak_day": "2026-08-31",
+    "peak_views": 820,
+    "recent_vs_peak": "0.9600",
+    "phase": "rising"
+   },
+   {
+    "video_id": 12,
+    "external_video_id": "7668123456784410",
+    "caption": "kaos kaki abu-abu",
+    "published_at": "2026-08-18T08:00:00Z",
+    "days": [
+     {
+      "date": "2026-08-18",
+      "views": 614,
+      "impressions": 614,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-19",
+      "views": 563,
+      "impressions": 563,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-20",
+      "views": 512,
+      "impressions": 512,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-21",
+      "views": 589,
+      "impressions": 589,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-22",
+      "views": 538,
+      "impressions": 538,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-23",
+      "views": 614,
+      "impressions": 614,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-24",
+      "views": 563,
+      "impressions": 563,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-25",
+      "views": 512,
+      "impressions": 512,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-26",
+      "views": 589,
+      "impressions": 589,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-27",
+      "views": 538,
+      "impressions": 538,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-28",
+      "views": 614,
+      "impressions": 614,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-29",
+      "views": 563,
+      "impressions": 563,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-30",
+      "views": 512,
+      "impressions": 512,
+      "clicks": 6,
+      "orders": 0,
+      "gmv": "0"
+     },
+     {
+      "date": "2026-08-31",
+      "views": 589,
+      "impressions": 589,
+      "clicks": 7,
+      "orders": 0,
+      "gmv": "0"
+     }
+    ],
+    "peak_day": "2026-08-21",
+    "peak_views": 640,
+    "recent_vs_peak": "0.8900",
+    "phase": "steady"
+   }
+  ],
+  "notes": [
+   "lift = orders/day in the 7 days after publish vs 7 days before, all traffic (association, not attribution)",
+   "phase from last-3-day views vs peak: rising ≥ 0.9 of peak and peak in last 3 days; fading < 0.3 of peak"
+  ]
+ }
 }
