@@ -5,5 +5,5 @@
 - OAuth callbacks: https://tt.lomiraproduct.com/oauth/tiktok-shop/callback, /oauth/tiktok-ads/callback
 - Neighbours on the box: Jony (8200), BUBU (8300), opt-app (3000/8000). Never `docker compose down` in their dirs.
 - `.env` lives only on VPS (`/root/TT/.env`); rsync/scp with `--exclude .env`.
-- Deploy: `cd /root/TT && git pull && docker compose build api worker && docker compose up -d --force-recreate api worker`
+- Deploy: `cd /root/TT && git pull && docker compose build api worker && docker compose run --rm api alembic upgrade head && docker compose up -d --force-recreate api worker`
 - Check: `curl -s localhost:8400/health`; `docker compose logs -f --tail 100 api`
