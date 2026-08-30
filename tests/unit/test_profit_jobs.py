@@ -114,13 +114,13 @@ def test_missing_cogs_flagged_not_raised():
 
 
 def test_missing_cogs_uses_shop_default_when_set():
-    res = compute_from_inputs(inputs([ctx(order(), rec=record(), skus=[sku_record(qty=2)])],
+    res = compute_from_inputs(inputs([ctx(order(), items=[], rec=record(), skus=[sku_record(qty=2)])],
                                      cost=[], default_cogs=D(25000)), NOW)
     p = res[0]
     assert p.profit.costs.cogs == D(50000)
     assert p.snapshot["cogs_missing"] is True and p.snapshot["cogs_default_used"] is True
     assert any("shop default 25000" in w for w in p.profit.warnings)
-    assert p.snapshot["cost_versions"] == [(SKU, "1970-01-01", "25000")]
+    assert p.snapshot["cost_versions"] == [(SKU_EXT, "1970-01-01", "25000")]
 
 
 def test_known_cogs_not_overridden_by_default():

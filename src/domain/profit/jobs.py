@@ -34,7 +34,16 @@ from src.analytics.profitability import (
 )
 from src.analytics.profitability import OrderProfit as EngineProfit
 from src.analytics.transaction_types import quantum
-from src.db.models import Order, OrderItem, Product, Settlement, Shop, ShopConfig, Sku, SkuCostVersion
+from src.db.models import (
+    Order,
+    OrderItem,
+    Product,
+    Settlement,
+    Shop,
+    ShopConfig,
+    Sku,
+    SkuCostVersion,
+)
 from src.db.models import OrderProfit as OrderProfitRow
 from src.db.models_finance import (
     STATEMENT_AMOUNT_FIELDS,
