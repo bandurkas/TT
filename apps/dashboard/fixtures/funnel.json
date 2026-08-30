@@ -1,0 +1,17 @@
+{"shop":{"id":1,"name":"Lomira.product","currency":"IDR","timezone":"Asia/Jakarta"},"period":{"start":"2026-08-01","end":"2026-08-31"},"compare":{"start":"2026-07-02","end":"2026-08-01"},"generated_at":"2026-08-31T09:12:00Z",
+ "stages":[{"name":"impression","count":6972,"note":"video views (Shop API analytics)"},{"name":"click","count":57,"note":"derived: views × click_through_rate (no click count in API)"},{"name":"order","count":6,"note":"orders with a profit row"},{"name":"completed","count":5,"note":"COMPLETED/DELIVERED orders"},{"name":"settled","count":5,"note":"orders with a settled statement (lags 8–10 days; not a conversion)"}],
+ "steps":[{"from":"impression","to":"click","count":57,"rate":"0.0082","baseline_rate":"0.014","delta_pct":"-0.4143","timing_only":false},{"from":"click","to":"order","count":6,"rate":"0.1053","baseline_rate":"0.098","delta_pct":"0.0745","timing_only":false},{"from":"order","to":"completed","count":5,"rate":"0.8333","baseline_rate":"0.9","delta_pct":"-0.0741","timing_only":false},{"from":"completed","to":"settled","count":5,"rate":"1","baseline_rate":"1","delta_pct":"0","timing_only":true}],
+ "diagnosis":{"stage_from":"impression","stage_to":"click","current_rate":"0.0082","baseline_rate":"0.014","delta_pct":"-0.4143","lost_orders":"4","lost_profit":"-240000","evidence":["impression→click 0.82% vs baseline 1.40% (−41%)","click→order stable: creative hook, not product page"],"estimated":true},
+ "baseline_note":"baseline = previous comparable period",
+ "waterfall":{"orders":33,"provisional_orders":3,"steps":[
+  {"key":"revenue_after_seller_discounts","amount":"2760000","measured":false},
+  {"key":"refunds","amount":"-391000","measured":false},
+  {"key":"tiktok_fees","amount":"-354000","measured":false},
+  {"key":"affiliate_commission","amount":"-54000","measured":false},
+  {"key":"taxes_adjustments_subsidies","amount":"-213000","measured":false},
+  {"key":"net_seller_revenue","amount":"1748000","subtotal":true,"measured":false},
+  {"key":"cogs","amount":"-800000","measured":true},
+  {"key":"contribution_before_ads","amount":"948000","subtotal":true,"measured":false},
+  {"key":"ad_deductions_blended","amount":"-2231033","measured":false},
+  {"key":"net_profit","amount":"-1283033","subtotal":true,"measured":false}],
+  "note":"Measured = settled statements; provisional orders carry estimated fees; ad cost = BLENDED payout deductions (estimate)."}}

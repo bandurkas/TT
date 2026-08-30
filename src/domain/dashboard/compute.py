@@ -591,3 +591,104 @@ def video_product_map(vpm: Iterable[Any], product_rows_: Sequence[dict[str, Any]
                "products": sorted(prods, key=lambda p: -p["gmv"])} for vid, prods in by_video.items()]
     videos.sort(key=lambda v: -sum(p["gmv"] for p in v["products"]))
     return products, videos
+
+
+# --- history: how videos influenced products over time -----------------------------------------
+LIFT_WINDOW = 7
+
+
+def _lift_verdict(before_pd: Decimal, after_pd: Decimal, after_orders: int, min_orders: int) -> tuple[str, Decimal | None]:
+    if after_orders + int(before_pd * LIFT_WINDOW) < min_orders:
+        return "insufficient", None
+    if before_pd == 0:
+        return ("positive", None) if after_pd > 0 else ("neutral", None)
+    lift = ((after_pd - before_pd) / before_pd).quantize(PCT)
+    return ("positive" if lift >= Decimal("0.2") else "negative" if lift <= Decimal("-0.2") else "neutral"), lift
+
+
+def video_history(vpm: Iterable[Any], product_daily_rows: Iterable[Any], video_daily: Mapping[int, Sequence[Any]],
+                  video_meta: Mapping[int, Any], product_meta: Mapping[int, Any], period: Period,
+                  min_orders: int) -> dict[str, Any]:
+    """Per product: daily series (video vs total), video launch events, before/after lift per video.
+    Per video: daily views→impressions→clicks→units, peak day, decay. Deterministic; lift = orders/day
+    in the 7 days after publish vs 7 days before (all traffic, so it is an association, not attribution)."""
+    vp_day: dict[tuple[int, date], dict[str, Any]] = {}
+    vids_per_product: dict[int, set[int]] = {}
+    for r in vpm:
+        k = (r.product_id, r.metric_date)
+        a = vp_day.setdefault(k, {"video_gmv": ZERO, "video_clicks": 0, "video_impressions": 0, "video_units": 0})
+        a["video_gmv"] += _d(r.gmv)
+        a["video_clicks"] += int(r.clicks or 0)
+        a["video_impressions"] += int(r.impressions or 0)
+        a["video_units"] += int(r.units_sold or 0)
+        if int(r.impressions or 0) or _d(r.gmv):
+            vids_per_product.setdefault(r.product_id, set()).add(r.video_id)
+    pd_day: dict[tuple[int, date], Any] = {(r.product_id, r.metric_date): r for r in product_daily_rows}
+    pids = {pid for pid, _ in pd_day} | {pid for pid, _ in vp_day}
+    products = []
+    for pid in sorted(pids):
+        days = []
+        for k in range(period.days):
+            d = period.start + timedelta(days=k)
+            p, v = pd_day.get((pid, d)), vp_day.get((pid, d), {})
+            gmv = _d(getattr(p, "gmv", 0)) if p else ZERO
+            vg = v.get("video_gmv", ZERO)
+            days.append({"date": d, "gmv": gmv, "orders": int(getattr(p, "orders", 0) or 0) if p else 0,
+                         "net_profit": _d(getattr(p, "net_profit", 0)) if p else ZERO, "video_gmv": vg,
+                         "non_video_gmv": max(gmv - vg, ZERO), "video_clicks": v.get("video_clicks", 0),
+                         "video_impressions": v.get("video_impressions", 0), "video_units": v.get("video_units", 0)})
+        events, lifts = [], []
+        for vid in sorted(vids_per_product.get(pid, ())):
+            vm = video_meta.get(vid)
+            pub = getattr(vm, "published_at", None)
+            if pub is None:
+                continue
+            pday = pub.date()
+            ext = getattr(vm, "external_video_id", None)
+            if period.start <= pday <= period.end:
+                events.append({"date": pday, "video_id": vid, "external_video_id": ext, "type": "published"})
+            before = [pd_day.get((pid, pday - timedelta(days=i))) for i in range(1, LIFT_WINDOW + 1)]
+            after = [pd_day.get((pid, pday + timedelta(days=i))) for i in range(LIFT_WINDOW)]
+            bo = sum(int(getattr(x, "orders", 0) or 0) for x in before if x)
+            ao = sum(int(getattr(x, "orders", 0) or 0) for x in after if x)
+            bg = sum((_d(getattr(x, "gmv", 0)) for x in before if x), ZERO)
+            ag = sum((_d(getattr(x, "gmv", 0)) for x in after if x), ZERO)
+            b_pd, a_pd = Decimal(bo) / LIFT_WINDOW, Decimal(ao) / LIFT_WINDOW
+            verdict, lift = _lift_verdict(b_pd, a_pd, ao, min_orders)
+            vg_after = sum((vp_day.get((pid, pday + timedelta(days=i)), {}).get("video_gmv", ZERO)
+                            for i in range(LIFT_WINDOW)), ZERO)
+            lifts.append({"video_id": vid, "external_video_id": ext, "published": pday,
+                          "before": {"orders": bo, "gmv": bg, "orders_per_day": b_pd.quantize(RATIO)},
+                          "after": {"orders": ao, "gmv": ag, "orders_per_day": a_pd.quantize(RATIO),
+                                    "video_gmv": vg_after},
+                          "lift_pct": lift, "verdict": verdict,
+                          "note": "orders/day 7d after publish vs 7d before, all traffic (association)"})
+        pm = product_meta.get(pid)
+        products.append({"product_id": pid, "title": getattr(pm, "title", None) or f"product {pid}",
+                         "days": days, "events": events, "lifts": lifts})
+    videos = []
+    for vid, rows in video_daily.items():
+        by_day = {}
+        for r in rows:
+            if period.start <= r.metric_date <= period.end:
+                by_day[r.metric_date] = {"date": r.metric_date, "views": int(r.views or 0),
+                                         "impressions": int(r.impressions or 0), "clicks": int(r.product_clicks or 0),
+                                         "orders": int(r.orders or 0), "gmv": _d(r.gmv)}
+        if not by_day:
+            continue
+        series = [by_day[d] for d in sorted(by_day)]
+        peak = max(series, key=lambda x: x["views"])
+        last3 = series[-3:]
+        decay = (sum(x["views"] for x in last3) / Decimal(len(last3)) / Decimal(peak["views"])).quantize(PCT) \
+            if peak["views"] else None
+        vm = video_meta.get(vid)
+        videos.append({"video_id": vid, "external_video_id": getattr(vm, "external_video_id", None),
+                       "caption": getattr(vm, "caption", None), "published_at": getattr(vm, "published_at", None),
+                       "days": series, "peak_day": peak["date"], "peak_views": peak["views"],
+                       "recent_vs_peak": decay,
+                       "phase": "insufficient" if len(series) < 3 else "fading" if decay is not None and decay < Decimal("0.2")
+                       else "steady" if decay is not None and decay < Decimal("0.7") else "rising"})
+    videos.sort(key=lambda v: -sum(x["views"] for x in v["days"]))
+    return {"products": products, "videos": videos,
+            "notes": [("lift compares 7 days after a video's publish date with 7 days before on ALL traffic — "
+                      "an association, not causal attribution"), "phase: rising/steady/fading = last-3-day views vs peak"]}

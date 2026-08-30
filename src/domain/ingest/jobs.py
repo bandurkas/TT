@@ -307,13 +307,13 @@ def sync_video_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
 
 
 def sync_video_product_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
-    """Per video × product breakdown for videos that had views on `day` (1 API call per video).
-    Also fills video_metrics.impressions/product_clicks/ctr from the overall block."""
+    """Per video × product breakdown for every video with a metrics row on `day` (1 API call per
+    video; GMV can land on days with zero views). Also fills video_metrics.impressions/product_clicks/ctr."""
     start, end = _day_range(day)
     pids = product_ids(ctx.session, ctx.shop_id)
     q = (select(Video.id, Video.external_video_id).join(VideoMetric, VideoMetric.video_id == Video.id)
          .where(Video.shop_id == ctx.shop_id, VideoMetric.metric_date == day,
-                VideoMetric.metric_hour.is_(None), VideoMetric.views > 0))
+                VideoMetric.metric_hour.is_(None)))
     n_videos = n_rows = 0
     for vid, ext in ctx.session.execute(q):
         detail = ctx.client.get_video_performance_detail(ext, start, end)

@@ -2,7 +2,7 @@
 All money = Decimal serialised as strings; ad cost always labelled BLENDED/estimate."""
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -159,7 +159,9 @@ def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     gpc = sum((d["gmv_product_card"] for d in days), Decimal(0))
     gl = sum((d["gmv_live"] for d in days), Decimal(0))
     tot = gv + gpc + gl
-    return _n({**c.meta(),
+    pd_hist = L.product_daily(c.session, c.shop.id, c.period.start - timedelta(days=C.LIFT_WINDOW), c.period.end)
+    history = C.video_history(vpm, pd_hist, daily, vmeta, pmeta, c.period, c.min_orders)
+    return _n({**c.meta(), "history": history,
                "shop_split": {"gmv_video": gv, "gmv_product_card": gpc, "gmv_live": gl, "gmv_total": tot,
                               "video_share": C.ratio(gv, tot) if tot else None, "days": days},
                "dependency": C.lag_dependency(days), "products": products, "videos": videos,

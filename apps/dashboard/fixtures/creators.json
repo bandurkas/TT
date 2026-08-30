@@ -1,0 +1,2 @@
+{"shop":{"id":1,"name":"Lomira.product","currency":"IDR","timezone":"Asia/Jakarta"},"period":{"start":"2026-08-01","end":"2026-08-31"},"compare":{"start":"2026-07-02","end":"2026-08-01"},"generated_at":"2026-08-31T09:12:00Z","rows":[{"creator":"Affiliate (aggregated)","orders":7,"gmv":"700000","affiliate_commission":"54000","profit_after_commission":"383000"}],
+ "note":"Per-creator attribution NOT AVAILABLE from Shop API orders; affiliate commission is measured."}

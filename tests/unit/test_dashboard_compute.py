@@ -218,3 +218,32 @@ def test_video_product_map():
     assert p4["status"] == "NO_SALES" and p4["video_share"] is None and p4["title"] == "Abu"
     assert videos[0]["video_id"] == 1 and videos[0]["views"] == 14884 and videos[0]["classification"] == "PROMISING"
     assert videos[1]["products"][0]["title"] == "Pria Hitam" and len(videos[1]["products"]) == 2
+
+
+def test_video_history_lift_and_phase():
+    def r(vid, pid, d, imp, clk, units, gmv):
+        return NS(video_id=vid, product_id=pid, metric_date=d, impressions=imp, clicks=clk, units_sold=units,
+                  gmv=D(gmv), customers=1)
+    pub = datetime(2026, 8, 10, tzinfo=UTC)
+    pdr = []
+    for k in range(1, 25):
+        d = date(2026, 8, k)
+        o = 1 if k < 10 else 3
+        pdr.append(NS(product_id=3, metric_date=d, gmv=D(100000 * o), orders=o, net_profit=D(40000 * o)))
+    vpm = [r(1, 3, date(2026, 8, 10 + i), 100, 5, 1, 90000) for i in range(5)]
+    vd = {1: [NS(metric_date=date(2026, 8, 10 + i), views=[500, 800, 300, 100, 50][i], impressions=100,
+                 product_clicks=5, orders=1, gmv=D(90000)) for i in range(5)]}
+    out = C.video_history(vpm, pdr, vd, {1: NS(external_video_id="v1", caption="c", published_at=pub)},
+                          {3: NS(title="Pria")}, AUG, 5)
+    p = out["products"][0]
+    assert p["title"] == "Pria" and len(p["days"]) == 31 and p["days"][9]["video_gmv"] == D(90000)
+    assert p["days"][9]["non_video_gmv"] == D(210000) and p["events"] == [
+        {"date": date(2026, 8, 10), "video_id": 1, "external_video_id": "v1", "type": "published"}]
+    lift = p["lifts"][0]
+    assert lift["before"]["orders"] == 7 and lift["after"]["orders"] == 21 and lift["lift_pct"] == D(2)
+    assert lift["verdict"] == "positive" and lift["after"]["video_gmv"] == D(450000)
+    v = out["videos"][0]
+    assert v["peak_day"] == date(2026, 8, 11) and v["peak_views"] == 800 and v["phase"] == "fading"
+    assert v["recent_vs_peak"] == D("0.1875")
+    assert C._lift_verdict(D(0), D(0), 0, 5) == ("insufficient", None)
+    assert C._lift_verdict(D(1), D("0.5"), 4, 5) == ("negative", D("-0.5"))
