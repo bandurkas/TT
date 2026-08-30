@@ -134,3 +134,13 @@ Variants (tested): partial refund 20,000 in s1 → 3,500 (SETTLED); the same ref
 adjustment +1,000 in settlement s2 → 24,500 (ADJUSTED); adjustment −2,000 → 21,500 (ADJUSTED);
 no settlement ids → 23,500 but PROVISIONAL; order dated 2026-07-15 with older COGS 20,000 →
 28,500.
+
+## 8. Live API shape → engine (added 2026-08-30)
+
+The Finance API does **not** deliver typed transactions: `GET /finance/202309/orders/{id}/statement_transactions`
+returns one flat record per order (~60 named amount fields + `sku_statement_transactions[]`). The
+adapter `src/analytics/finance_fields.py::statement_record_to_txns` turns that record into the component
+`FinanceTxn`s this engine expects (fee residual → `PLATFORM_COMMISSION`, shipping passthrough and
+platform discount not emitted, `statement_id` → `settlement_id`). Verified: engine
+`net_seller_revenue == settlement_amount == Seller Center` on all 12 August 2026 orders (832,693 IDR).
+Full field table, identities and the residual rule: `docs/finance-field-mapping.md`.

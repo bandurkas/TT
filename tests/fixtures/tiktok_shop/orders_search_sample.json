@@ -1,0 +1,23 @@
+{
+ "_source": "POST /order/202309/orders/search — synthetic sample built from field names in docs/tiktok-api-capability-matrix.md (Live verification). PII-free. Field names UNVERIFIED.",
+ "orders": [
+  {"id": "585489904998712566", "status": "COMPLETED", "create_time": 1786780800, "paid_time": 1786780900,
+   "update_time": 1787000000, "delivery_time": 1786990000,
+   "payment": {"currency": "IDR", "sub_total": "100000", "shipping_fee": "26500", "seller_discount": "0",
+               "platform_discount": "2155", "total_amount": "124982", "original_total_product_price": "100000", "tax": "0"},
+   "line_items": [
+     {"id": "585489904998777777", "sku_id": "1736823576747934791", "product_id": "1736665360313713735",
+      "product_name": "Socks Kaos Kaki Pria Hitam 5 Pasang", "sku_name": "Dewasa: 41-47", "seller_sku": "",
+      "sale_price": "100000", "original_price": "100000", "seller_discount": "0", "platform_discount": "2155",
+      "currency": "IDR", "display_status": "COMPLETED"}
+   ]},
+  {"id": "585500000000000001", "status": "CANCELLED", "create_time": 1786800000, "update_time": 1786900000,
+   "cancel_time": 1786900000,
+   "payment": {"currency": "IDR", "sub_total": "170000", "shipping_fee": "0", "seller_discount": "5000",
+               "platform_discount": "0", "total_amount": "165000"},
+   "line_items": [
+     {"id": "l1", "sku_id": "1736377104982377543", "product_id": "1736376427332535367", "sale_price": "85000", "original_price": "85000"},
+     {"id": "l2", "sku_id": "1736377104982377543", "product_id": "1736376427332535367", "sale_price": "85000", "original_price": "85000"}
+   ]}
+ ]
+}
