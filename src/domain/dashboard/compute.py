@@ -188,13 +188,13 @@ def _status(value: Decimal | None, good_if: str, threshold: Decimal | None = Non
 
 def kpi(key: str, value: Decimal | int | None, prev: Decimal | int | None, spark: Sequence[Decimal],
         *, kind: str = "money", status: str = NEUTRAL, note: str | None = None,
-        provisional: bool = False) -> dict[str, Any]:
+        provisional: bool = False, meta: dict[str, Any] | None = None) -> dict[str, Any]:
     v = _d(value) if value is not None else None
     p = _d(prev) if prev is not None else None
     return {"key": key, "kind": kind, "value": v, "prev": p,
             "change_abs": (v - p) if v is not None and p is not None else None,
             "change_pct": pct_change(v, p), "sparkline": list(spark), "status": status,
-            "note": note, "provisional": provisional}
+            "note": note, "provisional": provisional, "meta": meta or {}}
 
 
 def sparkline(rows: Iterable[Any], end: date, field_: str, n: int = 7) -> list[Decimal]:
@@ -211,25 +211,27 @@ def business_health(cur: Totals, prev: Totals, daily_rows: Sequence[Any], period
             status=_status(cur.net_profit, "up"), provisional=prov,
             note="accrual; ad cost BLENDED estimate" if cur.ad_cost else "accrual"),
         kpi("gmv", cur.gmv, prev.gmv, sparkline(daily_rows, period.end, "gmv"),
-            status=_status(pct_change(cur.gmv, prev.gmv), "up"), note=f"{cur.units} units"),
+            status=_status(pct_change(cur.gmv, prev.gmv), "up"), note=f"{cur.units} units",
+            meta={"units": cur.units}),
         kpi("net_seller_revenue", cur.net_seller_revenue, prev.net_seller_revenue,
             sparkline(daily_rows, period.end, "net_seller_revenue"),
             status=_status(pct_change(cur.net_seller_revenue, prev.net_seller_revenue), "up"),
             note="after fees & refunds", provisional=prov),
         kpi("orders", cur.orders, prev.orders, sparkline(daily_rows, period.end, "orders"), kind="count",
             status=_status(pct_change(Decimal(cur.orders), Decimal(prev.orders)), "up"),
-            note=f"{cur.refunded_orders} refunded"),
+            note=f"{cur.refunded_orders} refunded", meta={"refunded": cur.refunded_orders}),
         kpi("ad_spend", cur.ad_cost, prev.ad_cost, sparkline(daily_rows, period.end, "ad_cost"),
             status=NEUTRAL, provisional=True,
             note=(f"{ratio(cur.ad_cost, cur.net_seller_revenue)!s} of net revenue"
-                  if cur.net_seller_revenue > 0 else "GMV Max payout deductions")),
+                  if cur.net_seller_revenue > 0 else "GMV Max payout deductions"),
+            meta={"ad_share": ratio(cur.ad_cost, cur.net_seller_revenue) if cur.net_seller_revenue > 0 else None}),
         kpi("net_margin", m, pm, [], kind="pct", status=_status(m, "up", floor_margin),
-            note=f"floor {floor_margin}", provisional=prov),
+            note=f"floor {floor_margin}", provisional=prov, meta={"floor": floor_margin}),
         kpi("reported_roas", None, None, [], kind="ratio", status=NEUTRAL, note=NOT_AVAILABLE + ": Ads API"),
         kpi("blended_roas", cur.blended_roas, prev.blended_roas, [], kind="ratio",
             status=_status(cur.blended_roas, "up", cur.break_even_roas) if cur.break_even_roas else NEUTRAL,
             note=f"break-even {cur.break_even_roas}" if cur.break_even_roas else "net revenue / ad spend",
-            provisional=True),
+            provisional=True, meta={"break_even": cur.break_even_roas}),
         kpi("aov", cur.aov, prev.aov, [], status=_status(pct_change(cur.aov, prev.aov), "up")),
         kpi("cvr", cur.cvr, prev.cvr, [], kind="pct", status=_status(pct_change(cur.cvr, prev.cvr), "up"),
             note=f"video CVR: {cur.video_orders} video orders / derived clicks", provisional=True),
@@ -237,7 +239,8 @@ def business_health(cur: Totals, prev: Totals, daily_rows: Sequence[Any], period
             status=_status(cur.refund_rate, "down", Decimal("0.10")), note="refunded orders / orders"),
         kpi("settlement_coverage", cur.settlement_coverage, prev.settlement_coverage, [], kind="pct",
             status=_status(cur.settlement_coverage, "up", Decimal("0.90")),
-            note=f"{cur.provisional_orders} provisional"),
+            note=f"{cur.provisional_orders} provisional",
+            meta={"settled": cur.settled_orders, "provisional": cur.provisional_orders}),
     ]
     return {"cards": cards, "health": profit_health(cur, prev, floor_margin, dq),
             "unit_economics": unit_economics(cur)}

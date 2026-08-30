@@ -127,10 +127,14 @@ def trends(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     for v in meta.values():
         pday = C._pub_date(v, c.tz)
         if pday and c.period.start <= pday <= c.period.end:
-            events.append({"date": pday, "type": "video_posted", "amount": None,
+            events.append({"date": pday, "type": "video_posted", "amount": None, "video_id": v.id,
+                           "external_video_id": v.external_video_id,
                            "label": f"new video {v.external_video_id}"})
     events.sort(key=lambda e: e["date"])
     sm = L.shop_metrics(c.session, c.shop.id, c.period.start, c.period.end)
+    for e in events:
+        e.setdefault("video_id", None)
+        e.setdefault("external_video_id", None)
     return _n({**c.meta(), "series": series, "events": events,
             "gmv_sources": [{"date": m.metric_date, "gmv_total": m.gmv_total, "gmv_video": m.gmv_video,
                              "gmv_product_card": m.gmv_product_card, "gmv_live": m.gmv_live,

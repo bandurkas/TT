@@ -74,7 +74,7 @@ def findings(cur: Totals, prev: Totals, floor: Decimal, products: Sequence[dict[
     for v in videos:
         if v["classification"] in ("WINNER", "PROMISING"):
             out.append(_f(f"video_{v['classification'].lower()}:{v['video_id']}", "OPPORTUNITY",
-                          f"Video {v['external_video_id']}: {v['classification']} — CTR {v['ctr']}, "
+                          f"Video {v['external_video_id']}: {v['classification']} — CTR {v['ctr']:.2%}, "
                           f"{v['orders']} orders, GMV {v['gmv']}",
                           "; ".join(v["reasons"]), v["gmv"], v["confidence"], "video_metrics", True,
                           {"video_id": v["video_id"]}, kind="opportunity"))
