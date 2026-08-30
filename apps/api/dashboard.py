@@ -17,6 +17,7 @@ from src.domain.dashboard import compute as C
 from src.domain.dashboard import insights as I
 from src.domain.dashboard import loaders as L
 from src.domain.dashboard import order_loaders as OL
+from src.domain.reports import advertising_summary
 
 router = APIRouter(prefix="/api")
 TASK_STATUSES = ("today", "in_progress", "review", "done")
@@ -61,8 +62,19 @@ class Ctx:
                          lambda: L.shop_funnel_by_day(self.session, self.shop.id, period.start, period.end))
 
     def totals(self, period: C.Period) -> C.Totals:
-        return self.memo(("totals", period.start, period.end), lambda: C.sum_daily(
-            self.daily(period), period, self.funnel_days(period), self.profits(period)[1]))
+        def build():
+            t = C.sum_daily(self.daily(period), period, self.funnel_days(period), self.profits(period)[1])
+            ad = self.advertising(period)
+            t.ad_cost_known = ad["cost"] is not None
+            t.ad_cost_partial = bool(ad["partial_days"])
+            t.ad_cost = ad["known_cost"]
+            t.net_profit = t.contribution - t.ad_cost
+            return t
+        return self.memo(("totals", period.start, period.end), build)
+
+    def advertising(self, period):
+        return self.memo(("advertising", period.start, period.end), lambda: advertising_summary(
+            self.session, self.shop.id, period.start, period.end, self.tz))
 
     def meta(self) -> dict[str, Any]:
         return {"shop": {"id": self.shop.id, "name": self.shop.name, "currency": self.shop.currency,
@@ -103,11 +115,11 @@ def _overview(c: Ctx) -> dict[str, Any]:
     missing, unmapped = L.cogs_gaps(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
     dq = C.data_quality(fresh, cur, missing, unmapped)
     zone1 = C.business_health(cur, prev, rows, c.period, c.floor, dq)
-    return {**c.meta(), **zone1, "data_quality": {"score": dq.score, "state": dq.state.value,
+    return {**c.meta(), **zone1, "advertising": c.advertising(c.period), "data_quality": {"score": dq.score, "state": dq.state.value,
                                                    "reasons": list(dq.reasons), "last_sync": sync_at,
                                                    "freshness_minutes": fresh},
-            "totals": {k: getattr(cur, k) for k in C.DAILY_FIELDS} | {"refunded_orders": cur.refunded_orders},
-            "notes": ["Ad spend = GMV Max payout deductions, BLENDED over trailing 7 days (estimate, LOW).",
+            "totals": {k: (None if (k == "ad_cost" and not cur.ad_cost_known) or (k == "net_profit" and not cur.profit_known) else getattr(cur, k)) for k in C.DAILY_FIELDS} | {"refunded_orders": cur.refunded_orders},
+            "notes": ["Ad spend = reported daily Cost; GMV Pay is a separate payment. Order attribution is same-day BLENDED (LOW).",
                       "Provisional orders: fees estimated from trailing settled ratio; not final.",
                       "Reported ROAS / per-campaign cost: NOT AVAILABLE until the TikTok Ads app is approved."]}
 
@@ -122,7 +134,7 @@ def trends(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     rows = c.daily(c.period)
     series = C.trend_series(rows, c.period)
     events = [{"date": d["date"], "type": "ad_deduction", "amount": d["amount"],
-               "label": f"GMV Max deduction {d['amount']}"}
+               "label": f"GMV Pay payment {d['amount']} (not Cost)"}
               for d in L.ad_deductions(c.session, c.shop.id, c.period.start, c.period.end, c.tz)]
     _, meta = _video_rows(c)
     for v in meta.values():
@@ -148,7 +160,7 @@ def products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     pf = L.product_funnel(c.session, c.shop.id, c.period.start, c.period.end)
     rows = C.product_rows(pd, L.products(c.session, c.shop.id), c.period, pf, c.floor, c.min_orders)
     return _n({**c.meta(), "rows": rows, "cvr_note": C.NOT_AVAILABLE + ": product clicks not in Shop API",
-               "ad_cost_note": "BLENDED estimate (shop-level deductions split by revenue)"})
+               "ad_cost_note": "BLENDED estimate: reported daily Cost split by same-day revenue; GMV Pay excluded"})
 
 
 def _video_rows(c: Ctx):
@@ -215,8 +227,9 @@ def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
 @router.get("/analytics/campaigns")
 def campaigns(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     ded = L.ad_deductions(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
-    return _n({**c.meta(), "available": False, "reason": "TikTok Ads app pending approval",
-               "shop_level_ad_cost": sum((d["amount"] for d in ded), Decimal(0)), "deductions": ded, "rows": []})
+    ad = c.advertising(c.period)
+    return _n({**c.meta(), "available": False, "reason": "Shop overview export has no campaign IDs",
+               "advertising": ad, "shop_level_ad_cost": ad["cost"], "deductions": ded, "rows": []})
 
 
 @router.get("/analytics/creators")
@@ -231,14 +244,14 @@ def _funnel(c: Ctx) -> dict[str, Any]:
     cur = L.funnel_counts(c.session, c.shop.id, c.period, c.tz)
     base = L.funnel_counts(c.session, c.shop.id, c.compare, c.tz)
     t = c.totals(c.period)
-    avg_profit = (t.contribution / t.orders).quantize(Decimal(1)) if t.orders else None
+    avg_profit = (t.contribution / t.orders).quantize(Decimal(1)) if t.orders and t.profit_inputs_known else None
     return c.memo(("funnel_view",), lambda: C.funnel_view(cur, base, avg_profit))
 
 
 @router.get("/dashboard/funnel")
 def funnel(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     rows = c.profits(c.period)[0]
-    return _n({**c.meta(), **_funnel(c), "waterfall": C.waterfall(rows)})
+    return _n({**c.meta(), **_funnel(c), "waterfall": C.waterfall(rows, c.advertising(c.period))})
 
 
 @router.get("/dashboard/insights")

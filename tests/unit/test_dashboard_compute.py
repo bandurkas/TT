@@ -12,7 +12,7 @@ AUG = C.Period(date(2026, 8, 1), date(2026, 8, 31))
 
 def day(d, orders=1, gmv=100000, net=91000, fees=9000, cogs=25000, ads=20000, refunds=0, settled=1, prov=0):
     net_profit = D(net) - D(cogs) - D(ads)
-    return NS(metric_date=d, orders=orders, units=orders, gmv=D(gmv), net_seller_revenue=D(net), fees=D(fees),
+    return NS(metric_date=d, ad_cost_known=True, profit_inputs_known=True, orders=orders, units=orders, gmv=D(gmv), net_seller_revenue=D(net), fees=D(fees),
               affiliate=D(0), cogs=D(cogs), contribution=D(net) - D(cogs), ad_cost=D(ads),
               net_profit=net_profit, refunds=D(refunds), settled_orders=settled, provisional_orders=prov)
 
@@ -58,7 +58,7 @@ def test_business_health_cards_and_score():
     assert cards["reported_roas"]["value"] is None and "NOT_AVAILABLE" in cards["reported_roas"]["note"]
     assert len(cards["gmv"]["sparkline"]) == 7
     assert C.sparkline(rows, date(2026, 8, 10), "gmv")[-1] == D(100000)
-    assert cards["ad_spend"]["provisional"] is True
+    assert cards["ad_spend"]["provisional"] is False  # reported Cost; allocation is a separate estimate
     h = z["health"]
     assert set(h["components"]) == {"margin", "ad_efficiency", "conversion", "refunds", "data_quality"}
     assert h["components"]["data_quality"] == 96 and h["components"]["refunds"] == 100
@@ -70,8 +70,8 @@ def test_business_health_cards_and_score():
 def test_trend_series_fills_gaps_and_cumulates():
     p = C.Period(date(2026, 8, 1), date(2026, 8, 3))
     s = C.trend_series([day(date(2026, 8, 1)), day(date(2026, 8, 3), ads=100000)], p)
-    assert [x["net_profit"] for x in s] == [D(46000), D(0), D(-34000)]
-    assert [x["cum_net_profit"] for x in s] == [D(46000), D(46000), D(12000)]
+    assert [x["net_profit"] for x in s] == [D(46000), None, D(-34000)]
+    assert [x["cum_net_profit"] for x in s] == [D(46000), None, None]
     assert s[1]["orders"] == 0
 
 
@@ -163,7 +163,7 @@ def test_funnel_view_and_waterfall():
     assert lag["diagnosis"] is None  # settlement lag is not a deterioration
     pipe = C.funnel_view(C.FunnelCounts(10, 1, 0, 60, 40, 10), C.FunnelCounts(10, 1, 0, 60, 60, 60), D(1))
     assert pipe["diagnosis"]["stage_from"] == "order" and pipe["diagnosis"]["stage_to"] == "completed"
-    profits = [NS(profit_status="SETTLED", sale_proceeds=D(100000), seller_discounts=D(9000), refunds=D(0),
+    profits = [NS(inputs_snapshot={"source": "settled", "ad_cost_known": True}, profit_status="SETTLED", sale_proceeds=D(100000), seller_discounts=D(9000), refunds=D(0),
                   platform_fees=D(8000), affiliate_commission=D(2000), seller_shipping=D(500), taxes=D(0),
                   subsidies=D(0), adjustments=D(0), cogs=D(25000), packaging=D(0), inbound_logistics=D(0),
                   other_variable=D(0), contribution_profit=D(55500), allocated_ad_cost=D(20000),

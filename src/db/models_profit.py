@@ -3,7 +3,7 @@ Imported by models_finance.py so Base.metadata sees the tables."""
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base, PKMixin
@@ -16,6 +16,9 @@ MONEY_COLUMNS: tuple[str, ...] = (
 
 
 class _DailyMoney:
+    profit_inputs_known: Mapped[bool] = mapped_column(Boolean, default=False)
+    ad_cost_known: Mapped[bool] = mapped_column(Boolean, default=False)
+    ad_cost_partial: Mapped[bool] = mapped_column(Boolean, default=False)
     orders: Mapped[int] = mapped_column(Integer, default=0)
     units: Mapped[int] = mapped_column(Integer, default=0)
     gmv: Mapped[Decimal] = mapped_column(Money, default=0)

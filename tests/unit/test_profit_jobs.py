@@ -205,14 +205,16 @@ def test_blended_allocation_no_orders_in_window_is_unallocated():
     assert alloc == {"o1": D(0)} and unallocated == D(5000) and warns
 
 
-def test_compute_allocates_deductions_across_orders():
-    o1, o2 = order(1, "A", created=jkt(2026, 8, 18)), order(2, "B", created=jkt(2026, 8, 22))
+def test_compute_allocates_reported_cost_not_payments_across_same_day_orders():
+    o1, o2 = order(1, "A", created=jkt(2026, 8, 22)), order(2, "B", created=jkt(2026, 8, 22))
     sets = [settlement("ad", jkt(2026, 8, 23), D(-100000))]
-    res = compute_from_inputs(inputs([ctx(o1, rec=record("A", 1)), ctx(o2, rec=record("B", 2))], sets), NOW)
+    inp = inputs([ctx(o1, rec=record("A", 1)), ctx(o2, rec=record("B", 2))], sets)
+    inp.advertising = [NS(metric_date=date(2026, 8, 22), cost=D(100000), currency="IDR", partial=False, report_id=1)]
+    res = compute_from_inputs(inp, NOW)
     ads = {r.external_order_id: r.profit.allocated_ad_cost for r in res}
     assert sum(ads.values()) == D(100000) and ads == {"A": D(50000), "B": D(50000)}
     assert res[0].profit.estimated_net_profit == D(55482) - D(50000)
-    assert res[0].snapshot["ad_method"] == "BLENDED" and res[0].snapshot["ad_window_days"] == 7
+    assert res[0].snapshot["ad_method"] == "BLENDED" and res[0].snapshot["ad_window_days"] == 1
 
 
 # --- provisional estimate ---------------------------------------------------------------------
@@ -259,14 +261,15 @@ def test_since_allocation_consistent_with_full_run():
     o1, o2 = order(1, "A", created=jkt(2026, 8, 18)), order(2, "B", created=jkt(2026, 8, 22))
     sets = [settlement("ad1", jkt(2026, 8, 19), D(-40000)), settlement("ad2", jkt(2026, 8, 23), D(-100000))]
     orders = [ctx(o1, rec=record("A", 1)), ctx(o2, rec=record("B", 2))]
-    full = {r.external_order_id: r.profit.allocated_ad_cost
-            for r in compute_from_inputs(inputs(orders, sets), NOW)}
     inc = inputs(orders, sets)
+    inc.advertising = [NS(metric_date=date(2026, 8, day), cost=D(cost), currency="IDR", partial=False, report_id=1)
+                       for day, cost in [(18, 40000), (22, 100000)]]
+    full = {r.external_order_id: r.profit.allocated_ad_cost for r in compute_from_inputs(inc, NOW)}
     inc.since = date(2026, 8, 20)
     res = compute_from_inputs(inc, NOW)
     assert [r.external_order_id for r in res] == ["B"]  # look-back order A not persisted
-    assert res[0].profit.allocated_ad_cost == full["B"] == D(50000)
-    assert full["A"] == D(90000)
+    assert res[0].profit.allocated_ad_cost == full["B"] == D(100000)
+    assert full["A"] == D(40000)
 
 
 def test_multiple_settled_records_all_used_and_flagged():

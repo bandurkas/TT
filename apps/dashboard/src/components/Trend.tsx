@@ -27,8 +27,9 @@ export function TrendChart({ tr }: { tr: Trends }) {
   const H = 240, P = { l: 46, r: 12, t: 12, b: 24 };
   const s = tr.series;
   const n = s.length;
-  const gmv = s.map((d) => num(d.gmv) ?? 0), ads = s.map((d) => num(d.ad_cost) ?? 0), cum = s.map((d) => num(d.cum_net_profit) ?? 0);
-  const maxY = Math.max(1, ...gmv, ...cum), minY = Math.min(0, ...ads.map((a) => -a), ...cum);
+  const gmv = s.map((d) => num(d.gmv) ?? 0), ads = s.map((d) => num(d.ad_cost)), cum = s.map((d) => num(d.cum_net_profit));
+  const validCum = cum.filter((v): v is number => v !== null);
+  const maxY = Math.max(1, ...gmv, ...validCum), minY = Math.min(0, ...ads.map((a) => -(a ?? 0)), ...validCum);
   const step = niceStep(maxY - minY);
   const top = Math.ceil(maxY / step) * step, bot = Math.floor(minY / step) * step;
   const iw = W - P.l - P.r, ih = H - P.t - P.b;
@@ -42,15 +43,15 @@ export function TrendChart({ tr }: { tr: Trends }) {
   tr.events.forEach((e) => { const i = s.findIndex((d) => d.date === e.date); if (i >= 0) evIdx.set(i, [...(evIdx.get(i) ?? []), e.type]); });
   return (
     <div ref={ref}>
-      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="GMV, ad deductions and cumulative net profit by day">
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="GMV, reported ad Cost and estimated cumulative profit by day">
         {ticks.map((v) => <g key={v}><line x1={P.l} x2={W - P.r} y1={Y(v)} y2={Y(v)} stroke="var(--line)" /><text x={4} y={Y(v) + 4} fontSize="11" fill="var(--muted)">{fmtAxis(v)}</text></g>)}
         {s.map((d, i) => (i % labelEvery === 0 || i === n - 1) && <text key={d.date} x={X(i)} y={H - 6} fontSize="11" fill="var(--muted)" textAnchor="middle">{dayMon(d.date, lang)}</text>)}
         {gmv.map((v, i) => v > 0 && <rect key={`g${i}`} x={X(i) - bw / 2} y={Y(v)} width={bw} height={Y(0) - Y(v)} fill="var(--accent)" opacity="0.6"><title>{`${dayMon(s[i].date, lang)} GMV ${idr(v, lang)}`}</title></rect>)}
-        {ads.map((v, i) => v > 0 && <rect key={`a${i}`} x={X(i) - bw / 2} y={Y(0)} width={bw} height={Y(-v) - Y(0)} fill="var(--bad)"><title>{`${dayMon(s[i].date, lang)} ad ${idr(-v, lang)}`}</title></rect>)}
+        {ads.map((v, i) => v !== null && v > 0 && <rect key={`a${i}`} x={X(i) - bw / 2} y={Y(0)} width={bw} height={Y(-v) - Y(0)} fill="var(--bad)"><title>{`${dayMon(s[i].date, lang)} ad ${idr(-v, lang)}`}</title></rect>)}
         <line x1={P.l} x2={W - P.r} y1={Y(0)} y2={Y(0)} stroke="var(--muted)" strokeWidth="1" />
-        {n > 0 && <path d={cum.map((v, i) => `${i ? "L" : "M"}${X(i)} ${Y(v)}`).join(" ")} fill="none" stroke="var(--ink)" strokeWidth="2" />}
-        {n > 0 && <circle cx={X(n - 1)} cy={Y(cum[n - 1])} r="3.5" fill="var(--ink)" />}
-        {[...evIdx.entries()].map(([i, types]) => <text key={`e${i}`} x={X(i)} y={Y(-ads[i]) + 14} fontSize="12" textAnchor="middle" fill={types.includes("ad_deduction") ? "var(--bad)" : "var(--accent)"}>◆</text>)}
+        {n > 0 && <path d={cum.map((v, i) => v === null ? "" : `${i && cum[i - 1] !== null ? "L" : "M"}${X(i)} ${Y(v)}`).join(" ")} fill="none" stroke="var(--ink)" strokeWidth="2" />}
+        {n > 0 && cum[n - 1] !== null && <circle cx={X(n - 1)} cy={Y(cum[n - 1]!)} r="3.5" fill="var(--ink)" />}
+        {[...evIdx.entries()].map(([i, types]) => <text key={`e${i}`} x={X(i)} y={Y(-(ads[i] ?? 0)) + 14} fontSize="12" textAnchor="middle" fill={types.includes("ad_deduction") ? "var(--bad)" : "var(--accent)"}>◆</text>)}
       </svg>
     </div>
   );
@@ -62,7 +63,7 @@ export default function Trend({ tr, ov, loading, error, reload }: { tr: Trends |
   const tot = ov?.totals ?? null;
   const last = tr?.series.length ? tr.series[tr.series.length - 1] : null;
   const src = tr?.gmv_sources.length ? tr.gmv_sources[tr.gmv_sources.length - 1] : null;
-  const evLabel = (e: Trends["events"][number]) => e.type === "ad_deduction" ? `${t("GMV Max deduction")} ${idr(e.amount, lang)}` : e.type === "video_posted" ? `${t("new video posted")} (${shortId(e.external_video_id ?? e.video_id ?? e.label)})` : e.label;
+  const evLabel = (e: Trends["events"][number]) => e.type === "ad_deduction" ? `${(lang === "ru" ? "Оплата GMV Pay" : "GMV Pay payment")} ${idr(e.amount, lang)}` : e.type === "video_posted" ? `${t("new video posted")} (${shortId(e.external_video_id ?? e.video_id ?? e.label)})` : e.label;
   return (
     <section className="zone">
       <ZoneHeader id="z3" eyebrow={t("3 · Sales & profit trend")} title={tr ? `${periodLabel(tr.period.start, tr.period.end, lang)}, ${t("daily")}` : t("daily")} />
@@ -72,17 +73,18 @@ export default function Trend({ tr, ov, loading, error, reload }: { tr: Trends |
           <div className="card chart">
             <div className="legend">
               <span><i style={{ background: "var(--accent)" }} />{t("GMV")}</span>
-              <span><i style={{ background: "var(--bad)" }} />{t("Ad deduction")} <span className="tiny">({t("estimate")})</span></span>
+              <span><i style={{ background: "var(--bad)" }} />{(lang === "ru" ? "Расход рекламы · Cost" : "Advertising Cost")} <span className="tiny">({t("estimate")})</span></span>
               <span><i style={{ background: "var(--ink)" }} />{t("Cumulative net profit")}</span>
               <span style={{ marginLeft: "auto" }}>{t("◆ event annotation")}</span>
             </div>
             <TrendChart tr={tr} />
+            {tr.series.some(d => d.ad_cost === null || d.net_profit === null) && <p className="note">{lang === "ru" ? "Есть дни без подтверждённых исходных данных: расход и накопленная прибыль за неполный период не показываются." : "Missing inputs: unknown spend and incomplete cumulative profit are not shown."}</p>}
           </div>
           <div className="card pace">
             <div className="k lbl">{t("Period totals")} <span style={{ textTransform: "none", letterSpacing: 0 }}>· {t("Source · overview totals (API)")}</span></div>
             <div className="big">{tot ? int(tot.orders, lang) : "—"} {t("orders")}</div>
             <div style={{ color: "var(--ink2)" }}>{tot ? int(tot.settled_orders, lang) : "—"} {t("settled")} · {tot ? int(tot.provisional_orders, lang) : "—"} {t("provisional")} <span className="tiny">({t("provisional ≠ settled")})</span></div>
-            <div className="small" style={{ marginTop: 6 }}>{t("GMV")} <b>{idr(tot?.gmv, lang)}</b> · {t("Ad deduction")} <b className="dn">{tot ? idr(-(num(tot.ad_cost) ?? 0), lang) : "—"}</b> · {t("Net profit")} <b className={(num(tot?.net_profit) ?? 0) < 0 ? "dn" : "up"}>{idr(tot?.net_profit, lang)}</b></div>
+            <div className="small" style={{ marginTop: 6 }}>{t("GMV")} <b>{idr(tot?.gmv, lang)}</b> · {(lang === "ru" ? "Расход рекламы · Cost" : "Advertising Cost")} <b className="dn">{num(tot?.ad_cost) !== null ? idr(-num(tot?.ad_cost)!, lang) : "—"}</b> · {t("Net profit")} <b className={(num(tot?.net_profit) ?? 0) < 0 ? "dn" : "up"}>{idr(tot?.net_profit, lang)}</b></div>
             {last && <div className="tiny">{t("Cumulative net profit")} · {t("last day of series")} {dayMon(last.date, lang)}: {idr(last.cum_net_profit, lang)}</div>}
             {src && (
               <div className="small" style={{ marginTop: 6 }}><span className="k lbl">{t("GMV by source")} · {dayMon(src.date, lang)}</span><br />

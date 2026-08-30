@@ -3,10 +3,11 @@ import type { Lang } from "./i18n";
 
 export type OrderState = "final" | "preliminary" | "not_calculated";
 export interface OrderAmounts {
-  revenue_base: string; fees: string; costs: string; refunds: string; other_effect: string; ad_cost: string; net_profit: string;
+  revenue_base: string; fees: string | null; costs: string | null; refunds: string; other_effect: string; ad_cost: string | null; net_profit: string | null;
   profit_share: string | null; shares: Record<string, string | null>;
 }
 export interface OrderRow {
+  income_evidence?: { filename: string; row: number; refund: string; settlement: string; dynamic_commission: string; processing: string; tax: string } | null;
   id: number; external_order_id: string; created_at: string | null; order_status: string;
   currency: string; state: OrderState; profit_status: string | null; version: number | null;
   calculated_at: string | null;
@@ -16,9 +17,9 @@ export interface OrderRow {
 }
 export interface OrderPage extends Meta {
   rows: OrderRow[]; total: number; offset: number; limit: number; demo?: boolean; mixed_currencies: boolean;
-  summary: (OrderAmounts & { currency: string | null; calculated_orders: number; missing_orders: number; uncertain_orders: number }) | null;
+  summary: (OrderAmounts & { currency: string | null; calculated_orders: number; missing_orders: number; uncertain_orders: number; basis?: string; unallocated_ad_cost?: string }) | null;
 }
-export interface FinanceLine { key: string; amount: string; share: string | null; subtotal: boolean; evidence: string }
+export interface FinanceLine { key: string; amount: string | null; share: string | null; subtotal: boolean; evidence: string }
 export interface OrderDetail extends OrderRow {
   timezone: string; demo?: boolean; revenue_base?: string; source?: string;
   ad_method?: string; ad_confidence?: string; ad_window_days?: number;
@@ -41,6 +42,8 @@ export function orderMoney(value: string | null | undefined, lang: Lang, currenc
 }
 
 const LABELS: Record<string, [string, string]> = {
+  warning_advertising_missing: ["Нет отчёта Cost за день заказа. Реклама и прибыль не подтверждены.", "No Cost report for this order day. Advertising and profit are unavailable."],
+  warning_advertising_partial: ["Рекламный отчёт за день неполный; прибыль ещё изменится.", "Advertising report for this day is partial; profit may change."],
   journal: ["Журнал заказов", "Order journal"], title: ["Из чего складывается прибыль заказа", "Where each order's profit comes from"],
   basis: ["100% — выручка после скидки продавца, до возвратов и комиссий. Проценты показывают долю от этой суммы, а не тариф TikTok.", "100% is revenue after seller discounts, before refunds and fees. Percentages are shares of this amount, not TikTok fee rates."],
   basisShort: ["% от выручки после скидки", "% of revenue after discount"],

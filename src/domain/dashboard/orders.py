@@ -44,6 +44,13 @@ def financial_state(p: Any | None) -> str:
                        (p.inputs_snapshot or {}).get("source") == "settled") else "preliminary"
 
 
+def inputs_known(p):
+    snap = p.inputs_snapshot or {}
+    return not ((snap.get("cogs_missing") and not snap.get("cogs_default_used")) or
+                (snap.get("source") == "ratio_estimate" and snap.get("fee_ratio") is None) or
+                snap.get("mismatch"))
+
+
 def compact(v: dict[str, Decimal]) -> dict[str, Any]:
     base = v["sale_proceeds"] - v["seller_discounts"]
     out = {"revenue_base": base, "fees": sum((v[k] for k in FEES), ZERO),
@@ -62,12 +69,24 @@ def order_row(order: Any, p: Any | None, items: list[dict[str, Any]]) -> dict[st
         unconfirmed.append("fees")
     if p and snap.get("cogs_missing") and not snap.get("cogs_default_used"):
         unconfirmed.append("costs")
+    if p and not snap.get("ad_cost_known"):
+        unconfirmed.append("ad_cost")
+    if unconfirmed or p and not inputs_known(p):
+        unconfirmed.append("net_profit")
+    money = compact(amounts(p)) if p else None
+    if money:
+        for key in unconfirmed:
+            money[key] = None
+            money["shares"][key] = None
+        if "net_profit" in unconfirmed:
+            money["profit_share"] = None
     return {"id": order.id, "external_order_id": order.external_order_id,
             "created_at": order.order_created_at, "order_status": order.order_status,
             "currency": p.currency if p else order.currency, "state": financial_state(p),
             "profit_status": p.profit_status if p else None,
             "version": p.version if p else None, "calculated_at": p.calculated_at if p else None,
-            "items": items, "unconfirmed_fields": unconfirmed, "amounts": compact(amounts(p)) if p else None}
+            "items": items, "unconfirmed_fields": unconfirmed, "amounts": money,
+            "ad_cost_partial": bool(snap.get("ad_cost_partial"))}
 
 
 def statement_ids(p: Any) -> list[str]:
@@ -96,6 +115,10 @@ def breakdown(order: Any, p: Any | None, items: list[dict[str, Any]],
     if source == "ratio_estimate" and snap.get("fee_ratio") is None:
         out["warnings"].append("fees_unknown_zero_assumption")
     out["warnings"].append("advertising_allocated")
+    if not snap.get("ad_cost_known"):
+        out["warnings"].append("advertising_missing")
+    elif snap.get("ad_cost_partial"):
+        out["warnings"].append("advertising_partial")
     out["basis"] = "revenue_after_seller_discount_before_refunds_and_fees"
     out["revenue_base"] = base
     out["source"] = source
@@ -123,7 +146,7 @@ def breakdown(order: Any, p: Any | None, items: list[dict[str, Any]],
         out["warnings"].append("unknown_transactions")
 
     def line(key: str, amount: Decimal, *, subtotal: bool = False, proof: str | None = None):
-        out["lines"].append({"key": key, "amount": amount, "share": share(amount, base),
+        out["lines"].append({"key": key, "amount": None if proof == "unavailable" else amount, "share": None if proof == "unavailable" else share(amount, base),
                              "subtotal": subtotal, "evidence": proof or evidence})
 
     line("sale_proceeds", v["sale_proceeds"])
@@ -138,8 +161,9 @@ def breakdown(order: Any, p: Any | None, items: list[dict[str, Any]],
     for key in COSTS:
         line(key, -v[key], proof=costs_state)
     line("contribution_profit", v["contribution_profit"], subtotal=True, proof="calculated")
-    line("allocated_ad_cost", -v["allocated_ad_cost"], proof="estimate")
-    line("estimated_net_profit", v["estimated_net_profit"], subtotal=True, proof="estimate")
+    line("allocated_ad_cost", -v["allocated_ad_cost"], proof="estimate" if snap.get("ad_cost_known") else "unavailable")
+    line("estimated_net_profit", v["estimated_net_profit"], subtotal=True,
+         proof="unavailable" if "net_profit" in out["unconfirmed_fields"] else "estimate")
 
     expected_net = base - v["refunds"] - sum((v[k] for k in FEES), ZERO) + v["subsidies"] + v["adjustments"]
     differences = {"net_seller_revenue": expected_net - v["net_seller_revenue"],

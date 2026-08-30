@@ -2,6 +2,7 @@
 export type Dec = string;
 
 export interface Meta {
+  advertising?: Advertising;
   shop: { id: number; name: string; currency: string; timezone: string };
   period: { start: string; end: string };
   compare: { start: string; end: string };
@@ -47,6 +48,14 @@ export interface UnitEconomics {
   rounding_per_unit?: Dec | null;
 }
 
+export interface Advertising {
+  cost: string | null; known_cost: string; gmv_pay: string;
+  covered_days: number; expected_days: number; missing_days: string[]; partial_days: string[];
+  status: "reported" | "partial" | "missing";
+  reports: { filename: string; sha256: string; observed_at: string; timezone: string }[];
+  days: { date: string; cost: string; partial: boolean; sku_orders: number; gross_revenue: string }[];
+}
+
 export interface DataQuality {
   score: number;
   state: "OK" | "PARTIAL" | "POOR";
@@ -68,9 +77,9 @@ export interface TrendPoint {
   date: string;
   gmv: Dec;
   net_seller_revenue: Dec;
-  ad_cost: Dec;
-  net_profit: Dec;
-  cum_net_profit: Dec;
+  ad_cost: Dec | null;
+  net_profit: Dec | null;
+  cum_net_profit: Dec | null;
   orders: number;
   settled_orders: number;
   provisional_orders: number;
@@ -113,10 +122,10 @@ export interface ProductRow {
   fees: Dec;
   affiliate: Dec;
   cogs: Dec;
-  ad_cost: Dec;
+  ad_cost: Dec | null;
   ad_cost_is_estimate: boolean;
   refunds: Dec;
-  net_profit: Dec;
+  net_profit: Dec | null;
   net_margin: Dec | null;
   cvr: Dec | null;
   ctr: Dec | null;
@@ -173,7 +182,7 @@ export interface Deduction {
 export interface Campaigns extends Meta {
   available: boolean;
   reason: string;
-  shop_level_ad_cost: Dec;
+  shop_level_ad_cost: Dec | null;
   deductions: Deduction[];
   rows: unknown[];
 }
@@ -201,7 +210,7 @@ export interface FunnelDiagnosis {
   stage_from: string; stage_to: string; current_rate: Dec; baseline_rate: Dec; delta_pct: Dec;
   lost_orders: Dec; lost_profit: Dec | null; evidence: string[]; estimated: true;
 }
-export interface WaterfallStep { key: string; amount: Dec; measured: boolean; subtotal?: boolean }
+export interface WaterfallStep { key: string; amount: Dec | null; measured: boolean; subtotal?: boolean }
 export interface Funnel extends Meta {
   stages: FunnelStage[];
   steps: FunnelStep[];
@@ -278,7 +287,7 @@ export interface VPVideoRef {
   impressions: number; clicks: number; units_sold: number; gmv: Dec; customers: number; ctr: Dec | null;
 }
 export interface VPProduct {
-  product_id: number; title: string; external_product_id: string | null; gmv: Dec; orders: number; net_profit: Dec;
+  product_id: number; title: string; external_product_id: string | null; gmv: Dec; orders: number; net_profit: Dec | null;
   status: ProductStatus | "NO_SALES"; video_gmv: Dec; video_units: number; video_share: Dec | null;
   video_impressions: number; video_clicks: number; videos: VPVideoRef[];
 }
@@ -294,7 +303,7 @@ export interface VideoProducts extends Meta {
 }
 
 // history block of /api/analytics/video-products (compute.video_history)
-export interface VPHistDay { date: string; gmv: Dec; orders: number; net_profit: Dec; video_gmv: Dec; non_video_gmv: Dec; video_clicks: number; video_impressions: number; video_units: number }
+export interface VPHistDay { date: string; gmv: Dec; orders: number; net_profit: Dec | null; video_gmv: Dec; non_video_gmv: Dec; video_clicks: number; video_impressions: number; video_units: number }
 export interface VPHistEvent { date: string; video_id: number; external_video_id: string | null; type: "published" }
 export type LiftVerdict = "positive" | "neutral" | "negative" | "insufficient" | "pending" | "out_of_range";
 export interface VPLift {

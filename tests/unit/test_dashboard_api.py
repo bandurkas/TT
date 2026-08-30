@@ -15,7 +15,7 @@ CFG = NS(minimum_net_margin=D("0.10"), minimum_sample_orders=5, minimum_sample_i
 
 
 def _row(d):
-    return NS(metric_date=d, orders=1, units=1, gmv=D(100000), net_seller_revenue=D(91000), fees=D(9000),
+    return NS(ad_cost_known=True, profit_inputs_known=True, ad_cost_partial=False, metric_date=d, orders=1, units=1, gmv=D(100000), net_seller_revenue=D(91000), fees=D(9000),
               affiliate=D(0), cogs=D(25000), contribution=D(66000), ad_cost=D(20000), net_profit=D(46000),
               refunds=D(0), settled_orders=1, provisional_orders=0)
 
@@ -27,7 +27,8 @@ def client():
 
 
 def patches():
-    return [patch.object(A.L, "shop_and_config", lambda s, sid: (SHOP, CFG)),
+    return [patch.object(A, "advertising_summary", lambda s, sid, a, b, tz: {"cost": D(20000)*sum(a <= date(2026, 8, k) <= b for k in range(1, 6)), "known_cost": D(20000)*sum(a <= date(2026, 8, k) <= b for k in range(1, 6)), "partial_days": [], "gmv_pay": D(20000), "status": "reported"}),
+            patch.object(A.L, "shop_and_config", lambda s, sid: (SHOP, CFG)),
             patch.object(A.L, "today_local", lambda shop: date(2026, 8, 31)),
             patch.object(A.L, "shop_daily", lambda s, sid, a, b: [_row(date(2026, 8, k)) for k in range(1, 6)
                                                                   if a <= date(2026, 8, k) <= b]),
@@ -96,7 +97,7 @@ def test_other_endpoints():
     assert out["/api/analytics/products"]["rows"] == []
     assert out["/api/analytics/videos"]["cards"] == [] and "NOT_AVAILABLE" in out["/api/analytics/videos"]["ad_spend_note"]
     camp = out["/api/analytics/campaigns"]
-    assert camp["available"] is False and camp["shop_level_ad_cost"] == "20000"
+    assert camp["available"] is False and camp["shop_level_ad_cost"] == "100000" and camp["advertising"]["gmv_pay"] == "20000"
     assert out["/api/analytics/creators"]["rows"][0]["creator"].startswith("Affiliate")
     f = out["/api/dashboard/funnel"]
     assert f["stages"][0]["count"] == 1000 and f["waterfall"]["orders"] == 0

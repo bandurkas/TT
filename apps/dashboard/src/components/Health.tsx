@@ -5,6 +5,7 @@ import type { Card, Overview } from "@/lib/types";
 import { kpiChange } from "@/lib/kpi";
 import { orderMoney } from "@/lib/orders";
 import { ErrorNote, Pill, Skeleton, Sparkline, ZoneHeader, statusTone } from "./ui";
+import AdvertisingSource from "./AdvertisingSource";
 
 const MAIN = ["net_profit", "gmv", "net_seller_revenue", "orders", "ad_spend", "net_margin"];
 const SEC = ["reported_roas", "blended_roas", "aov", "cvr", "refund_rate", "settlement_coverage"];
@@ -40,7 +41,7 @@ function KpiCard({ c, ov }: { c: Card; ov: Overview }) {
   const explanation = EXPLAIN[c.key];
   return (
     <div className="card kpi">
-      <span className="k">{t(LABEL[c.key] ?? c.key)}</span>
+      <span className="k">{c.key === "ad_spend" ? (lang === "ru" ? "Расход рекламы · Cost" : "Advertising Cost") : t(LABEL[c.key] ?? c.key)}</span>
       <span className={`n ${cls}`}>{na ? "—" : fmt(c.value)}</span>
       {change && !na && <div className={`kpi-change ${change.tone}`}>
         {change.direction > 0 ? "▲" : change.direction < 0 ? "▼" : "="}{" "}
@@ -51,7 +52,7 @@ function KpiCard({ c, ov }: { c: Card; ov: Overview }) {
       {c.sparkline.length > 1 && <Sparkline values={c.sparkline} tone={tone === "bad" ? "bad" : tone === "good" ? "good" : "accent"} />}
       {explanation && <details className="kpi-help">
         <summary aria-label={`${t("How to read this")}: ${t(LABEL[c.key] ?? c.key)}`}>{t("How to read this")}</summary>
-        <p>{t(explanation)}</p>
+        <p>{c.key === "ad_spend" ? (lang === "ru" ? "Cost из дневного рекламного отчёта. Платежи GMV Pay показаны отдельно. Расход не теряется в дни без заказов." : "Cost from the daily ad report. GMV Pay is separate. Days without orders remain included.") : c.key === "net_profit" ? (lang === "ru" ? "Прибыль до рекламы по датам заказов минус Cost по датам расхода. Комиссии могут быть предварительными; сверка рекламных налогов и кредитов ещё не завершена." : "Contribution by order date less Cost by spending date. Fees may be preliminary; ad taxes and credits are not yet reconciled.") : t(explanation)}</p>
       </details>}
     </div>
   );
@@ -67,7 +68,7 @@ function Note({ c, ov }: { c: Card; ov: Overview }) {
     case "orders": return <span>{int(c.meta?.refunded ?? ov.totals.refunded_orders, lang)} {t("refunded")}</span>;
     case "ad_spend": {
       const share = c.meta?.ad_share ?? null;
-      return <>{share !== null && <span>{pct(share, lang)} {t("of net revenue")}</span>}<Pill tone="warn">{t("Estimated allocation")}</Pill><span>{t("No campaign breakdown")}</span></>;
+      return <>{share !== null && <span>{pct(share, lang)} {t("of net revenue")}</span>}<Pill tone="warn">{lang === "ru" ? (c.value === null ? "Отчёт неполный" : c.provisional ? "Неполный день" : "Источник: выгрузка") : (c.value === null ? "Missing report" : c.provisional ? "Partial day" : "Export source")}</Pill></>;
     }
     case "net_margin": {
       const floor = c.meta?.floor ?? null;
@@ -104,6 +105,7 @@ export default function Health({ ov, loading, error, reload }: { ov: Overview | 
       {error && <ErrorNote error={error} onRetry={reload} />}
       {loading && !ov ? <Skeleton h={140} /> : ov && (
         <>
+          <AdvertisingSource data={ov.advertising} currency={ov.shop.currency} />
           <div className="note kpi-context">
             <span>{t("Comparison period")}: {ov.compare.start} — {ov.compare.end}.</span>{" "}
             <span>{t("Rate changes use percentage points (pp); other changes use percent.")}</span>

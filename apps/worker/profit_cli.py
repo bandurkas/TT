@@ -64,18 +64,29 @@ def report_rows(session, shop_id: int, month: str) -> list[dict]:
     start, end = month_range(month)
     q = (select(ShopDaily).where(ShopDaily.shop_id == shop_id, ShopDaily.metric_date >= start,
                                  ShopDaily.metric_date <= end).order_by(ShopDaily.metric_date))
-    return [{"date": str(r.metric_date), "orders": r.orders, "settled": r.settled_orders,
-             "provisional": r.provisional_orders, **{c: Decimal(getattr(r, c)) for c in COLS},
-             "net_margin": r.net_margin} for r in session.scalars(q)]
+    rows = {r.metric_date: r for r in session.scalars(q)}
+    out = []
+    for i in range((end - start).days + 1):
+        day = start + timedelta(days=i)
+        r = rows.get(day)
+        money = {c: Decimal(getattr(r, c)) if r else Decimal(0) for c in COLS}
+        if not r or not r.ad_cost_known:
+            money["ad_cost"] = money["net_profit"] = None
+        if r and not r.profit_inputs_known:
+            money["net_profit"] = None
+        out.append({"date": str(day), "orders": r.orders if r else 0,
+                    "settled": r.settled_orders if r else 0, "provisional": r.provisional_orders if r else 0,
+                    **money, "net_margin": r.net_margin if r and money["net_profit"] is not None else None})
+    return out
 
 
 def totals(rows: list[dict]) -> dict:
     t = {"date": "TOTAL", "orders": sum(r["orders"] for r in rows),
          "settled": sum(r["settled"] for r in rows),
          "provisional": sum(r["provisional"] for r in rows),
-         **{c: sum((r[c] for r in rows), Decimal(0)) for c in COLS}}
+         **{c: sum((r[c] for r in rows), Decimal(0)) if rows and all(r[c] is not None for r in rows) else None for c in COLS}}
     t["net_margin"] = (t["net_profit"] / t["net_seller_revenue"]).quantize(Decimal("0.000001")) \
-        if t["net_seller_revenue"] > 0 else None
+        if t["net_seller_revenue"] and t["net_seller_revenue"] > 0 and t["net_profit"] is not None else None
     return t
 
 
@@ -99,8 +110,8 @@ def render_table(rows: list[dict]) -> str:
                                    for i, (c, w) in enumerate(zip(cells, widths, strict=True)))
     out = [line(hdr), line(["-" * w for w in widths])] + [line(b) for b in body[:-1]]
     out += [line(["-" * w for w in widths]), line(body[-1])]
-    out.append("ad cost = GMV Max payout deductions, BLENDED over trailing 7 days, confidence LOW "
-               "(estimate). Provisional orders: fees estimated, not settled.")
+    out.append("Ad cost = calendar Cost from the shop overview export; GMV Pay is payment only. "
+               "Profit is estimated: incomplete days, fees, taxes and ad credits require reconciliation.")
     return "\n".join(out)
 
 

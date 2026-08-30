@@ -50,8 +50,8 @@ export default function Funnel({ fn, loading, error, reload }: { fn: FunnelT | n
             {bars.map(({ s, a, from, to }) => (
               <div className={`wrow ${s.key === "net_profit" ? "total" : ""}`} key={s.key}>
                 <span className={`lab ${s.subtotal ? "tot" : ""}`}>{t(s.key)}<small>{s.measured ? t("measured") : t("est.")}</small></span>
-                <span className="g"><b style={{ left: `${((from - lo) / span) * 100}%`, width: `${Math.max(0.5, ((to - from) / span) * 100)}%`, background: s.subtotal ? (a < 0 ? "var(--bad)" : s.key === "net_profit" ? "var(--good)" : "var(--accent)") : a < 0 ? (s.key === "cogs" ? "var(--warn)" : "var(--bad)") : "var(--good)" }} /></span>
-                <span className={`val ${a < 0 ? "dn" : ""}`}>{s.subtotal ? <b>{idr(a, lang)}</b> : idr(a, lang)}</span>
+                <span className="g"><b style={{ left: `${((from - lo) / span) * 100}%`, width: `${s.amount === null ? 0 : Math.max(0.5, ((to - from) / span) * 100)}%`, background: s.subtotal ? (a < 0 ? "var(--bad)" : s.key === "net_profit" ? "var(--good)" : "var(--accent)") : a < 0 ? (s.key === "cogs" ? "var(--warn)" : "var(--bad)") : "var(--good)" }} /></span>
+                <span className={`val ${a < 0 ? "dn" : ""}`}>{s.subtotal ? <b>{idr(s.amount, lang)}</b> : idr(s.amount, lang)}</span>
               </div>
             ))}
             <div className="tiny" style={{ marginTop: 8 }}>{wf?.note}<EnHint lang={lang} /></div>

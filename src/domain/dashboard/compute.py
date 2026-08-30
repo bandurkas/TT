@@ -20,7 +20,7 @@ from src.analytics.creative_scoring import (
     classify_video,
     median,
 )
-from src.analytics.data_quality import DataQuality, DataQualityInputs, compute_data_quality
+from src.analytics.data_quality import DataQuality, DataQualityInputs, DQState, compute_data_quality
 
 ZERO = Decimal(0)
 PCT = Decimal("0.0001")
@@ -88,6 +88,9 @@ def default_periods(today: date, start: date | None = None, end: date | None = N
 # --- totals -------------------------------------------------------------------------------------
 @dataclass
 class Totals:
+    profit_inputs_known: bool = True
+    ad_cost_known: bool = True
+    ad_cost_partial: bool = False
     orders: int = 0
     units: int = 0
     gmv: Decimal = ZERO
@@ -109,11 +112,15 @@ class Totals:
 
     @property
     def net_margin(self) -> Decimal | None:
-        return ratio(self.net_profit, self.net_seller_revenue) if self.net_seller_revenue > 0 else None
+        return ratio(self.net_profit, self.net_seller_revenue) if self.profit_known and self.net_seller_revenue > 0 else None
+
+    @property
+    def profit_known(self):
+        return self.ad_cost_known and self.profit_inputs_known
 
     @property
     def blended_roas(self) -> Decimal | None:
-        return ratio(self.net_seller_revenue, self.ad_cost, RATIO) if self.ad_cost > 0 else None
+        return ratio(self.net_seller_revenue, self.ad_cost, RATIO) if self.ad_cost_known and self.ad_cost > 0 else None
 
     @property
     def aov(self) -> Decimal | None:
@@ -139,7 +146,7 @@ class Totals:
 
     @property
     def contribution_ratio(self) -> Decimal | None:
-        return ratio(self.contribution, self.net_seller_revenue) if self.net_seller_revenue > 0 else None
+        return ratio(self.contribution, self.net_seller_revenue) if self.profit_inputs_known and self.net_seller_revenue > 0 else None
 
     @property
     def break_even_roas(self) -> Decimal | None:
@@ -157,6 +164,7 @@ def sum_daily(rows: Iterable[Any], period: Period, funnel: Mapping[date, tuple[i
         if not (period.start <= d <= period.end):
             continue
         t.days_with_data += 1
+        t.profit_inputs_known = t.profit_inputs_known and bool(getattr(r, "profit_inputs_known", True))
         for f in DAILY_FIELDS:
             v = getattr(r, f, 0) or 0
             setattr(t, f, getattr(t, f) + (int(v) if isinstance(getattr(t, f), int) else _d(v)))
@@ -204,11 +212,12 @@ def sparkline(rows: Iterable[Any], end: date, field_: str, n: int = 7) -> list[D
 
 def business_health(cur: Totals, prev: Totals, daily_rows: Sequence[Any], period: Period,
                     floor_margin: Decimal, dq: DataQuality) -> dict[str, Any]:
-    prov = cur.provisional_orders > 0
+    prov = cur.provisional_orders > 0 or cur.ad_cost_partial or not cur.ad_cost_known
     m, pm = cur.net_margin, prev.net_margin
     cards = [
-        kpi("net_profit", cur.net_profit, prev.net_profit, sparkline(daily_rows, period.end, "net_profit"),
-            status=_status(cur.net_profit, "up"), provisional=prov,
+        kpi("net_profit", cur.net_profit if cur.profit_known else None,
+            prev.net_profit if prev.profit_known else None, [],
+            status=_status(cur.net_profit, "up") if cur.profit_known else NEUTRAL, provisional=prov,
             note="accrual; ad cost BLENDED estimate" if cur.ad_cost else "accrual"),
         kpi("gmv", cur.gmv, prev.gmv, sparkline(daily_rows, period.end, "gmv"),
             status=_status(pct_change(cur.gmv, prev.gmv), "up"), note=f"{cur.units} units",
@@ -220,11 +229,12 @@ def business_health(cur: Totals, prev: Totals, daily_rows: Sequence[Any], period
         kpi("orders", cur.orders, prev.orders, sparkline(daily_rows, period.end, "orders"), kind="count",
             status=_status(pct_change(Decimal(cur.orders), Decimal(prev.orders)), "up"),
             note=f"{cur.refunded_orders} refunded", meta={"refunded": cur.refunded_orders}),
-        kpi("ad_spend", cur.ad_cost, prev.ad_cost, sparkline(daily_rows, period.end, "ad_cost"),
-            status=NEUTRAL, provisional=True,
+        kpi("ad_spend", cur.ad_cost if cur.ad_cost_known else None,
+            prev.ad_cost if prev.ad_cost_known else None, [],
+            status=NEUTRAL, provisional=cur.ad_cost_partial or not cur.ad_cost_known,
             note=(f"{ratio(cur.ad_cost, cur.net_seller_revenue)!s} of net revenue"
-                  if cur.net_seller_revenue > 0 else "GMV Max payout deductions"),
-            meta={"ad_share": ratio(cur.ad_cost, cur.net_seller_revenue) if cur.net_seller_revenue > 0 else None}),
+                  if cur.net_seller_revenue > 0 and cur.ad_cost_known else "Advertising report incomplete"),
+            meta={"ad_share": ratio(cur.ad_cost, cur.net_seller_revenue) if cur.ad_cost_known and cur.net_seller_revenue > 0 else None}),
         kpi("net_margin", m, pm, [], kind="pct", status=_status(m, "up", floor_margin),
             note=f"floor {floor_margin}", provisional=prov, meta={"floor": floor_margin}),
         kpi("reported_roas", None, None, [], kind="ratio", status=NEUTRAL, note=NOT_AVAILABLE + ": Ads API"),
@@ -276,9 +286,9 @@ def unit_economics(t: Totals) -> dict[str, Any] | None:
     ads = q(t.ad_cost)
     difference = t.net_seller_revenue - t.cogs - t.ad_cost - t.net_profit
     contribution_difference = t.net_seller_revenue - t.cogs - t.contribution
-    return {"units": t.units, "revenue_per_unit": rev, "fees_per_unit": fees, "cogs_per_unit": cogs,
-            "contribution_per_unit": q(t.contribution), "ad_cost_per_unit": ads,
-            "net_per_unit": q(t.net_profit), "ad_cost_is_estimate": True,
+    return {"units": t.units, "revenue_per_unit": rev, "fees_per_unit": fees if t.profit_inputs_known else None, "cogs_per_unit": cogs if t.profit_inputs_known else None,
+            "contribution_per_unit": q(t.contribution) if t.profit_inputs_known else None, "ad_cost_per_unit": ads if t.ad_cost_known else None,
+            "net_per_unit": q(t.net_profit) if t.profit_known else None, "ad_cost_is_estimate": True,
             "revenue_basis": "after_refunds_and_adjustments_before_fees",
             "calculation_difference": difference,
             "contribution_difference": contribution_difference,
@@ -291,16 +301,19 @@ def unit_economics(t: Totals) -> dict[str, Any] | None:
 # --- trends -------------------------------------------------------------------------------------
 def trend_series(rows: Iterable[Any], period: Period) -> list[dict[str, Any]]:
     by = {r.metric_date: r for r in rows if period.start <= r.metric_date <= period.end}
-    out, cum = [], ZERO
+    out, cum, complete = [], ZERO, True
     for k in range(period.days):
         d = period.start + timedelta(days=k)
         r = by.get(d)
+        known = bool(getattr(r, "ad_cost_known", False)) if r else False
+        profit_known = known and bool(getattr(r, "profit_inputs_known", False))
+        complete = complete and profit_known
         np_ = _d(getattr(r, "net_profit", 0)) if r else ZERO
         cum += np_
         out.append({"date": d, "gmv": _d(getattr(r, "gmv", 0)) if r else ZERO,
                     "net_seller_revenue": _d(getattr(r, "net_seller_revenue", 0)) if r else ZERO,
-                    "ad_cost": _d(getattr(r, "ad_cost", 0)) if r else ZERO, "net_profit": np_,
-                    "cum_net_profit": cum, "orders": int(getattr(r, "orders", 0) or 0) if r else 0,
+                    "ad_cost": _d(r.ad_cost) if known else None, "net_profit": np_ if profit_known else None,
+                    "cum_net_profit": cum if complete else None, "orders": int(getattr(r, "orders", 0) or 0) if r else 0,
                     "settled_orders": int(getattr(r, "settled_orders", 0) or 0) if r else 0,
                     "provisional_orders": int(getattr(r, "provisional_orders", 0) or 0) if r else 0})
     return out
@@ -312,6 +325,8 @@ PRODUCT_STATUS = {"SCALE": "SCALE", "HEALTHY": "HEALTHY", "WATCH": "WATCH", "INV
 
 
 def product_status(t: Totals, floor: Decimal, min_orders: int) -> tuple[str, str]:
+    if not t.profit_known or t.ad_cost_partial or t.provisional_orders:
+        return "INVESTIGATE", "profit inputs missing or preliminary; verify before changing spend"
     if t.orders < min_orders:
         return "SMALL_SAMPLE", f"{t.orders} orders < {min_orders}"
     m = t.net_margin
@@ -335,6 +350,9 @@ def product_rows(product_daily: Iterable[Any], product_meta: Mapping[int, Any], 
         if not (period.start <= r.metric_date <= period.end):
             continue
         t = per.setdefault(r.product_id, Totals())
+        t.profit_inputs_known = t.profit_inputs_known and bool(getattr(r, "profit_inputs_known", False))
+        t.ad_cost_known = t.ad_cost_known and bool(getattr(r, "ad_cost_known", False))
+        t.ad_cost_partial = t.ad_cost_partial or bool(getattr(r, "ad_cost_partial", False))
         for f in DAILY_FIELDS:
             v = getattr(r, f, 0) or 0
             setattr(t, f, getattr(t, f) + (int(v) if isinstance(getattr(t, f), int) else _d(v)))
@@ -351,11 +369,11 @@ def product_rows(product_daily: Iterable[Any], product_meta: Mapping[int, Any], 
                     "external_product_id": getattr(meta, "external_product_id", None),
                     "units": t.units, "orders": t.orders, "gmv": t.gmv,
                     "net_seller_revenue": t.net_seller_revenue, "fees": t.fees, "affiliate": t.affiliate,
-                    "cogs": t.cogs, "ad_cost": t.ad_cost, "ad_cost_is_estimate": True,
-                    "refunds": t.refunds, "net_profit": t.net_profit, "net_margin": t.net_margin,
+                    "cogs": t.cogs, "ad_cost": t.ad_cost if t.ad_cost_known else None, "ad_cost_is_estimate": True,
+                    "refunds": t.refunds, "net_profit": t.net_profit if t.profit_known else None, "net_margin": t.net_margin,
                     "cvr": None, "ctr": None, "cvr_note": NOT_AVAILABLE + ": product clicks not in Shop API",
                     "status": st, "status_reason": why})
-    out.sort(key=lambda r: r["net_profit"], reverse=True)
+    out.sort(key=lambda r: (r["net_profit"] is not None, r["net_profit"] or ZERO), reverse=True)
     return out
 
 
@@ -498,19 +516,25 @@ def funnel_view(cur: FunnelCounts, base: FunnelCounts, avg_profit_per_order: Dec
             "baseline_note": "baseline = previous comparable period"}
 
 
-def waterfall(profits: Iterable[Any]) -> dict[str, Any]:
+def waterfall(profits: Iterable[Any], advertising: dict | None = None) -> dict[str, Any]:
     """Σ current analytics_order_profit rows -> measured steps (statements) + COGS + blended ads."""
     s = {k: ZERO for k in ("sale_proceeds", "seller_discounts", "refunds", "platform_fees",
                            "affiliate_commission", "seller_shipping", "taxes", "subsidies", "adjustments",
                            "cogs", "packaging", "inbound_logistics", "other_variable", "contribution_profit",
                            "allocated_ad_cost", "estimated_net_profit", "net_seller_revenue")}
+    from src.domain.dashboard.orders import inputs_known
     n = prov = cogs_missing = 0
+    costs_known = ads_known = True
     for p in profits:
+        costs_known = costs_known and inputs_known(p)
+        ads_known = ads_known and bool((p.inputs_snapshot or {}).get("ad_cost_known"))
         n += 1
         prov += 1 if str(p.profit_status) == "PROVISIONAL" else 0
         cogs_missing += 1 if (getattr(p, "inputs_snapshot", None) or {}).get("cogs_missing") else 0
         for k in s:
             s[k] += _d(getattr(p, k, 0))
+    ad_cost = advertising["cost"] if advertising is not None else (s["allocated_ad_cost"] if ads_known else None)
+    net_profit = s["contribution_profit"] - ad_cost if costs_known and ad_cost is not None else None
     steps = [
         {"key": "revenue_after_seller_discounts", "amount": s["sale_proceeds"] - s["seller_discounts"],
          "measured": prov == 0},
@@ -521,25 +545,35 @@ def waterfall(profits: Iterable[Any]) -> dict[str, Any]:
          "measured": prov == 0},
         {"key": "net_seller_revenue", "amount": s["net_seller_revenue"], "subtotal": True, "measured": prov == 0},
         {"key": "cogs", "amount": -(s["cogs"] + s["packaging"] + s["inbound_logistics"] + s["other_variable"]),
-         "measured": cogs_missing == 0, "note": f"{cogs_missing} orders on default/zero COGS" if cogs_missing else None},
+         "measured": cogs_missing == 0 and costs_known, "note": f"{cogs_missing} orders on default/zero COGS" if cogs_missing else None},
         {"key": "contribution_before_ads", "amount": s["contribution_profit"], "subtotal": True,
          "measured": prov == 0},
-        {"key": "ad_deductions_blended", "amount": -s["allocated_ad_cost"], "measured": False},
-        {"key": "net_profit", "amount": s["estimated_net_profit"], "subtotal": True, "measured": False},
+        {"key": "ad_deductions_blended", "amount": -ad_cost if ad_cost is not None else None, "measured": False},
+        {"key": "net_profit", "amount": net_profit, "subtotal": True, "measured": False},
     ]
+    if not costs_known:
+        for step in steps:
+            if step["key"] not in ("revenue_after_seller_discounts", "ad_deductions_blended"):
+                step["amount"], step["measured"] = None, False
     return {"orders": n, "provisional_orders": prov, "cogs_missing_orders": cogs_missing, "steps": steps,
             "note": "Measured = settled statements; provisional orders carry estimated fees; "
-                    "ad cost = BLENDED payout deductions (estimate)."}
+                    "ad cost = calendar Cost from the shop overview export, including days without orders; "
+                    "GMV Pay is payment only. Taxes/credits not reconciled; profit remains an estimate."}
 
 
 # --- data quality -------------------------------------------------------------------------------
 def data_quality(freshness_minutes: int | None, cur: Totals, orders_missing_cogs: int,
                  unmapped_skus: int) -> DataQuality:
     cov = cur.settlement_coverage
-    return compute_data_quality(DataQualityInputs(
+    dq = compute_data_quality(DataQualityInputs(
         freshness_minutes=freshness_minutes, unmapped_skus=unmapped_skus,
         orders_missing_cogs=orders_missing_cogs, total_orders=cur.orders,
         settlement_coverage_pct=(cov * 100).quantize(RATIO) if cov is not None else None))
+    if not cur.profit_known or cur.ad_cost_partial:
+        reason = "Advertising or profit inputs missing" if not cur.profit_known else "Advertising export includes an incomplete day"
+        return DataQuality(DQState.POOR if dq.state == DQState.POOR else DQState.PARTIAL,
+                           min(dq.score, 70), (*dq.reasons, reason), dq.codes | {"PROFIT_INCOMPLETE"})
+    return dq
 
 
 @dataclass
@@ -680,7 +714,7 @@ def video_history(vpm: Iterable[Any], product_daily_rows: Iterable[Any], video_d
             gmv = _d(getattr(p, "gmv", 0)) if p else ZERO
             vg = v.get("video_gmv", ZERO)
             days.append({"date": d, "gmv": gmv, "orders": int(getattr(p, "orders", 0) or 0) if p else 0,
-                         "net_profit": _d(getattr(p, "net_profit", 0)) if p else ZERO, "video_gmv": vg,
+                         "net_profit": _d(p.net_profit) if p and getattr(p, "ad_cost_known", False) and getattr(p, "profit_inputs_known", False) else None, "video_gmv": vg,
                          "non_video_gmv": max(gmv - vg, ZERO), "video_clicks": v.get("video_clicks", 0),
                          "video_impressions": v.get("video_impressions", 0), "video_units": v.get("video_units", 0)})
         events, lifts = [], []

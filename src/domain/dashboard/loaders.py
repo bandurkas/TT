@@ -176,12 +176,13 @@ def ad_deductions(session: Any, shop_id: int, start: date, end: date, tz: str) -
 
 
 def affiliate_totals(profits: Sequence[Any]) -> dict[str, Any]:
+    from src.domain.dashboard.orders import inputs_known
     aff = [p for p in profits if Decimal(str(p.affiliate_commission or 0)) != 0]
     commission = sum((Decimal(str(p.affiliate_commission)) for p in aff), Decimal(0))
     profit = sum((Decimal(str(p.estimated_net_profit)) for p in aff), Decimal(0))
     gmv = sum((Decimal(str(p.sale_proceeds)) for p in aff), Decimal(0))
     return {"orders": len(aff), "gmv": gmv, "affiliate_commission": commission,
-            "profit_after_commission": profit}
+            "profit_after_commission": profit if all(inputs_known(p) and (p.inputs_snapshot or {}).get("ad_cost_known") for p in aff) else None}
 
 
 def video_product_metrics(session: Any, shop_id: int, start: date, end: date) -> list[Any]:

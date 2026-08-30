@@ -257,3 +257,8 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .order-dialog summary:focus-visible,.order-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:1100px){.order-totals{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:600px){.order-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.order-totals .card:last-child{grid-column:auto}.order-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}.order-dialog-head{padding:14px 12px}.order-dialog-head h2{font-size:15px}.order-detail{padding:0 12px 18px}.order-breakdown{font-size:12px}.order-breakdown th:first-child{width:46%}.order-breakdown th:nth-child(2){width:34%}.order-breakdown th:last-child{width:20%}.order-breakdown td,.order-breakdown th{padding:10px 5px}.order-checks{grid-template-columns:1fr}.order-pagination{justify-content:space-between;gap:8px}.order-filters .order-search{flex-basis:100%}.order-filters label:not(.order-checkbox){max-width:100%}.subtotal-estimated_net_profit{font-size:13px}}
+
+.ad-source { margin: 12px 0; overflow-wrap: anywhere; }
+.ad-source-values { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 10px 0; }
+.ad-source p { margin: 7px 0; }
+.ad-source .source-hash { word-break: break-all; }

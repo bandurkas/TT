@@ -5,6 +5,7 @@ import { useLang } from "@/lib/i18n";
 import { dateTime, pct } from "@/lib/format";
 import { orderMoney, orderText, type OrderDetail, type OrderPage, type OrderRow, type OrderState } from "@/lib/orders";
 import { ErrorNote, Skeleton, ZoneHeader } from "./ui";
+import AdvertisingSource from "./AdvertisingSource";
 
 function Evidence({ value }: { value: string }) {
   const lang = useLang();
@@ -54,13 +55,15 @@ function JournalPage({ path, tick, setOffset, open }: { path: string; tick: numb
   return <>
     {d.demo && <div className="banner warn">{t("demo")}</div>}
     <div className="order-results" aria-live="polite"><b>{t("found")}: {d.total}</b><span>{d.period.start} — {d.period.end} · {d.shop.timezone}</span></div>
+    <AdvertisingSource data={d.advertising} currency={currency} />
+    {summary && <p className="small muted">{lang === "ru" ? (summary.basis === "calendar" ? "Общий итог: реклама по дате расхода, включая дни без заказов. Сумма прибыли строк может отличаться на нераспределённый расход." : "Включены фильтры: ниже только оценка выбранных заказов. Расход всего магазина показан отдельно выше.") : (summary.basis === "calendar" ? "Calendar total includes advertising on days without orders; row profits exclude unallocated cost." : "Filtered cohort: estimated allocation only; full shop Cost is shown above.")}</p>}
     {d.mixed_currencies && <p className="banner warn">{t("mixed")}</p>}
     {summary && <>
       <p className="small muted">{t("totals")}. {t("included")}: {summary.calculated_orders} · {t("missing")}: {summary.missing_orders}</p>
       {summary.uncertain_orders > 0 && <p className="banner warn">{t("uncertain")}: {summary.uncertain_orders}</p>}
       <div className="order-totals">
         {([['revenue', 'revenue_base'], ['other_effect', 'other_effect'], ['fees', 'fees'], ['costs', 'costs'], ['ads', 'ad_cost'], ['profit', 'net_profit']] as const).map(([label, field]) => <div className="card" key={field}>
-          <span className="small muted">{t(label)}</span><strong>{orderMoney(summary.calculated_orders ? summary[field] : null, lang, currency)}</strong>
+          <span className="small muted">{field === "ad_cost" && summary.basis === "calendar" ? (lang === "ru" ? "Расход рекламы · Cost" : "Reported advertising Cost") : t(label)}</span><strong>{orderMoney(summary.calculated_orders || summary.basis === "calendar" ? summary[field] : null, lang, currency)}</strong>
           <span className="small muted">{field === "revenue_base" ? t("basisShort") : pct(summary.shares[field], lang, { frac: 2 })}</span>
         </div>)}
       </div>
@@ -72,7 +75,7 @@ function JournalPage({ path, tick, setOffset, open }: { path: string; tick: numb
         <td><button className="order-link" onClick={() => open(row.id)} aria-label={`${t("open")} ${row.external_order_id}`}>{row.external_order_id}</button>
           <div className="tiny">{dateTime(row.created_at, lang, d.shop.timezone)} · {row.order_status}</div><Items order={row} /></td>
         {(["revenue_base", "fees", "costs", "ad_cost", "net_profit"] as const).map(field => <td className="r" key={field}>
-          <b className={field === "net_profit" && row.amounts?.net_profit.startsWith("-") ? "dn" : ""}>{row.unconfirmed_fields.includes(field) ? "—" : orderMoney(row.amounts?.[field], lang, row.currency)}</b>
+          <b className={field === "net_profit" && row.amounts?.net_profit?.startsWith("-") ? "dn" : ""}>{row.unconfirmed_fields.includes(field) ? "—" : orderMoney(row.amounts?.[field], lang, row.currency)}</b>
           {row.unconfirmed_fields.includes(field) ? <div className="tiny">{t("assumed")}: {orderMoney(row.amounts?.[field], lang, row.currency)}</div> : field !== "revenue_base" && <div className="tiny">{pct(row.amounts?.shares[field], lang, { frac: 2 })}</div>}
         </td>)}
         <td><Evidence value={row.state} /><button className="btn sm" onClick={() => open(row.id)}>{t("open")}</button></td>
@@ -111,6 +114,7 @@ function DetailBody({ d }: { d: OrderDetail }) {
     {d.demo && <div className="banner warn">{t("demo")}</div>}
     <div className="order-results"><Evidence value={d.state} /><span>{dateTime(d.created_at, lang, d.timezone)} · {d.order_status}</span></div>
     <Items order={d} />
+    {d.income_evidence && <div className="note"><b>{lang === "ru" ? "Финансовая выгрузка TikTok" : "TikTok income export"}</b><p>{d.income_evidence.filename} · {lang === "ru" ? "строка" : "row"} {d.income_evidence.row}</p><p>{lang === "ru" ? "Возврат после скидки" : "Refund after discount"}: {money(d.income_evidence.refund)} · {lang === "ru" ? "Начисление после удержаний" : "Settlement"}: {money(d.income_evidence.settlement)}</p><p>{lang === "ru" ? "Динамическая комиссия" : "Dynamic commission"}: {money(d.income_evidence.dynamic_commission)} · {lang === "ru" ? "Обработка заказа" : "Order processing"}: {money(d.income_evidence.processing)} · {lang === "ru" ? "Налог" : "Tax"}: {money(d.income_evidence.tax)}</p><span className="small muted">{lang === "ru" ? "Сверочный источник. Эти удержания уже входят в Total Fees и повторно не вычитаются. Нулевое начисление не подтверждает нулевые внутренние затраты." : "Reconciliation source. These deductions are already included in Total Fees, never subtracted twice. Zero settlement does not prove zero internal costs."}</span></div>}
     <p className="small muted">{t("version")}: {d.version ?? "—"} · {t("calculatedAt")}: {dateTime(d.calculated_at, lang, d.timezone)}<br />{t("source")}: {t(d.source ?? "unknown")}</p>
     {!!d.warnings.length && <div className="order-warnings"><b>{t("warnings")}</b><ul>{d.warnings.map(w => <li key={w}>{t(`warning_${w}`)}</li>)}</ul></div>}
     {!!d.lines.length && <>
@@ -122,7 +126,7 @@ function DetailBody({ d }: { d: OrderDetail }) {
           return <Fragment key={line.key}>
             <tr className={line.subtotal ? `order-subtotal subtotal-${line.key}` : ""}>
               <td><div>{t(line.key)}</div><Evidence value={line.evidence} />{txns.length > 0 && <button className="order-expand" aria-expanded={isOpen} onClick={() => toggle(line.key)}>{isOpen ? "▾" : "▸"} {t("transactions")} ({txns.length})</button>}</td>
-              <td className={`r ${line.amount.startsWith("-") ? "dn" : ""}`}>{unconfirmed ? <><span>—</span><small>{t("assumed")}: {money(line.amount)}</small></> : money(line.amount)}</td>
+              <td className={`r ${line.amount?.startsWith("-") ? "dn" : ""}`}>{unconfirmed ? <><span>—</span></> : money(line.amount)}</td>
               <td className="r">{unconfirmed ? "—" : pct(line.share, lang, { frac: 2 })}</td>
             </tr>
             {isOpen && <tr className="order-operation"><td colSpan={3} className="tiny">{t("already")}</td></tr>}

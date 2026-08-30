@@ -37,7 +37,8 @@ def engine():
 
 @pytest.fixture
 def db(engine):
-    with Session(engine) as session:
+    with engine.connect() as connection, Session(connection, join_transaction_mode="create_savepoint") as session:
+        transaction = connection.begin()
         session.add_all([Shop(id=i, external_shop_id=f"test-{i}", name=f"Shop {i}", currency="IDR",
                               timezone="Asia/Jakarta", region="ID") for i in (1, 2)])
         session.flush()
@@ -66,6 +67,7 @@ def db(engine):
         session.flush()
         yield session
         session.rollback()
+        transaction.rollback()
 
 
 def page(db, **kwargs):
@@ -76,7 +78,7 @@ def test_date_boundaries_versions_and_totals_are_independent_of_pagination(db):
     p = page(db, limit=1)
     assert p["total"] == 3 and [r["id"] for r in p["rows"]] == [2]
     assert p["summary"]["calculated_orders"] == 2 and p["summary"]["missing_orders"] == 1
-    assert p["summary"]["net_profit"] == D(19200)
+    assert p["summary"]["net_profit"] is None
     assert page(db, limit=1, offset=2)["rows"][0]["id"] == 1
     assert page(db, limit=1, offset=2)["summary"] == p["summary"]
     assert page(db, offset=200)["rows"] == []
@@ -119,7 +121,7 @@ def test_http_contract_validation_and_not_found(db):
         response = c.get(f"/api/orders?{query}&limit=1")
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["summary"]["net_profit"] == "19200" and body["total"] == 3
+        assert body["summary"]["net_profit"] is None and body["total"] == 3
         assert c.get("/api/orders/1?shop_id=1").json()["settlement_check"]["actual"] == "68200"
         assert c.get("/api/orders/1?shop_id=2").status_code == 404
         assert c.get("/api/orders/999?shop_id=1").status_code == 404

@@ -23,29 +23,29 @@ def findings(cur: Totals, prev: Totals, floor: Decimal, products: Sequence[dict[
     out: list[dict[str, Any]] = []
     # 1. ads vs break-even
     roas, be = cur.blended_roas, cur.break_even_roas
-    if roas is not None and be is not None and cur.ad_cost > 0:
+    if cur.profit_known and not cur.ad_cost_partial and roas is not None and be is not None and cur.ad_cost > 0:
         if roas < be:
             loss = (cur.ad_cost - cur.contribution) if cur.contribution < cur.ad_cost else ZERO
             out.append(_f("ads_below_break_even", "CRITICAL",
                           f"GMV Max spend above break-even: blended ROAS {roas} < {be}",
-                          f"Ad deductions {cur.ad_cost} vs contribution before ads {cur.contribution}. "
-                          "Ad cost is the shop-level payout deduction (BLENDED, LOW confidence); "
+                          f"Reported Cost {cur.ad_cost} vs contribution before ads {cur.contribution}. "
+                          "Cost comes from the shop overview export; taxes and credits are not reconciled. "
                           "per-campaign split needs the Ads API.",
-                          -loss, LOW, "payout deductions + statements", False,
+                          -loss, LOW, "Campaign overview Cost + statements", False,
                           {"tab": "campaigns"}))
         else:
             out.append(_f("ads_above_break_even", "INFO",
                           f"Blended ROAS {roas} ≥ break-even {be}",
-                          f"Contribution before ads {cur.contribution} covers ad deductions {cur.ad_cost}; "
+                          f"Contribution before ads {cur.contribution} covers reported Cost {cur.ad_cost}; "
                           f"net profit {cur.net_profit}.", cur.net_profit, LOW,
-                          "payout deductions + statements", False, {"tab": "campaigns"}, kind="opportunity"))
+                          "Campaign overview Cost + statements", False, {"tab": "campaigns"}, kind="opportunity"))
     # 2. margin vs floor
     m = cur.net_margin
     if m is not None and m < floor and cur.orders >= min_orders:
         out.append(_f("margin_below_floor", "WARNING", f"Net margin {m:.1%} below floor {floor:.0%}",
                       f"{cur.orders} orders, net profit {cur.net_profit} on net revenue "
                       f"{cur.net_seller_revenue}.", cur.net_profit, MEDIUM, "analytics_shop_daily",
-                      cur.provisional_orders == 0))
+                      False))
     # 3. refunds
     rr = cur.refund_rate
     if rr is not None and rr >= Decimal("0.10") and cur.orders >= min_orders:
@@ -84,12 +84,12 @@ def findings(cur: Totals, prev: Totals, floor: Decimal, products: Sequence[dict[
                           "; ".join(v["reasons"]), None, v["confidence"], "video_metrics", True,
                           {"video_id": v["video_id"]}))
     # 7. period comparison headline
-    ch = pct_change(cur.net_profit, prev.net_profit)
+    ch = pct_change(cur.net_profit, prev.net_profit) if cur.profit_known and prev.profit_known and not (cur.ad_cost_partial or prev.ad_cost_partial) else None
     if ch is not None:
         out.append(_f("profit_vs_previous", "INFO", f"Net profit {ch:+.1%} vs previous period",
                       f"{cur.net_profit} now vs {prev.net_profit} before.", cur.net_profit - prev.net_profit,
                       MEDIUM if cur.provisional_orders == 0 else LOW, "analytics_shop_daily",
-                      cur.provisional_orders == 0))
+                      False))
     rank = {"CRITICAL": 0, "WARNING": 1, "OPPORTUNITY": 2, "INFO": 3}
     out.sort(key=lambda f: (rank.get(f["severity"], 9), -abs(f["impact"] or ZERO)))
     return out

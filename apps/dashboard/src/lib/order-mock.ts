@@ -29,7 +29,7 @@ export function demoOrderPage(all: OrderDetail[], params: URLSearchParams): Orde
   const filtered = all.filter(o => {
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date(o.created_at!));
     return day >= start && day <= end && (state === "all" || o.state === state) &&
-      (params.get("loss_only") !== "true" || !!o.amounts?.net_profit.startsWith("-")) &&
+      (params.get("loss_only") !== "true" || !!o.amounts?.net_profit?.startsWith("-")) &&
       (!search || o.external_order_id.toLocaleLowerCase().includes(search) || o.items.some(i => i.title?.toLocaleLowerCase().includes(search)));
   }).sort((a, b) => b.created_at!.localeCompare(a.created_at!) || b.id - a.id);
   const offset = Math.max(0, Number(params.get("offset")) || 0), limit = Math.min(100, Math.max(1, Number(params.get("limit")) || 25));

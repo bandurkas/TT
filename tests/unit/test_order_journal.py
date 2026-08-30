@@ -30,7 +30,7 @@ def sample():
             ("return:adjustment_amount", "OTHER_ADJUSTMENT", "-300", "statement-B")]
     profit = NS(**values, profit_status="ADJUSTED", currency="IDR", version=3,
                 calculated_at=NOW, attribution_method="BLENDED", attribution_confidence="LOW",
-                inputs_snapshot={"source": "settled", "txns": txns, "ad_window_days": 7,
+                inputs_snapshot={"source": "settled", "txns": txns, "ad_window_days": 1, "ad_cost_known": True,
                                  "cost_versions": [("SKU-A", "2026-08-01", "12500")]})
     records = [NS(statement_id="statement-A", settlement_amount=D(77500), currency="IDR",
                   statement_time=NOW, fetched_at=NOW, status="SETTLED"),

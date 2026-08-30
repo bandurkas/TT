@@ -1,7 +1,7 @@
 """Compute and persist per-order profit for one shop.
 
 Sources: order_statement_records(+sku) -> FinanceTxn (finance_fields adapter), sku_cost_versions ->
-COGS, settlements classified AD_DEDUCTION -> ad cost (BLENDED, trailing 7-day window, LOW confidence).
+COGS, imported shop-day Cost -> same-day BLENDED allocation (LOW confidence).
 Orders without a settled record get a clearly labelled PROVISIONAL estimate (estimate_provisional).
 Decimal only. Versioned rows: a new version is inserted only when the inputs hash changes.
 """
@@ -89,6 +89,7 @@ class ProfitInputs:
     fee_ratio_records: list[Any] = field(default_factory=list)  # settled records for fee ratio
     default_cogs: Decimal | None = None  # shop_config.default_cogs_per_unit
     since: date | None = None  # incremental run: persist orders/deductions with local date >= since
+    advertising: list[Any] = field(default_factory=list)  # reported Cost, never GMV Pay
 
 
 @dataclass
@@ -366,7 +367,8 @@ def estimate_provisional(order: Any, items: Sequence[OrderItemInput], fee_ratio:
 
 # --- compute ----------------------------------------------------------------------------------
 HASH_KEYS = ("estimate", "fee_ratio", "txns", "items", "cost_versions", "ad_cost", "ad_method",
-             "ad_window_days", "status", "local_date", "mismatch", "source")
+             "ad_window_days", "status", "local_date", "mismatch", "source", "ad_source",
+             "ad_cost_known", "ad_cost_partial", "ad_report_id", "calculation_schema")
 
 
 def snapshot_hash(snapshot: Mapping[str, Any]) -> str:
@@ -427,11 +429,9 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None,
         versions, cw = cost_versions_with_fallback(inp.cost_versions, items, d, cur, inp.default_cogs)
         prepared.append((ctx, d, items, txns, versions, warns + cw, est, source))
 
-    spend_by_day = ad_deductions_by_day(inp.settlements, tz)
-    if since is not None:
-        # incremental: only deductions on/after `since`; look-back orders (< since) are weights only
-        spend_by_day = {day: v for day, v in spend_by_day.items() if day >= since}
-    ads, unallocated, ad_warns = allocate_ads_blended(spend_by_day, net_by_order, cur)
+    advertising = {r.metric_date: r for r in inp.advertising if r.currency == cur}
+    spend_by_day = {d: _dec(r.cost) for d, r in advertising.items()}
+    ads, unallocated, ad_warns = allocate_ads_blended(spend_by_day, net_by_order, cur, window_days=1)
     for w in ad_warns:
         log.warning("%s", w)
     if unallocated:
@@ -472,7 +472,12 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None,
             "cogs_missing": any(w.startswith("COGS missing") for w in warns),
             "cogs_default_used": any("shop default" in w for w in warns),
             "mismatch": mism or None,
-            "ad_cost": _ds(p.allocated_ad_cost), "ad_method": "BLENDED", "ad_window_days": AD_WINDOW_DAYS,
+            "ad_cost": _ds(p.allocated_ad_cost), "ad_method": "BLENDED", "ad_window_days": 1,
+            "ad_source": "campaign_overview_cost" if d in advertising else "unavailable",
+            "ad_cost_known": d in advertising,
+            "ad_cost_partial": bool(advertising[d].partial) if d in advertising else False,
+            "ad_report_id": advertising[d].report_id if d in advertising else None,
+            "calculation_schema": 2,
             "status": p.profit_status.value, "local_date": str(d), "warnings": list(p.warnings),
         }
         snap["hash"] = snapshot_hash(snap)
@@ -524,6 +529,7 @@ def persist_order_profits(session: Any, calcs: Sequence[OrderProfitCalc],
 
 # --- DB loading ---------------------------------------------------------------------------------
 def load_inputs(session: Any, shop_id: int, since: date | None = None) -> ProfitInputs:
+    from src.domain.reports import ad_days
     shop = session.get(Shop, shop_id)
     if shop is None:
         raise LookupError(f"shop {shop_id} not found")
@@ -592,7 +598,8 @@ def load_inputs(session: Any, shop_id: int, since: date | None = None) -> Profit
     default_cogs = _dec(cfg.default_cogs_per_unit) if cfg and cfg.default_cogs_per_unit is not None else None
     return ProfitInputs(shop_id=shop_id, currency=shop.currency, timezone=tz, orders=ctxs,
                         cost_versions=versions, settlements=settlements, fee_ratio_records=settled,
-                        default_cogs=default_cogs, since=since)
+                        default_cogs=default_cogs, since=since,
+                        advertising=ad_days(session, shop_id))
 
 
 def load_current_rows(session: Any, order_ids: Sequence[int]) -> dict[int, Any]:
@@ -607,7 +614,8 @@ def compute_order_profits(session: Any, shop_id: int, since: date | None = None,
                           now: datetime | None = None) -> dict[str, Any]:
     """Full pipeline for one shop; commits. Returns counts + affected local dates."""
     now = now or datetime.now(UTC)
-    inp = load_inputs(session, shop_id, since)
+    # Revisions/imports can change history. Full rebuild avoids stale allocations on lookback days.
+    inp = load_inputs(session, shop_id, None)
     errors: list[str] = []
     calcs = compute_from_inputs(inp, now, errors)
     current = load_current_rows(session, [c.order_id for c in calcs])

@@ -4,6 +4,7 @@ import { dayMon, idr, int, num, pct, shortId } from "@/lib/format";
 import type { Campaigns, Creators, ProductStatus, Products, VideoClass, Videos } from "@/lib/types";
 import type { Loaded } from "@/lib/api";
 import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
+import AdvertisingSource from "./AdvertisingSource";
 
 export const PSTATUS: Record<ProductStatus | "NO_SALES", { label: string; tone: "good" | "bad" | "warn" | "info" | "gray" }> = {
   SCALE: { label: "Scale", tone: "good" }, HEALTHY: { label: "Healthy", tone: "good" }, WATCH: { label: "Watch", tone: "info" },
@@ -26,7 +27,7 @@ export const VideoPill = ({ c }: { c: VideoClass | null | undefined }) => {
   return m && c ? <Pill tone={m.tone}>{t(c) === c ? t(m.label) : t(c)}</Pill> : <Pill tone="gray">—</Pill>;
 };
 
-const neg = (v: string | null, lang: "en" | "ru") => idr(-(num(v) ?? 0), lang);
+const neg = (v: string | null, lang: "en" | "ru") => v === null ? "—" : idr(-(num(v) ?? 0), lang);
 
 interface Props {
   tab: string; setTab: (t: string) => void; apiDown?: boolean;
@@ -102,7 +103,9 @@ export default function Explorer({ tab, setTab, apiDown, products, videos, campa
                 <thead><tr><th>{t("Campaign")}</th><th>{t("Status")}</th><th className="r">{t("Spend")}</th><th className="r">{t("Orders")}</th><th className="r">{t("GMV")}</th><th className="r">{t("Reported ROAS")}</th><th className="r">{t("Adjusted ROAS")}</th><th className="r">{t("Net profit")}</th><th>{t("AI status")}</th></tr></thead>
                 <tbody>
                   <tr><td colSpan={9} className="empty">
-                    <b>{t("NOT AVAILABLE — Ads API pending")}</b> — {t("Campaign breakdown appears after the TikTok Ads app is approved")} ({campaigns.data.reason}). {t("Until then ad cost is shop-level")}: <b>{idr(campaigns.data.shop_level_ad_cost, lang)}</b> {t("in")} {campaigns.data.deductions.length} {t("deductions")}.
+                    <AdvertisingSource data={campaigns.data.advertising} currency={campaigns.data.shop.currency} />
+                    <b>{lang === "ru" ? "В выгрузке нет разбивки по кампаниям — доступен общий дневной Cost." : "The export contains daily shop Cost, without a campaign breakdown."}</b>
+                    <p>{lang === "ru" ? "Платежи GMV Pay ниже — не дополнительные расходы. Даты платежей могут отличаться от дат показов." : "GMV Pay payments below are not additional expenses. Payment dates may differ from delivery dates."}</p>
                     {campaigns.data.deductions.length > 0 && <div className="small" style={{ marginTop: 8 }}>{campaigns.data.deductions.map((d, i) => <span key={i} style={{ marginRight: 12 }}>◆ {dayMon(d.date, lang)} {idr(d.amount, lang)}</span>)}</div>}
                   </td></tr>
                 </tbody>

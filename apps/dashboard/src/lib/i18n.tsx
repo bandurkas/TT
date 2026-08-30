@@ -58,7 +58,7 @@ export const RU: Record<string, string> = {
   "Profit waterfall": "Водопад прибыли", "revenue_after_seller_discounts": "Выручка после скидок продавца",
   "refunds": "Возвраты", "tiktok_fees": "Комиссии TikTok", "affiliate_commission": "Комиссия аффилиатов",
   "taxes_adjustments_subsidies": "Налоги / корректировки / субсидии", "net_seller_revenue": "Выручка продавца нетто",
-  "cogs": "Себестоимость", "contribution_before_ads": "Контрибуция до рекламы", "ad_deductions_blended": "Списания GMV Max (смешанно)",
+  "cogs": "Себестоимость", "contribution_before_ads": "Контрибуция до рекламы", "ad_deductions_blended": "Расход рекламы · Cost",
   "net_profit": "Чистая прибыль", "est.": "оц.", "orders": "заказов",
   "6 · Opportunities & leakage": "6 · Возможности и утечки", "Ranked by money, not percentages": "Ранжировано по деньгам, не по процентам",
   "Opportunities": "Возможности", "Leakage / risks": "Утечки / риски", "None detected.": "Не обнаружено.",
@@ -89,7 +89,7 @@ export const RU: Record<string, string> = {
   "video orders / derived clicks": "заказы из видео / расчётные клики", "(log scale)": "(лог. шкала)", "derived": "расчётно", "share of product GMV": "доля GMV товара",
   "SCALE": "Масштабировать", "HEALTHY": "Здоров", "WATCH": "Наблюдать", "INVESTIGATE": "Разобраться", "REDUCE": "Сократить", "SMALL_SAMPLE": "Мало данных", "NO_SALES": "Нет продаж",
   "WINNER": "Победитель", "PROMISING": "Перспективно", "TRAFFIC_NO_SALES": "Трафик без продаж", "LOW_ATTENTION": "Слабый хук", "LOSER": "Убыточно", "FATIGUING": "Выгорает", "NEUTRAL": "Нейтрально", "INSUFFICIENT_DATA": "Мало данных",
-  "note.ad_blended": "Расходы на рекламу — списания GMV Max из выплат магазина. Распределение по заказам оценочное (BLENDED, низкая уверенность), а не точная атрибуция рекламы.", "note.provisional": "По заказам без финального расчёта TikTok комиссии пока оценены; прибыль может измениться.", "note.roas_na": "ROAS по данным TikTok и расходы отдельных кампаний появятся после подключения TikTok Ads.",
+  "note.ad_blended": "Расход рекламы — Cost по дням из выгрузки. GMV Pay — оплата, она не вычитается повторно. Распределение Cost по заказам того же дня — оценка, не точная атрибуция.", "note.provisional": "По заказам без финального расчёта TikTok комиссии пока оценены; прибыль может измениться.", "note.roas_na": "ROAS по данным TikTok и расходы отдельных кампаний появятся после подключения TikTok Ads.",
   "EN": "EN", "source text in English": "исходный текст на английском", "Source · overview totals (API)": "Источник · итоги overview (API)", "last day of series": "последний день ряда",
   "Move to next column": "Перевести в следующую колонку", "Move to previous column": "Перевести в предыдущую колонку", "Expand": "Раскрыть",
   "Notes": "Примечания", "Generated": "Сформировано", "Keep": "Оставить", "Reduce priority": "Снизить приоритет",
@@ -121,7 +121,7 @@ export const RU: Record<string, string> = {
 };
 
 const EN: Record<string, string> = {
-  "note.ad_blended": "Advertising uses shop GMV Max payout deductions. Allocation to orders is estimated (BLENDED, LOW confidence), not exact ad attribution.",
+  "note.ad_blended": "Advertising uses daily Cost from the export. GMV Pay is payment and is not subtracted twice. Same-day order allocation is an estimate.",
   "note.provisional": "Fees on orders without final TikTok settlement data are estimated; profit may change.",
   "note.roas_na": "TikTok-reported ROAS and campaign spend require the TikTok Ads connection.",
 };

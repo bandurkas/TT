@@ -7,6 +7,7 @@ from sqlalchemy import and_, func, or_, select
 from src.db.models import Order, OrderItem, OrderProfit, Product, Sku
 from src.db.models_finance import OrderStatementRecord
 from src.domain.dashboard import orders as O
+from src.domain.reports import advertising_summary, income_evidence
 
 
 def _final():
@@ -69,14 +70,40 @@ def page(session, shop_id, start, end, tz, search="", state="all", loss_only=Fal
     summary.update(calculated_orders=aggregate["calculated_orders"],
                    missing_orders=total - aggregate["calculated_orders"], currency=aggregate["currency"],
                    uncertain_orders=aggregate["uncertain_orders"])
+    ad = advertising_summary(session, shop_id, start, end, tz)
+    summary["allocated_ad_cost"] = summary["ad_cost"]
+    calendar = not search and state == "all" and not loss_only
+    summary["basis"] = "calendar" if calendar else "order_allocation"
+    unknown = session.scalar(base.with_only_columns(func.count(OrderProfit.id)).where(or_(
+        OrderProfit.inputs_snapshot["mismatch"].astext.is_not(None),
+        ~func.coalesce(OrderProfit.inputs_snapshot["ad_cost_known"].as_boolean(), False),
+        and_(OrderProfit.inputs_snapshot["cogs_missing"].as_boolean().is_(True),
+             ~func.coalesce(OrderProfit.inputs_snapshot["cogs_default_used"].as_boolean(), False)),
+        and_(OrderProfit.inputs_snapshot["source"].astext == "ratio_estimate",
+             OrderProfit.inputs_snapshot["fee_ratio"].astext.is_(None))))) or 0
+    if calendar:
+        summary["ad_cost"] = ad["cost"]
+        summary["unallocated_ad_cost"] = ad["known_cost"] - summary["allocated_ad_cost"]
+        summary["net_profit"] = (aggregate["contribution_profit"] - ad["cost"]
+                                 if ad["cost"] is not None and not unknown else None)
+    elif unknown:
+        summary["ad_cost"] = summary["net_profit"] = None
+    summary["profit_share"] = O.share(summary["net_profit"], summary["revenue_base"]) if summary["net_profit"] is not None else None
+    for key in ("ad_cost", "net_profit"):
+        summary["shares"][key] = O.share(summary[key], summary["revenue_base"]) if summary[key] is not None else None
     if aggregate["currency_count"] > 1:
         summary = None
     records = list(session.execute(base.order_by(Order.order_created_at.desc(), Order.id.desc())
                                    .offset(offset).limit(limit)))
     items = items_for(session, shop_id, [o.id for o, _ in records])
+    evidence = income_evidence(session, shop_id)
+    result_rows = [O.order_row(o, p, items.get(o.id, [])) for o, p in records]
+    for r in result_rows:
+        r["income_evidence"] = evidence.get(r["external_order_id"])
     return {"total": total, "offset": offset, "limit": limit, "summary": summary,
+            "advertising": ad,
             "mixed_currencies": aggregate["currency_count"] > 1,
-            "rows": [O.order_row(o, p, items.get(o.id, [])) for o, p in records]}
+            "rows": result_rows}
 
 
 def detail(session, shop_id, order_id):
@@ -92,4 +119,6 @@ def detail(session, shop_id, order_id):
                                          OrderStatementRecord.external_order_id == order.external_order_id,
                                          OrderStatementRecord.statement_id.in_(ids))
                                   .order_by(OrderStatementRecord.statement_time, OrderStatementRecord.id))) if ids else []
-    return O.breakdown(order, profit, items_for(session, shop_id, [order_id]).get(order_id, []), records)
+    result = O.breakdown(order, profit, items_for(session, shop_id, [order_id]).get(order_id, []), records)
+    result["income_evidence"] = income_evidence(session, shop_id).get(order.external_order_id)
+    return result

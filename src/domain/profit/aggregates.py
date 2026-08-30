@@ -17,6 +17,7 @@ from src.db.models import Order, Product
 from src.db.models import OrderProfit as OrderProfitRow
 from src.db.models_finance import ShopMetric
 from src.db.models_profit import ProductDaily, ShopDaily
+from src.domain.dashboard.orders import inputs_known
 from src.domain.ingest.upserts import upsert
 from src.domain.profit.jobs import DEFAULT_TZ, local_date
 
@@ -31,6 +32,9 @@ def _d(v: Any) -> Decimal:
 
 @dataclass
 class DailyAgg:
+    profit_inputs_known: bool = True
+    ad_cost_known: bool = True
+    ad_cost_partial: bool = False
     orders: int = 0
     units: int = 0
     gmv: Decimal = ZERO
@@ -54,6 +58,8 @@ class DailyAgg:
 
     def as_row(self, computed_at: datetime, gmv_override: Decimal | None = None) -> dict[str, Any]:
         return {
+            "profit_inputs_known": self.profit_inputs_known,
+            "ad_cost_known": self.ad_cost_known, "ad_cost_partial": self.ad_cost_partial,
             "orders": self.orders, "units": self.units,
             "gmv": gmv_override if gmv_override is not None else self.gmv,
             "net_seller_revenue": self.net_seller_revenue, "fees": self.fees,
@@ -65,6 +71,10 @@ class DailyAgg:
 
 
 def _add_order(a: DailyAgg, p: Any) -> None:
+    a.profit_inputs_known = a.profit_inputs_known and inputs_known(p)
+    snap = p.inputs_snapshot or {}
+    a.ad_cost_known = a.ad_cost_known and bool(snap.get("ad_cost_known"))
+    a.ad_cost_partial = a.ad_cost_partial or bool(snap.get("ad_cost_partial"))
     a.orders += 1
     a.net_seller_revenue += _d(p.net_seller_revenue)
     a.fees += _d(p.platform_fees) + _d(p.seller_shipping) + _d(p.taxes)
@@ -115,6 +125,9 @@ def product_daily(profits: Iterable[Any], order_dates: Mapping[int, date]) -> di
             if pid is None:
                 continue
             a = out[(int(pid), d)]
+            a.profit_inputs_known = a.profit_inputs_known and inputs_known(p)
+            a.ad_cost_known = a.ad_cost_known and bool((p.inputs_snapshot or {}).get("ad_cost_known"))
+            a.ad_cost_partial = a.ad_cost_partial or bool((p.inputs_snapshot or {}).get("ad_cost_partial"))
             key = (p.order_id, p.id if hasattr(p, "id") else None)
             if key not in a._seen:
                 a._seen.add(key)
@@ -162,10 +175,21 @@ def recompute_daily(session: Any, shop_id: int, dates: Sequence[date] | None = N
     """Recompute analytics_shop_daily / analytics_product_daily for the given local dates
     (None = every date that has a current profit row). Commits."""
     now = now or datetime.now(UTC)
-    profits, order_dates = load_current_profits(session, shop_id, dates, tz)
-    days = sorted(set(order_dates.values()) | set(dates or []))
+    from src.domain.reports import ad_days
+    advertising = {r.metric_date: r for r in ad_days(session, shop_id)}
+    # Cost coverage spans all report dates, so the rebuild must load all orders too.
+    dates = None
+    profits, order_dates = load_current_profits(session, shop_id, None, tz)
+    # Include Cost on days without orders; the shop view is calendar-based, not an order cohort.
+    days = sorted(set(order_dates.values()) | set(dates or []) | set(advertising))
     gmv = load_gmv(session, shop_id, days)
     shop_rows = shop_daily(profits, order_dates)
+    for d in days:
+        a = shop_rows.setdefault(d, DailyAgg())
+        r = advertising.get(d)
+        a.ad_cost_known, a.ad_cost_partial = r is not None, bool(r.partial) if r else False
+        a.ad_cost = _d(r.cost) if r else ZERO
+        a.net_profit = a.contribution - a.ad_cost
     rows = [{"shop_id": shop_id, "metric_date": d,
              **shop_rows.get(d, DailyAgg()).as_row(now, gmv.get(d))} for d in days]
     upsert(session, ShopDaily, rows, ["shop_id", "metric_date"])

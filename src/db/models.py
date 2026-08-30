@@ -518,3 +518,4 @@ class AuditLog(PKMixin, Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 from src.db import models_finance as _models_finance  # noqa: F401  (extends schema)
+from src.db import models_reports as _models_reports  # noqa: F401
