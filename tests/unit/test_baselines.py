@@ -1,6 +1,8 @@
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
+import pytest
+
 from src.analytics.baselines import (
     DailyValue,
     Point,
@@ -32,8 +34,23 @@ def test_compute_baselines_windows():
     assert b.prev_comparable_24h == Decimal(20)
     assert b.avg_3d == Decimal(30)
     assert b.avg_7d == Decimal(50)
-    assert b.same_weekday == Decimal(80) / 4
-    assert b.avg_30d == Decimal(350) / 30
+    assert b.same_weekday is None  # only 1 of 4 same-weekday buckets has data
+    assert b.avg_14d is None and b.avg_30d is None
+    assert b.days_with_data == 8
+
+
+def test_compute_baselines_requires_full_bucket_coverage():
+    pts = _daily_points([1] * 31)
+    b = compute_baselines(pts, NOW)
+    assert b.avg_30d == Decimal(1) and b.same_weekday == Decimal(1) and b.days_with_data == 31
+    gap = [p for p in pts if p.ts.date() != (NOW - timedelta(days=2)).date()]
+    b = compute_baselines(gap, NOW)
+    assert b.avg_3d is None and b.avg_7d is None and b.avg_30d is None
+    assert b.same_weekday == Decimal(1) and b.days_with_data == 30
+    b = compute_baselines(_daily_points([5, 0, 7]), NOW)  # explicit zero point counts as data
+    assert b.avg_3d is None and b.prev_comparable_24h == Decimal(0)
+    b = compute_baselines(_daily_points([5]), NOW)
+    assert b.prev_comparable_24h is None
 
 
 def test_compute_baselines_empty_and_future_points():
@@ -74,6 +91,11 @@ def test_intraday_pace_uses_same_weekday_cumulative():
     assert pace.expected == Decimal(15)
     assert pace.actual == Decimal(6)
     assert pace.pct == Decimal("-60.0")
+
+
+def test_intraday_pace_rejects_naive_now():
+    with pytest.raises(ValueError):
+        intraday_pace([], NOW.replace(tzinfo=None))
 
 
 def test_intraday_pace_no_history():

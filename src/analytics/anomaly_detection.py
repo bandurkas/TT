@@ -42,7 +42,11 @@ class AnomalyConfig:
         "net_margin": True, "ctr": True, "cvr": True, "roas": True, "aov": True,
         "ad_spend": False, "cpm": False, "cpc": False, "cpa": False, "refund_rate": False,
     })
-    min_samples: Mapping[str, int] = field(default_factory=dict)
+    # `sample` units per metric: ctr -> impressions, cvr -> clicks, refund_rate -> orders.
+    # Rate metrics are skipped when the sample is missing or below the minimum.
+    min_samples: Mapping[str, int] = field(default_factory=lambda: {
+        "ctr": 1000, "cvr": 30, "refund_rate": 20,
+    })
 
 
 def detect_anomaly(

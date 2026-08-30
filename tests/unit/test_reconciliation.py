@@ -29,6 +29,7 @@ def test_statuses_per_order():
     assert by["x"].status == ReconStatus.MISMATCH and by["x"].difference == D(-5)
     assert by["pend"].status == ReconStatus.PENDING and by["pend"].settlement_total is None
     assert by["items_bad"].status == ReconStatus.MISMATCH
+    assert by["items_bad"].difference == D(0) and by["items_bad"].item_difference == D(-10)
     assert any("items 90 != order total 100" in n for n in by["items_bad"].notes)
     assert r.counts[ReconStatus.MATCHED] == 1 and r.counts[ReconStatus.MISMATCH] == 2
     assert r.counts[ReconStatus.PARTIAL] == 1 and r.counts[ReconStatus.PENDING] == 1
@@ -60,3 +61,20 @@ def test_payout_shortfall_noted():
                   [Settlement("s", "a", D(90))], [Payout("p", D(70))])
     assert r.payout_difference == D(-20)
     assert any("payouts 70 vs final settlements 90" in n for n in r.notes)
+
+
+def test_order_without_items_is_at_most_partial():
+    r = reconcile([Order("a", D(100)), Order("b", D(100))], [],
+                  [FinanceTxn("t", "a", D(90))], [Settlement("s", "a", D(90))])
+    a, b = r.orders
+    assert a.status == ReconStatus.PARTIAL and a.difference == D(0)
+    assert a.item_difference == D(-100) and "no order items" in a.notes
+    assert b.status == ReconStatus.PENDING and b.difference == D(0)
+    assert r.total_difference == D(0)
+
+
+def test_item_mismatch_kept_separate_from_settlement_difference():
+    r = reconcile([Order("a", D(100))], [OrderItem("a", D(80))], [], [])
+    o = r.orders[0]
+    assert o.status == ReconStatus.MISMATCH
+    assert o.difference == D(0) and o.item_difference == D(-20)

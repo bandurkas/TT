@@ -32,6 +32,7 @@ class Baselines:
     avg_14d: Decimal | None
     avg_30d: Decimal | None
     same_weekday: Decimal | None
+    days_with_data: int = 0  # 24h buckets (of the last 31) containing >= 1 point
 
 
 @dataclass(frozen=True)
@@ -54,8 +55,11 @@ def _mean(values: Sequence[Decimal]) -> Decimal | None:
     return sum(values, ZERO) / Decimal(len(values))
 
 
-def _window_sums(points: Iterable[Point], now: datetime, n_windows: int) -> list[Decimal]:
+def _window_sums(
+    points: Iterable[Point], now: datetime, n_windows: int
+) -> tuple[list[Decimal], list[bool]]:
     sums = [ZERO] * n_windows
+    has = [False] * n_windows
     for p in points:
         if p.ts > now:
             continue
@@ -65,24 +69,31 @@ def _window_sums(points: Iterable[Point], now: datetime, n_windows: int) -> list
             idx -= 1
         if idx < n_windows:
             sums[idx] += p.value
-    return sums
+            has[idx] = True
+    return sums, has
 
 
 def compute_baselines(points: Sequence[Point], now: datetime, same_weekday_n: int = 4) -> Baselines:
-    """Windows are 24h buckets ending at `now`; empty buckets count as 0 (additive metric)."""
+    """Windows are 24h buckets ending at `now`; empty buckets count as 0 (additive metric).
+    An avg over N buckets is None unless every one of those N buckets has >= 1 point."""
     if not points:
         return Baselines(None, None, None, None, None, None, None)
     n_windows = max(31, 7 * same_weekday_n + 1)
-    w = _window_sums(points, now, n_windows)
-    sw = [w[7 * k] for k in range(1, same_weekday_n + 1)]
+    w, has = _window_sums(points, now, n_windows)
+    sw_idx = [7 * k for k in range(1, same_weekday_n + 1)]
+
+    def avg(idx: Sequence[int]) -> Decimal | None:
+        return _mean([w[i] for i in idx]) if all(has[i] for i in idx) else None
+
     return Baselines(
         last_24h=w[0],
-        prev_comparable_24h=w[1],
-        avg_3d=_mean(w[1:4]),
-        avg_7d=_mean(w[1:8]),
-        avg_14d=_mean(w[1:15]),
-        avg_30d=_mean(w[1:31]),
-        same_weekday=_mean(sw),
+        prev_comparable_24h=w[1] if has[1] else None,
+        avg_3d=avg(range(1, 4)),
+        avg_7d=avg(range(1, 8)),
+        avg_14d=avg(range(1, 15)),
+        avg_30d=avg(range(1, 31)),
+        same_weekday=avg(sw_idx),
+        days_with_data=sum(has[:31]),
     )
 
 
@@ -111,6 +122,8 @@ def compute_baselines_daily(
 
 def intraday_pace(points: Sequence[Point], now: datetime, n_weekdays: int = 4) -> Pace:
     """Actual cumulative today vs mean cumulative-by-this-hour on last N same weekdays (SPEC §44.1)."""
+    if now.tzinfo is None:
+        raise ValueError("now must be timezone-aware")
     today = now.date()
     cutoff = now.timetz()
     actual = ZERO

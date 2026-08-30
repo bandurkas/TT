@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_DOWN, Decimal
 from enum import StrEnum
 
+from src.analytics.common import Confidence
 from src.analytics.transaction_types import quantum
 
 ZERO = Decimal(0)
@@ -18,12 +19,6 @@ class AttributionMethod(StrEnum):
     DIRECT_CREATIVE = "DIRECT_CREATIVE"
     PROPORTIONAL = "PROPORTIONAL"
     BLENDED = "BLENDED"
-
-
-class Confidence(StrEnum):
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
 
 
 class ProportionalBasis(StrEnum):
@@ -98,7 +93,7 @@ def allocate_proportionally(
     if remainder != ZERO:
         largest = max(keys, key=lambda k: (eff[k], -keys.index(k)))
         shares[largest] += remainder
-    return {k: sign * v for k, v in shares.items()}
+    return {k: sign * v if v else ZERO for k, v in shares.items()}  # no Decimal('-0')
 
 
 def platform_reported(
@@ -108,14 +103,17 @@ def platform_reported(
     allocations = dict(reported)
     allocated = sum(allocations.values(), ZERO)
     total = allocated if total_spend is None else total_spend
+    unallocated = total - allocated
+    warnings = ("reported_exceeds_total",) if unallocated < ZERO else ()
     return AttributionResult(
         allocations=allocations,
         method=AttributionMethod.PLATFORM_REPORTED,
         confidence=Confidence.HIGH,
         currency=currency,
         total=total,
-        unallocated=total - allocated,
+        unallocated=unallocated,
         note="TikTok-reported attribution; reported, not incremental",
+        warnings=warnings,
     )
 
 
@@ -190,9 +188,10 @@ def blended_ratio(total_ad_spend: Decimal, net_revenue: Decimal) -> Decimal | No
 def blended(
     total_ad_spend: Decimal, net_revenue_by_order: Mapping[str, Decimal], currency: str
 ) -> AttributionResult:
-    """Model D: shop-level ratio applied to each order's net revenue, reconciled to total spend."""
+    """Model D: ratio = spend / total net revenue (all orders, SPEC §6.4-D); spend is then
+    allocated by positive net revenue only (negative orders get 0), reconciled to total spend."""
     positive = {k: v for k, v in net_revenue_by_order.items() if v > ZERO}
-    net_total = sum(positive.values(), ZERO)
+    net_total = sum(net_revenue_by_order.values(), ZERO)
     ratio = blended_ratio(total_ad_spend, net_total)
     if ratio is None:
         return AttributionResult(
@@ -213,7 +212,8 @@ def blended(
         confidence=Confidence.LOW,
         currency=currency,
         total=total_ad_spend,
-        note=f"blended marketing cost ratio {ratio}; order-level figure is an estimate",
+        note=(f"blended marketing cost ratio {ratio} = {total_ad_spend}/{net_total}; "
+              "order-level figure is an estimate"),
     )
 
 
@@ -221,3 +221,21 @@ def roas(kind: RoasKind, revenue: Decimal, spend: Decimal) -> LabeledRoas:
     if spend <= ZERO:
         return LabeledRoas(kind, None)
     return LabeledRoas(kind, (revenue / spend).quantize(RATIO_PLACES))
+
+
+__all__ = [
+    "AllocationError",
+    "AttributionMethod",
+    "AttributionResult",
+    "Confidence",
+    "LabeledRoas",
+    "ProportionalBasis",
+    "RoasKind",
+    "allocate_proportionally",
+    "blended",
+    "blended_ratio",
+    "direct_creative",
+    "platform_reported",
+    "proportional",
+    "roas",
+]

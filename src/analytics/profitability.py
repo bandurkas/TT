@@ -12,8 +12,10 @@ from enum import StrEnum
 from src.analytics.attribution import AttributionMethod, Confidence, allocate_proportionally
 from src.analytics.transaction_types import (
     ADJUSTMENT_TYPES,
+    SIGN_RULES,
     CurrencyMismatchError,
     NormalizedType,
+    SignRule,
     is_platform_fee,
     normalize,
     require_same_currency,
@@ -46,7 +48,7 @@ class OrderItemInput:
     quantity: int
     unit_sale_price: Decimal
     currency: str
-    discounts: Decimal = ZERO
+    discounts: Decimal = ZERO  # informational only; profit uses SELLER_DISCOUNT txns
 
     @property
     def gross_item_value(self) -> Decimal:
@@ -54,6 +56,7 @@ class OrderItemInput:
 
     @property
     def net_item_value(self) -> Decimal:
+        """Informational (listing view); not used in any profit figure."""
         return self.gross_item_value - self.discounts
 
 
@@ -287,7 +290,8 @@ def _sum_costs(parts: Iterable[InternalCosts]) -> InternalCosts:
 
 
 def derive_profit_status(txns: Sequence[FinanceTxn], revenue: RevenueBreakdown) -> ProfitStatus:
-    """Precedence: REFUNDED > ADJUSTED > PAID > SETTLED > PROVISIONAL."""
+    """Precedence: REFUNDED > ADJUSTED > PAID > SETTLED > PROVISIONAL.
+    ADJUSTED: any adjustment- or REDUCES-type txn (refund, fee, ...) outside the sale's settlements."""
     sales = [t for t in txns if t.ntype is NormalizedType.SALE_PROCEEDS]
     if revenue.sale_proceeds > ZERO and revenue.refunds >= revenue.sale_proceeds:
         return ProfitStatus.REFUNDED
@@ -295,7 +299,9 @@ def derive_profit_status(txns: Sequence[FinanceTxn], revenue: RevenueBreakdown) 
         return ProfitStatus.PROVISIONAL
     sale_settlements = {t.settlement_id for t in sales}
     post_settlement = [
-        t for t in txns if t.ntype in ADJUSTMENT_TYPES and t.settlement_id not in sale_settlements
+        t for t in txns
+        if (t.ntype in ADJUSTMENT_TYPES or SIGN_RULES[t.ntype] is SignRule.REDUCES)
+        and t.settlement_id not in sale_settlements
     ]
     if post_settlement:
         return ProfitStatus.ADJUSTED
@@ -343,6 +349,7 @@ def order_profit(
     item_ids = {it.order_item_id for it in items}
     order_level = [t for t in txns if t.order_item_id not in item_ids]
     item_level = [t for t in txns if t.order_item_id in item_ids]
+    unknown_items = sum(1 for t in order_level if t.order_item_id is not None)
     shared_rev = allocate_proportionally(
         net_seller_revenue(order_level, currency), weights, currency
     )
@@ -372,6 +379,8 @@ def order_profit(
     warnings: list[str] = []
     if revenue.unknown_count:
         warnings.append(f"{revenue.unknown_count} UNKNOWN transactions excluded")
+    if unknown_items:
+        warnings.append(f"{unknown_items} txns reference unknown order_item_id; allocated order-level")
     status = derive_profit_status(txns, revenue)
     if status is ProfitStatus.PROVISIONAL:
         warnings.append("settlement missing; figures provisional")

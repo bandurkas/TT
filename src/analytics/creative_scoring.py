@@ -9,6 +9,7 @@ from decimal import Decimal
 from enum import StrEnum
 
 from src.analytics.baselines import pct_change
+from src.analytics.common import Confidence
 
 ZERO = Decimal(0)
 
@@ -21,13 +22,8 @@ class Classification(StrEnum):
     LOSER = "LOSER"
     FATIGUING = "FATIGUING"
     NEUTRAL = "NEUTRAL"
+    WATCH = "WATCH"  # profitable but refund rate above max: monitor, do not scale
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
-
-
-class Confidence(StrEnum):
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
 
 
 @dataclass(frozen=True)
@@ -43,7 +39,8 @@ class ScoringConfig:
     strong_ctr_uplift: Decimal = Decimal("0.20")
     low_ctr_ratio: Decimal = Decimal("0.70")
     low_cvr_ratio: Decimal = Decimal("0.50")
-    max_refund_rate: Decimal = Decimal("0.15")
+    max_refund_rate: Decimal = Decimal("0.15")  # absolute fallback
+    refund_rate_median_factor: Decimal = Decimal(2)  # max = account median * factor when known
     fatigue_min_days: int = 3
     fatigue_ctr_drop: Decimal = Decimal("0.15")
     fatigue_cpm_rise: Decimal = Decimal("0.15")
@@ -79,6 +76,7 @@ class ScoringBaselines:
     account_median_cvr: Decimal | None = None
     product_median_ctr: Decimal | None = None
     product_median_cvr: Decimal | None = None
+    account_median_refund_rate: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -125,14 +123,31 @@ def _pick(product: Decimal | None, account: Decimal | None) -> tuple[Decimal | N
     return account, "account median"
 
 
-def _confidence(m: VideoMetrics, cfg: ScoringConfig) -> Confidence:
+def _confidence(m: VideoMetrics, cfg: ScoringConfig, zero_orders_high: bool = True) -> Confidence:
+    """HIGH needs 2x click sample and 2x order sample; 0 orders count as HIGH only when
+    `zero_orders_high` (no-sales verdicts), never for NEUTRAL."""
     if m.clicks >= 2 * cfg.minimum_sample_clicks and (
-        m.orders >= 2 * cfg.minimum_sample_orders or m.orders == 0
+        (m.orders > 0 and m.orders >= 2 * cfg.minimum_sample_orders)
+        or (m.orders == 0 and zero_orders_high)
     ):
         return Confidence.HIGH
     if m.clicks >= cfg.minimum_sample_clicks:
         return Confidence.MEDIUM
     return Confidence.LOW
+
+
+def _downgrade(conf: Confidence) -> Confidence:
+    return Confidence.MEDIUM if conf is Confidence.HIGH else Confidence.LOW
+
+
+def _max_refund_rate(cfg: ScoringConfig, baselines: ScoringBaselines) -> Decimal:
+    med = baselines.account_median_refund_rate
+    return med * cfg.refund_rate_median_factor if med is not None else cfg.max_refund_rate
+
+
+def _saving(m: VideoMetrics) -> Decimal:
+    days = max(1, len(m.daily) or m.age_days)
+    return (m.ad_spend / Decimal(days)).quantize(Decimal("0.01"))
 
 
 def _fatigue(c: _Ctx) -> bool:
@@ -187,6 +202,13 @@ def _result(
 def classify_video(
     metrics: VideoMetrics, baselines: ScoringBaselines, config: ScoringConfig
 ) -> ClassificationResult:
+    """Order of verdicts: FATIGUING > INSUFFICIENT_DATA > (small clicks) > WINNER > LOSER >
+    LOW_ATTENTION > TRAFFIC_NO_SALES > (small orders) > WATCH > NEUTRAL.
+
+    LOSER: net_profit < 0 with spend and either weak CTR/CVR or enough orders to trust the loss.
+    Refund rate above max (account median * factor, else absolute): LOSER if net_profit <= 0,
+    otherwise WATCH with confidence downgraded one level; never WINNER or NEUTRAL.
+    """
     m, cfg = metrics, config
     ctr_ref, ctr_label = _pick(baselines.product_median_ctr, baselines.account_median_ctr)
     cvr_ref, cvr_label = _pick(baselines.product_median_cvr, baselines.account_median_cvr)
@@ -227,8 +249,9 @@ def classify_video(
             return _result(c, Classification.PROMISING, Confidence.LOW)
         return _result(c, Classification.INSUFFICIENT_DATA, Confidence.LOW)
 
-    margin = _ratio(m.net_profit, m.gmv) if m.gmv > 0 else None
-    refund_ok = m.refund_rate is None or m.refund_rate <= cfg.max_refund_rate
+    margin = _ratio(m.net_profit, m.gmv) if m.gmv > 0 else None  # margin on GMV
+    max_refund = _max_refund_rate(cfg, baselines)
+    refund_ok = m.refund_rate is None or m.refund_rate <= max_refund
     profit_per_order = _ratio(m.net_profit, m.orders)
     cpa = _ratio(m.ad_spend, m.orders)
     cpa_ok = cfg.max_acceptable_cpa is None or (cpa is not None and cpa <= cfg.max_acceptable_cpa)
@@ -242,15 +265,25 @@ def classify_video(
         and profit_per_order is not None and profit_per_order >= cfg.minimum_profit_per_order
         and refund_ok and cpa_ok
     ):
-        c.reasons.append(f"net margin {_pct(margin)} >= floor {_pct(cfg.minimum_net_margin)}")
+        c.reasons.append(
+            f"net margin on GMV {_pct(margin)} >= floor {_pct(cfg.minimum_net_margin)}"
+        )
         return _result(c, Classification.WINNER, conf)
 
-    if m.net_profit < 0 and m.ad_spend > 0 and (cvr_low or ctr_low):
-        days = max(1, len(m.daily) or m.age_days)
-        saving = (m.ad_spend / Decimal(days)).quantize(Decimal("0.01"))
+    enough_orders = m.orders >= cfg.minimum_sample_orders
+    if not refund_ok:
+        c.reasons.append(f"refund rate {_pct(m.refund_rate)} above max {_pct(max_refund)}")
+    if m.ad_spend > 0 and (
+        (m.net_profit < 0 and (cvr_low or ctr_low or enough_orders))
+        or (m.net_profit <= 0 and not refund_ok)
+    ):
+        saving = _saving(m)
         c.reasons.append(f"negative contribution after ads: {m.net_profit}")
         c.reasons.append(f"estimated saving ~{saving}/day if spend stops")
         return _result(c, Classification.LOSER, conf, saving)
+    if not refund_ok and m.net_profit <= 0:
+        c.reasons.append(f"non-positive contribution with high refunds: {m.net_profit}")
+        return _result(c, Classification.LOSER, conf)
 
     if ctr_low:
         c.reasons.append("CTR significantly below median with enough impressions")
@@ -267,9 +300,10 @@ def classify_video(
         return _result(c, Classification.INSUFFICIENT_DATA, Confidence.LOW)
 
     if not refund_ok:
-        c.reasons.append(f"refund rate {_pct(m.refund_rate)} above {_pct(cfg.max_refund_rate)}")
+        c.reasons.append("profitable but refunds above max: monitor, do not scale")
+        return _result(c, Classification.WATCH, _downgrade(conf))
     c.reasons.append("within normal range of medians")
-    return _result(c, Classification.NEUTRAL, conf)
+    return _result(c, Classification.NEUTRAL, _confidence(m, cfg, zero_orders_high=False))
 
 
 def median(values: Sequence[Decimal]) -> Decimal | None:

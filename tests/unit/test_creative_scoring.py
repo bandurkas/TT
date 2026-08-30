@@ -29,7 +29,7 @@ def test_winner():
     assert r.classification == Classification.WINNER
     assert r.confidence == Confidence.HIGH
     assert any("CTR 3.00% vs account median 2.00% (50.0%)" in s for s in r.reasons)
-    assert any("net margin" in s for s in r.reasons)
+    assert any("net margin on GMV 20.00%" in s for s in r.reasons)
 
 
 def test_product_median_preferred_over_account():
@@ -82,14 +82,15 @@ def _fatigue_daily(ctrs, cpms, cvrs):
     out = []
     for i, (ctr, cpm, cvr) in enumerate(zip(ctrs, cpms, cvrs, strict=True)):
         imp = 10000
-        clicks = int(imp * ctr)
+        clicks = int(imp * Decimal(ctr))
         out.append(DailyMetrics(date(2026, 8, 20) + timedelta(days=i), imp, clicks,
-                                int(clicks * cvr), Decimal(imp) * Decimal(cpm)))
+                                int(clicks * Decimal(cvr)), Decimal(imp) * Decimal(cpm)))
     return tuple(out)
 
 
 def test_fatiguing_ctr_down_and_cpm_up():
-    daily = _fatigue_daily([0.03, 0.025, 0.02], [0.01, 0.011, 0.013], [0.05, 0.05, 0.05])
+    daily = _fatigue_daily(["0.03", "0.025", "0.02"], ["0.01", "0.011", "0.013"],
+                           ["0.05", "0.05", "0.05"])
     r = classify_video(_vm(daily=daily), BASE, CFG)
     assert r.classification == Classification.FATIGUING
     assert r.confidence == Confidence.MEDIUM
@@ -97,7 +98,8 @@ def test_fatiguing_ctr_down_and_cpm_up():
 
 
 def test_ctr_down_without_cpm_or_cvr_change_is_not_fatigue():
-    daily = _fatigue_daily([0.03, 0.025, 0.02], [0.01, 0.01, 0.01], [0.05, 0.05, 0.05])
+    daily = _fatigue_daily(["0.03", "0.025", "0.02"], ["0.01", "0.01", "0.01"],
+                           ["0.05", "0.05", "0.05"])
     r = classify_video(_vm(daily=daily, clicks=300, orders=20), BASE, CFG)
     assert r.classification == Classification.WINNER
 
@@ -107,10 +109,47 @@ def test_neutral_average_video():
     assert r.classification == Classification.NEUTRAL
 
 
-def test_refund_rate_blocks_winner():
+def test_refund_rate_blocks_winner_and_yields_watch():
     r = classify_video(_vm(clicks=300, orders=20, refund_rate=Decimal("0.30")), BASE, CFG)
+    assert r.classification == Classification.WATCH
+    assert r.confidence == Confidence.MEDIUM  # downgraded from HIGH
+    assert any("refund rate 30.00% above max 15.00%" in s for s in r.reasons)
+
+
+def test_refund_rate_high_with_no_profit_is_loser():
+    r = classify_video(_vm(clicks=210, orders=10, net_profit=Decimal(0), refund_rate=Decimal("0.30")),
+                       BASE, CFG)
+    assert r.classification == Classification.LOSER
+    assert r.estimated_daily_saving == Decimal("100.00")
+    r = classify_video(_vm(clicks=210, orders=10, net_profit=Decimal(0), ad_spend=Decimal(0),
+                           refund_rate=Decimal("0.30")), BASE, CFG)
+    assert r.classification == Classification.LOSER and r.estimated_daily_saving is None
+
+
+def test_max_refund_rate_from_account_median():
+    base = ScoringBaselines(account_median_ctr=Decimal("0.02"), account_median_cvr=Decimal("0.05"),
+                            account_median_refund_rate=Decimal("0.20"))  # max 0.40
+    r = classify_video(_vm(clicks=300, orders=20, refund_rate=Decimal("0.30")), base, CFG)
+    assert r.classification == Classification.WINNER
+    r = classify_video(_vm(clicks=300, orders=20, refund_rate=Decimal("0.45")), base, CFG)
+    assert r.classification == Classification.WATCH
+    assert any("above max 40.00%" in s for s in r.reasons)
+
+
+def test_negative_profit_with_enough_orders_is_loser_regardless_of_ctr():
+    m = _vm(clicks=300, orders=20, net_profit=Decimal(-50), age_days=5)  # CTR/CVR strong
+    r = classify_video(m, BASE, CFG)
+    assert r.classification == Classification.LOSER
+    assert r.estimated_daily_saving == Decimal("20.00")
+    assert r.confidence == Confidence.HIGH
+
+
+def test_neutral_zero_orders_not_high_confidence():
+    cfg = ScoringConfig(minimum_sample_orders=0)
+    base = ScoringBaselines(account_median_ctr=Decimal("0.02"))
+    r = classify_video(_vm(clicks=210, orders=0, gmv=Decimal(0), net_profit=Decimal(0)), base, cfg)
     assert r.classification == Classification.NEUTRAL
-    assert any("refund rate" in s for s in r.reasons)
+    assert r.confidence == Confidence.MEDIUM
 
 
 def test_median():

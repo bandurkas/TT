@@ -29,7 +29,7 @@ spend of 0 yields `None`, never a division error or infinity.
 | PLATFORM_REPORTED  | Use TikTok-reported spend/attribution per campaign/ad/creative as-is | HIGH (as *reported*)  | `platform_reported` |
 | DIRECT_CREATIVE    | Ad ↔ video ↔ order link explicitly available; creative spend split across its linked orders by order value | HIGH; LOW if spend has no linked orders (all spend `unallocated`) | `direct_creative` |
 | PROPORTIONAL       | No order-level link; spend split by attributed GMV (MEDIUM) or by order count (LOW) | MEDIUM / LOW; LOW if all weights are zero (equal split) | `proportional` |
-| BLENDED            | Shop-level: `Blended Marketing Cost Ratio = Total Ad Spend / Net Revenue`, applied to each order's positive net revenue | LOW at order level (it is a ratio, not attribution) | `blended`, `blended_ratio` |
+| BLENDED            | Shop-level: `Blended Marketing Cost Ratio = Total Ad Spend / Net Revenue` where Net Revenue is the sum over **all** orders incl. negative ones (SPEC §6.4-D); spend is then allocated by positive net revenue only | LOW at order level (it is a ratio, not attribution) | `blended`, `blended_ratio` |
 
 PLATFORM_REPORTED confidence is HIGH in the sense "the figure is exactly what TikTok reported";
 it says nothing about causality — the result note always carries "reported, not incremental".
@@ -41,7 +41,8 @@ All models use `allocate_proportionally`: shares are floored to the currency qua
 `Σ allocations == input spend` exactly. Spend that cannot be assigned (no linked orders,
 undefined blended ratio, reported per-entity totals below campaign total) is returned in
 `AttributionResult.unallocated`, never dropped. Orders with non-positive net revenue receive a
-zero blended allocation.
+zero blended allocation. If reported per-entity spend exceeds the campaign total, `unallocated`
+is negative and the result carries the warning `reported_exceeds_total`.
 
 ## 4. Confidence levels
 
@@ -70,4 +71,6 @@ DIRECT_CREATIVE, HIGH. Feeding 9,000 into `order_profit` for o1 yields the §34 
 with 3,000 more headroom than the 12,000 flat example.
 
 Shop day: ad spend 1,000, order net revenues {o1: 600, o2: 300, o3: −100} →
-`blended_ratio = 1000/900 = 1.111111`, allocations `{o1: 667, o2: 333, o3: 0}`, BLENDED, LOW.
+`blended_ratio = 1000/800 = 1.25` (all orders, incl. −100), allocations by positive revenue
+`{o1: 667, o2: 333, o3: 0}`, BLENDED, LOW. The ratio is undefined (all spend `unallocated`,
+warning `undefined_ratio`) when total net revenue ≤ 0.

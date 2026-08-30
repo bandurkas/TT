@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from src.analytics import attribution, common, creative_scoring, data_quality
 from src.analytics.creative_scoring import Confidence
 from src.analytics.data_quality import (
     DataQualityInputs,
@@ -46,3 +47,9 @@ def test_missing_cogs_and_negatives_accumulate():
 def test_delayed_is_partial():
     dq = compute_data_quality(DataQualityInputs(freshness_minutes=200, missing_hours=1))
     assert dq.state == DQState.PARTIAL and dq.score == 80
+
+
+def test_single_confidence_enum_shared():
+    assert attribution.Confidence is common.Confidence
+    assert creative_scoring.Confidence is common.Confidence
+    assert data_quality.Confidence is common.Confidence

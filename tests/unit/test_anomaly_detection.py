@@ -43,6 +43,16 @@ def test_min_sample_guard():
     assert a is not None and a.severity == Severity.CRITICAL
 
 
+def test_default_min_samples_for_rate_metrics():
+    cfg = AnomalyConfig()
+    assert cfg.min_samples == {"ctr": 1000, "cvr": 30, "refund_rate": 20}
+    assert detect_anomaly("v", "1", "cvr", Decimal("0.01"), Decimal("0.05"), cfg, sample=10) is None
+    assert detect_anomaly("v", "1", "cvr", Decimal("0.01"), Decimal("0.05"), cfg) is None
+    a = detect_anomaly("v", "1", "cvr", Decimal("0.01"), Decimal("0.05"), cfg, sample=30)
+    assert a is not None and a.severity == Severity.CRITICAL
+    assert detect_anomaly("v", "1", "orders", Decimal(50), Decimal(100), cfg) is not None
+
+
 def test_detect_anomalies_batch():
     out = detect_anomalies("shop", "s", {"orders": Decimal(50), "gmv": Decimal(100)},
                            {"orders": Decimal(100), "gmv": Decimal(100)}, CFG)

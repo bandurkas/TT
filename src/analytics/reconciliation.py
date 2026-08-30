@@ -59,8 +59,9 @@ class OrderReconciliation:
     items_total: Decimal
     txn_total: Decimal | None
     settlement_total: Decimal | None
-    difference: Decimal
+    difference: Decimal  # settlement vs finance txns / order total
     notes: tuple[str, ...]
+    item_difference: Decimal = ZERO  # items_total - order_total
 
 
 @dataclass(frozen=True)
@@ -95,12 +96,11 @@ def _reconcile_order(
         notes.append("no order items")
 
     if sett_total is None:
-        diff = items_diff if item_mismatch else ZERO
         if txn_total is not None:
             notes.append(f"finance txns {txn_total} recorded, no settlement yet")
         status = ReconStatus.MISMATCH if item_mismatch else ReconStatus.PENDING
         return OrderReconciliation(o.order_id, status, o.total, items_total, txn_total,
-                                   sett_total, diff, tuple(notes))
+                                   sett_total, ZERO, tuple(notes), items_diff)
 
     expected = txn_total if txn_total is not None else o.total
     basis = "finance txns" if txn_total is not None else "order total"
@@ -115,10 +115,12 @@ def _reconcile_order(
         status = ReconStatus.PARTIAL
     elif abs(diff) > tol:
         status = ReconStatus.MISMATCH
+    elif not items:
+        status = ReconStatus.PARTIAL  # cannot confirm without items
     else:
         status = ReconStatus.MATCHED
     return OrderReconciliation(o.order_id, status, o.total, items_total, txn_total, sett_total,
-                               diff, tuple(notes))
+                               diff, tuple(notes), items_diff)
 
 
 def reconcile(

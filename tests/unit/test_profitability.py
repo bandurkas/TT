@@ -139,6 +139,24 @@ def test_partial_refund() -> None:
     assert r.profit_status is ProfitStatus.SETTLED
 
 
+def test_refund_in_later_settlement_is_adjusted() -> None:
+    txns = SPEC_TXNS + [txn("r1", "refund", 20000, settlement="s2")]
+    r = order_profit("o", ORDER_DATE, [item()], txns, [cost()], ADS)
+    assert r.estimated_net_profit == D(3500)
+    assert r.profit_status is ProfitStatus.ADJUSTED
+    # any REDUCES-type txn outside the sale's settlement: same rule
+    txns = SPEC_TXNS + [txn("f9", "service_fee", 100, settlement="s3")]
+    assert order_profit("o", ORDER_DATE, [item()], txns, [cost()], ADS).profit_status is (
+        ProfitStatus.ADJUSTED
+    )
+    # PAID sale with a later refund: ADJUSTED beats PAID
+    txns = [txn("t1", "sale", 75000, settlement="s1", payout="p1"),
+            txn("r1", "refund", 1000, settlement="s2")]
+    assert order_profit("o", ORDER_DATE, [item()], txns, [cost()]).profit_status is (
+        ProfitStatus.ADJUSTED
+    )
+
+
 def test_full_refund_status() -> None:
     txns = SPEC_TXNS + [txn("r1", "refund", 75000, settlement="s1")]
     r = order_profit("o", ORDER_DATE, [item()], txns, [cost()], ADS)
@@ -222,6 +240,24 @@ def test_multiple_skus_split_reconciles() -> None:
     assert i2.net_seller_revenue == D(35999) - D(3000)
     assert i1.allocated_ad_cost == D(5) and i2.allocated_ad_cost == D(2)
     assert i1.costs.cogs == D(20000) and i2.costs.cogs == D(20000)
+
+
+def test_unknown_order_item_id_warns_and_allocates_order_level() -> None:
+    items = [item("i1", "A", qty=1, price=60000), item("i2", "B", qty=1, price=40000)]
+    txns = [txn("s", "sale", 100000, settlement="s1"),
+            txn("f", "platform_commission", 10000, item="ghost", settlement="s1")]
+    versions = [cost("A", cogs_per_unit=D(1)), cost("B", cogs_per_unit=D(1))]
+    r = order_profit("o", ORDER_DATE, items, txns, versions)
+    assert any("1 txns reference unknown order_item_id" in w for w in r.warnings)
+    assert r.net_seller_revenue == D(90000)
+    assert [i.net_seller_revenue for i in r.items] == [D(54000), D(36000)]
+
+
+def test_informational_item_fields_do_not_affect_profit() -> None:
+    it = OrderItemInput("i1", "LOMIRA-WHITE-5", 1, D(75000), IDR, discounts=D(5000))
+    assert it.net_item_value == D(70000)
+    r = order_profit("o1", ORDER_DATE, [it], SPEC_TXNS, [cost()], ADS)
+    assert r.estimated_net_profit == D(23500)
 
 
 def test_historical_cogs_version() -> None:

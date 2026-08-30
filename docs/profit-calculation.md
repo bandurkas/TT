@@ -30,6 +30,9 @@ Internal per-unit costs come from the `CostVersion` effective on the order date
 is open-ended, overlapping versions resolve to the latest `effective_from`, no match raises
 `CostVersionNotFoundError` (never silently zero COGS). Per-item cost = per-unit × quantity.
 
+`OrderItemInput.discounts` / `net_item_value` are **informational** (listing view only); seller
+discounts enter profit exclusively through `SELLER_DISCOUNT` transactions.
+
 `UNKNOWN` transactions are **excluded** from every figure, but their count and summed raw amount
 are reported (`RevenueBreakdown.unknown_amount/unknown_count`) and an `OrderProfit.warnings`
 entry is added. They are never forced into another category (SPEC §5.7).
@@ -81,7 +84,9 @@ which overrides the native mapping.
 * Transactions with `order_item_id` matching an item are applied to that item only.
 * Order-level transactions (no/unknown `order_item_id`) are summed into one net figure and split
   across items proportionally by `gross_item_value = unit_sale_price × quantity` using the
-  rule above. Allocated ads are split the same way.
+  rule above. Allocated ads are split the same way. A transaction whose `order_item_id` matches
+  no item is still allocated order-level and produces the warning
+  `"N txns reference unknown order_item_id; allocated order-level"`.
 * Guarantee: `Σ item.net_seller_revenue == order.net_seller_revenue`,
   `Σ item.allocated_ad_cost == order.allocated_ad_cost`,
   `Σ item.estimated_net_profit == order.estimated_net_profit`.
@@ -94,11 +99,12 @@ Derived by `derive_profit_status`, precedence top to bottom:
 |-------------|---------------------------------------------------------------------------------------|
 | REFUNDED    | `sale_proceeds > 0` and `refunds >= sale_proceeds`                                    |
 | PROVISIONAL | no SALE_PROCEEDS transaction, or any SALE_PROCEEDS transaction lacks `settlement_id`  |
-| ADJUSTED    | settled, and an adjustment-type transaction exists whose `settlement_id` is not one of the sale's settlements (i.e. arrived after/outside settlement) |
+| ADJUSTED    | settled, and an adjustment-type **or REDUCES-type** transaction (refund, fee, tax, shipping, seller discount, …) exists whose `settlement_id` is not one of the sale's settlements (i.e. arrived after/outside settlement, incl. a post-settlement partial refund) |
 | PAID        | settled and every SALE_PROCEEDS transaction has a `payout_id`                        |
 | SETTLED     | otherwise                                                                             |
 
-A partial refund does not change status by itself. Historical profit is mutable (SPEC §20):
+A partial refund inside the sale's settlement does not change status; a partial refund settled
+later (different `settlement_id`) marks the order ADJUSTED. Historical profit is mutable (SPEC §20):
 recompute whenever new transactions arrive; the caller is responsible for versioning results.
 
 ## 6. Guards
@@ -123,7 +129,8 @@ Estimated Net Profit          = 35,500 - 12,000                   = 23,500
 profit_status = SETTLED   attribution_method = DIRECT_CREATIVE   attribution_confidence = HIGH
 ```
 
-Variants (tested): partial refund 20,000 → 3,500 (SETTLED); full refund → −51,500 (REFUNDED);
+Variants (tested): partial refund 20,000 in s1 → 3,500 (SETTLED); the same refund in s2 → 3,500
+(ADJUSTED); full refund → −51,500 (REFUNDED);
 adjustment +1,000 in settlement s2 → 24,500 (ADJUSTED); adjustment −2,000 → 21,500 (ADJUSTED);
 no settlement ids → 23,500 but PROVISIONAL; order dated 2026-07-15 with older COGS 20,000 →
 28,500.

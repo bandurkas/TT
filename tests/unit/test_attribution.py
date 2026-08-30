@@ -49,6 +49,12 @@ def test_allocate_negative_total() -> None:
     assert sum(out.values()) == D(-10)
 
 
+def test_allocate_zero_share_is_plain_zero_not_negative_zero() -> None:
+    out = allocate_proportionally(D(-10), {"a": D(1), "b": D(0)}, "IDR")
+    assert out == {"a": D(-10), "b": D(0)}
+    assert not out["b"].is_signed() and str(out["b"]) == "0"
+
+
 def test_allocate_zero_weights_equal_split() -> None:
     out = allocate_proportionally(D(7), {"a": D(0), "b": D(0)}, "IDR")
     assert out == {"a": D(4), "b": D(3)}
@@ -69,6 +75,13 @@ def test_platform_reported_passthrough() -> None:
     assert r.allocated_total == D(15000)
     assert r.unallocated == D(1000)
     assert "not incremental" in r.note
+    assert r.warnings == ()
+
+
+def test_platform_reported_over_allocation_warns() -> None:
+    r = platform_reported({"c1": D(12000)}, "IDR", total_spend=D(10000))
+    assert r.unallocated == D(-2000)
+    assert "reported_exceeds_total" in r.warnings
 
 
 def test_direct_creative_splits_by_order_value() -> None:
@@ -119,6 +132,13 @@ def test_blended_allocation_reconciles_and_is_low_confidence() -> None:
     assert r.confidence is Confidence.LOW
     assert r.allocations == {"o1": D(667), "o2": D(333), "o3": D(0)}
     assert r.allocated_total == D(1000)
+    assert "ratio 1.250000 = 1000/800" in r.note  # SPEC §6.4-D: all net revenue, incl. negative
+
+
+def test_blended_undefined_when_negative_orders_dominate() -> None:
+    r = blended(D(1000), {"o1": D(100), "o2": D(-300)}, "IDR")
+    assert r.unallocated == D(1000) and "undefined_ratio" in r.warnings
+    assert r.allocations == {"o1": D(0), "o2": D(0)}
 
 
 def test_blended_undefined_when_no_revenue() -> None:
