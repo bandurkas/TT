@@ -135,3 +135,53 @@ def test_tasks_create_patch_list():
         lst = c.get("/api/tasks").json()
         assert lst["columns"]["review"][0]["id"] == 7 and lst["tasks"][0]["title"] == "Review GMV Max budget"
     app.dependency_overrides.clear()
+
+
+def test_manual_advertising_endpoint_recomputes():
+    c, _session = client()
+    with patch.object(A.L, "shop_and_config", lambda s, sid: (SHOP, CFG)), \
+         patch.object(A, "record_manual_ad_day", lambda *a, **k: {"report_id": 9, "unchanged": False, "partial": True}), \
+         patch.object(A.profit_jobs, "compute_order_profits", lambda s, sid: {"dates": [], "orders": 7, "inserted": 1}), \
+         patch.object(A.profit_aggregates, "recompute_daily", lambda s, sid, d, tz: {}), \
+         patch.object(A, "advertising_summary", lambda *a: {"days": [{"date": "2026-09-01", "cost": D(421192),
+                                                                       "source": "manual_entry", "partial": True}]}):
+        r = c.post("/api/advertising/manual", json={"date": "2026-09-01", "cost": "421192", "sku_orders": 9,
+                                                    "gross_revenue": "735034"})
+        assert r.status_code == 201, r.text
+        body = r.json()
+        assert body["report_id"] == 9 and body["recomputed"] == {"orders": 7, "inserted": 1}
+        assert body["day"]["cost"] == "421192" and body["day"]["source"] == "manual_entry"
+        assert c.post("/api/advertising/manual", json={"date": "2026-09-01", "cost": "-1"}).status_code == 422
+
+        def reject(*a, **k):
+            raise ValueError("newer exists")
+        with patch.object(A, "record_manual_ad_day", reject):
+            r = c.post("/api/advertising/manual", json={"date": "2026-09-01", "cost": "1"})
+            assert r.status_code == 422 and "newer" in r.json()["detail"]
+    app.dependency_overrides.clear()
+
+
+def test_costs_lot_endpoints():
+    c, session = client()
+    with patch.object(A.L, "shop_and_config", lambda s, sid: (SHOP, CFG)), \
+         patch.object(A.COSTS, "rebuild_cost_versions", lambda s, sid, cur, tz: {"versions": 3, "skus_with_lots": 2}), \
+         patch.object(A.profit_jobs, "compute_order_profits", lambda s, sid: {"dates": [], "orders": 90, "inserted": 12}), \
+         patch.object(A.profit_aggregates, "recompute_daily", lambda s, sid, dd, tz: {}):
+        def add(lot):
+            lot.id = 11
+        session.add.side_effect = add
+        r = c.post("/api/costs/lots", json={"scope": "all", "received_on": "2026-09-01", "unit_cost": "20000",
+                                            "quantity": 300, "note": "batch 2"})
+        assert r.status_code == 201, r.text
+        assert r.json() == {"lot_id": 11, "versions": 3, "skus_with_lots": 2, "recomputed": {"orders": 90, "inserted": 12}}
+        assert c.post("/api/costs/lots", json={"scope": "sku", "received_on": "2026-09-01", "unit_cost": "1"}).status_code == 422
+        lot = NS(id=11, shop_id=1, quantity=300, received_on=date(2026, 9, 1), unit_cost=D(20000), note=None, active=True)
+        session.get.side_effect = lambda model, i: lot if i == 11 else None
+        r = c.patch("/api/costs/lots/11", json={"quantity": 0, "active": False})
+        assert r.status_code == 200 and lot.quantity is None and lot.active is False
+        assert c.patch("/api/costs/lots/12", json={"active": False}).status_code == 404
+        cfg = NS(shop_id=1, default_cogs_per_unit=D(25000))
+        session.scalar.return_value = cfg
+        r = c.post("/api/costs/default", json={"default_cogs_per_unit": "20000"})
+        assert r.status_code == 200 and cfg.default_cogs_per_unit == D(20000) and r.json()["default_cogs_per_unit"] == "20000"
+    app.dependency_overrides.clear()

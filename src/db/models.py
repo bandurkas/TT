@@ -517,5 +517,6 @@ class AuditLog(PKMixin, Base):
     after: Mapped[dict | None] = mapped_column(JSONB)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
+from src.db import models_costs as _models_costs  # noqa: F401  (extends schema)
 from src.db import models_finance as _models_finance  # noqa: F401  (extends schema)
 from src.db import models_reports as _models_reports  # noqa: F401

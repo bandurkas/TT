@@ -96,3 +96,69 @@ def test_waterfall_calendar_cost_includes_unallocated_spend():
     steps = {r["key"]: r for r in waterfall([p], {"cost": D(50000)})["steps"]}
     assert steps["ad_deductions_blended"]["amount"] == -50000
     assert steps["net_profit"]["amount"] == p.contribution_profit - D(50000)
+
+
+def test_record_manual_ad_day_validation_and_payload(monkeypatch):
+    from datetime import UTC, date, datetime, timedelta
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from src.domain import reports as R
+    session = MagicMock()
+    session.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+    session.scalar.return_value = None
+    session.execute.return_value.first.return_value = None
+    now = datetime(2026, 8, 31, 13, 0, tzinfo=UTC)  # 20:00 Jakarta, 31 Aug (past)
+    with pytest.raises(ValueError):
+        R.record_manual_ad_day(session, 1, date(2026, 9, 1), 1, 0, 0, now, "Asia/Jakarta")  # future
+    with pytest.raises(ValueError):
+        R.record_manual_ad_day(session, 1, date(2026, 8, 31), 1, 0, 0, now, "Asia/Jakarta", final=True)  # not over
+    with pytest.raises(ValueError):
+        R.record_manual_ad_day(session, 1, date(2026, 8, 31), -1, 0, 0, now, "Asia/Jakarta")
+    with pytest.raises(ValueError):
+        R.record_manual_ad_day(session, 1, date(2026, 8, 31), 1, 0, 0, now, "UTC")
+    with pytest.raises(ValueError):
+        R.record_manual_ad_day(session, 1, date(2026, 9, 1), 1, 0, 0, now + timedelta(hours=1), "Asia/Jakarta")
+    out = R.record_manual_ad_day(session, 1, date(2026, 8, 31), "421192", 9, "735034", now, "Asia/Jakarta", note="20:00 screen")
+    assert out["unchanged"] is False and out["partial"] is True and out["period"] == ["2026-08-31", "2026-08-31"]
+    report = session.add.call_args_list[0].args[0]
+    assert report.data["scope"] == "manual_entry" and report.data["days"][0]["cost"] == "421192"
+    assert report.filename.startswith("manual-entry 2026-08-31 @ 20:00")
+    day = session.add.call_args_list[1].args[0]
+    assert day.cost == R.number("421192") and day.partial is True
+    # completed day entered next morning with final=True -> not partial
+    session.reset_mock(); session.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+    session.scalar.return_value = None; session.execute.return_value.first.return_value = None
+    out2 = R.record_manual_ad_day(session, 1, date(2026, 8, 30), 1, 0, 0, now, "Asia/Jakarta", final=True)
+    assert out2["partial"] is False
+    # older-or-equal observation is rejected
+    session.execute.return_value.first.return_value = (NS(), NS(observed_at=now))
+    with pytest.raises(ValueError):
+        R.record_manual_ad_day(session, 1, date(2026, 8, 30), 2, 0, 0, now, "Asia/Jakarta", final=True)
+
+
+def test_coverage_source_labels_manual(monkeypatch):
+    from datetime import UTC, date, datetime
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    from src.domain import reports as R
+    rows = [NS(metric_date=date(2026, 8, 31), cost=R.number(73989), partial=True, sku_orders=1,
+               gross_revenue=R.number(1), report_id=1),
+            NS(metric_date=date(2026, 9, 1), cost=R.number(421192), partial=True, sku_orders=9,
+               gross_revenue=R.number(735034), report_id=4)]
+    reps = [NS(id=1, filename="Campaign overview.xlsx", sha256="a", observed_at=datetime(2026, 8, 30, tzinfo=UTC),
+               timezone="Asia/Jakarta", period_start=date(2025, 8, 31), period_end=date(2026, 8, 31),
+               data={"scope": "shop_overview"}),
+            NS(id=4, filename="manual-entry 2026-09-01 @ 20:00 Asia/Jakarta", sha256="b",
+               observed_at=datetime(2026, 9, 1, 13, tzinfo=UTC), timezone="Asia/Jakarta",
+               period_start=date(2026, 9, 1), period_end=date(2026, 9, 1), data={"scope": "manual_entry", "note": "n"})]
+    session = MagicMock()
+    monkeypatch.setattr(R, "ad_days", lambda s, sid: rows)
+    session.scalars.return_value = reps
+    monkeypatch.setattr("src.domain.dashboard.loaders.ad_deductions", lambda *a: [])
+    out = R.advertising_summary(session, 1, date(2026, 8, 31), date(2026, 9, 1), "Asia/Jakarta")
+    assert [d["source"] for d in out["days"]] == ["shop_overview", "manual_entry"]
+    assert out["days"][1]["note"] == "n" and out["manual_days"] == 1 and "manual" in out["source"]

@@ -11,13 +11,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from src.analytics.creative_scoring import ScoringConfig
-from src.db.models import Task
+from src.db.models import ShopConfig, Task
+from src.db.models_costs import CostBatch
 from src.db.session import SessionLocal
+from src.domain import costs as COSTS
 from src.domain.dashboard import compute as C
 from src.domain.dashboard import insights as I
 from src.domain.dashboard import loaders as L
 from src.domain.dashboard import order_loaders as OL
-from src.domain.reports import advertising_summary
+from src.domain.profit import aggregates as profit_aggregates
+from src.domain.profit import jobs as profit_jobs
+from src.domain.reports import advertising_summary, record_manual_ad_day
 
 router = APIRouter(prefix="/api")
 TASK_STATUSES = ("today", "in_progress", "review", "done")
@@ -265,6 +269,123 @@ def insights(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
                "opportunities": [f for f in items if f["kind"] == "opportunity"],
                "risks": [f for f in items if f["kind"] == "risk" and f["severity"] in ("CRITICAL", "WARNING")],
                "note": "Deterministic rules; impact = estimate unless measured=true. LLM narrative: not enabled."})
+
+
+# --- advertising: manual daily Cost until the Ads API is approved --------------------------------
+class ManualAdDay(BaseModel):
+    date: date
+    cost: Decimal = Field(ge=0)
+    sku_orders: int = Field(ge=0, default=0)
+    gross_revenue: Decimal = Field(ge=0, default=Decimal(0))
+    final: bool = False  # True = the day is over and these are its closing figures
+    note: str | None = Field(None, max_length=500)
+    observed_at: datetime | None = None  # default now; must be tz-aware
+
+
+@router.get("/advertising")
+def advertising(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
+    return _n({**c.meta(), **c.advertising(c.period),
+               "entry_note": "Manual entry = operator-transcribed Ads Manager figures; replaced only by a "
+                             "newer observation; superseded automatically once the Ads API is connected."})
+
+
+@router.post("/advertising/manual", status_code=201)
+def advertising_manual(body: ManualAdDay, dep: Any = Depends(shop_dep)) -> dict[str, Any]:
+    shop, session = dep
+    tz = shop.timezone or "Asia/Jakarta"
+    observed = body.observed_at or datetime.now(UTC)
+    if observed.tzinfo is None:
+        raise HTTPException(422, "observed_at must be timezone-aware")
+    try:
+        res = record_manual_ad_day(session, shop.id, body.date, body.cost, body.sku_orders, body.gross_revenue,
+                                   observed, tz, final=body.final, note=body.note or "")
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    if not res.get("unchanged"):
+        calc = profit_jobs.compute_order_profits(session, shop.id)
+        profit_aggregates.recompute_daily(session, shop.id, calc["dates"] or None, tz)
+        res["recomputed"] = {"orders": calc["orders"], "inserted": calc["inserted"]}
+    summary = advertising_summary(session, shop.id, body.date, body.date, tz)
+    return _n({**res, "day": summary["days"][0] if summary["days"] else None})
+
+
+# --- product costs: lots (purchase batches) with FIFO -> cost versions ---------------------------
+class LotIn(BaseModel):
+    scope: Literal["all", "product", "sku"] = "all"
+    product_id: int | None = None
+    sku_id: int | None = None
+    received_on: date
+    unit_cost: Decimal = Field(ge=0)
+    quantity: int | None = Field(None, ge=1)
+    note: str | None = Field(None, max_length=500)
+
+
+class LotPatch(BaseModel):
+    received_on: date | None = None
+    unit_cost: Decimal | None = Field(None, ge=0)
+    quantity: int | None = Field(None, ge=0)  # 0 -> clears to "until next lot"
+    note: str | None = None
+    active: bool | None = None
+
+
+class DefaultCogsIn(BaseModel):
+    default_cogs_per_unit: Decimal | None = Field(None, ge=0)
+
+
+def _cost_rebuild(session: Any, shop: Any) -> dict[str, Any]:
+    tz = shop.timezone or "Asia/Jakarta"
+    rb = COSTS.rebuild_cost_versions(session, shop.id, shop.currency, tz)
+    calc = profit_jobs.compute_order_profits(session, shop.id)
+    profit_aggregates.recompute_daily(session, shop.id, calc["dates"] or None, tz)
+    return {"versions": rb["versions"], "skus_with_lots": rb["skus_with_lots"],
+            "recomputed": {"orders": calc["orders"], "inserted": calc["inserted"]}}
+
+
+@router.get("/costs")
+def costs(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
+    return _n({**c.meta(), **COSTS.cost_overview(c.session, c.shop.id, c.cfg, c.today, c.tz)})
+
+
+@router.post("/costs/lots", status_code=201)
+def create_lot(body: LotIn, dep: Any = Depends(shop_dep)) -> dict[str, Any]:
+    shop, session = dep
+    if body.scope == "product" and not body.product_id or body.scope == "sku" and not body.sku_id:
+        raise HTTPException(422, "product_id / sku_id required for that scope")
+    lot = CostBatch(shop_id=shop.id, scope=body.scope, product_id=body.product_id if body.scope == "product" else None,
+                    sku_id=body.sku_id if body.scope == "sku" else None, received_on=body.received_on,
+                    unit_cost=body.unit_cost, quantity=body.quantity, currency=shop.currency, note=body.note,
+                    active=True)
+    session.add(lot)
+    session.commit()
+    return _n({"lot_id": lot.id, **_cost_rebuild(session, shop)})
+
+
+@router.patch("/costs/lots/{lot_id}")
+def patch_lot(lot_id: int, body: LotPatch, dep: Any = Depends(shop_dep)) -> dict[str, Any]:
+    shop, session = dep
+    lot = session.get(CostBatch, lot_id)
+    if lot is None or lot.shop_id != shop.id:
+        raise HTTPException(404, "lot not found")
+    data = body.model_dump(exclude_unset=True)
+    if "quantity" in data:
+        lot.quantity = data["quantity"] or None
+    for k in ("received_on", "unit_cost", "note", "active"):
+        if k in data:
+            setattr(lot, k, data[k])
+    session.commit()
+    return _n({"lot_id": lot.id, **_cost_rebuild(session, shop)})
+
+
+@router.post("/costs/default")
+def set_default_cogs(body: DefaultCogsIn, dep: Any = Depends(shop_dep)) -> dict[str, Any]:
+    shop, session = dep
+    cfg = session.scalar(select(ShopConfig).where(ShopConfig.shop_id == shop.id))
+    if cfg is None:
+        cfg = ShopConfig(shop_id=shop.id)
+        session.add(cfg)
+    cfg.default_cogs_per_unit = body.default_cogs_per_unit
+    session.commit()
+    return _n({"default_cogs_per_unit": cfg.default_cogs_per_unit, **_cost_rebuild(session, shop)})
 
 
 # --- tasks (existing `tasks` table: why/expected_impact/source_entity/evaluation JSONB) ---------

@@ -1,6 +1,7 @@
 """Strict read-only XLSX extraction and idempotent, auditable shop report ingestion."""
 import hashlib
 import io
+import json
 import posixpath
 import re
 from collections import defaultdict
@@ -184,6 +185,61 @@ def import_report(session, shop_id, path, kind, timezone, observed_at):
             "period": [str(start), str(end)], "rows": len(data.get("days", data.get("operations", [])))}
 
 
+MANUAL_SCOPE = "manual_entry"
+
+
+def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue, observed_at, timezone,
+                         final=False, note="", entered_by="dashboard"):
+    """Operator-entered daily Cost (from the Ads Manager / GMV Max overview screen) until the Ads API
+    is approved. Same audit trail as XLSX imports: a SourceReport (kind=ads, scope manual_entry) with a
+    content hash, and a ShopAdDay row that only a NEWER observation may replace. `final=False` keeps the
+    day flagged partial (figures still moving); `final=True` marks the day complete."""
+    if observed_at.tzinfo is None or observed_at > datetime.now(UTC) + timedelta(minutes=5):
+        raise ValueError("Observed-at must be timezone-aware and not in the future")
+    shop = session.get(Shop, shop_id)
+    if not shop or timezone != shop.timezone:
+        raise ValueError("Explicit report timezone must match the shop timezone")
+    cost, gross_revenue = number(cost), number(gross_revenue)
+    sku_orders = int(sku_orders)
+    if min(cost, gross_revenue) < 0 or sku_orders < 0:
+        raise ValueError("Cost, SKU orders and gross revenue must be non-negative")
+    observed_day = observed_at.astimezone(ZoneInfo(timezone)).date()
+    if day > observed_day:
+        raise ValueError("Report contains future dates")
+    if final and day >= observed_day:
+        raise ValueError("A day can only be marked final after it has ended in the shop timezone")
+    payload = {"days": [{"date": str(day), "cost": str(cost), "sku_orders": sku_orders,
+                         "gross_revenue": str(gross_revenue), "row": 1}],
+               "cost": str(cost), "sku_orders": sku_orders, "reported_gross_revenue": str(gross_revenue),
+               "revenue_rounding_difference": "0", "scope": MANUAL_SCOPE, "metric": "Cost",
+               "taxes_and_credits": "not_reconciled", "final": bool(final), "note": (note or "")[:500],
+               "entered_by": entered_by, "observed_at": observed_at.isoformat(timespec="seconds")}
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+    prior = session.scalar(select(SourceReport).where(SourceReport.shop_id == shop_id,
+                           SourceReport.kind == "ads", SourceReport.sha256 == digest))
+    if prior:
+        return {"report_id": prior.id, "unchanged": True}
+    pair = session.execute(select(ShopAdDay, SourceReport)
+                           .join(SourceReport, SourceReport.id == ShopAdDay.report_id)
+                           .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date == day)).first()
+    if pair and pair[1].observed_at >= observed_at:
+        raise ValueError("A newer or equal observation for this day already exists; enter a later one")
+    report = SourceReport(shop_id=shop_id, kind="ads", sha256=digest,
+                          filename=f"manual-entry {day} @ {observed_at.astimezone(ZoneInfo(timezone)):%H:%M} {timezone}",
+                          currency=shop.currency, timezone=timezone, period_start=day, period_end=day,
+                          observed_at=observed_at, imported_at=datetime.now(UTC), data=payload)
+    session.add(report)
+    session.flush()
+    d = pair[0] if pair else ShopAdDay(shop_id=shop_id, metric_date=day)
+    d.report_id, d.currency = report.id, shop.currency
+    d.cost, d.sku_orders, d.gross_revenue = cost, sku_orders, gross_revenue
+    d.partial = (day >= observed_day) or not final
+    session.add(d)
+    session.commit()
+    return {"report_id": report.id, "unchanged": False, "sha256": digest, "period": [str(day), str(day)],
+            "rows": 1, "partial": d.partial}
+
+
 def ad_days(session, shop_id):
     # Fail closed for historical currency changes; never mix incompatible money.
     return list(session.scalars(select(ShopAdDay).join(Shop, Shop.id == ShopAdDay.shop_id)
@@ -211,14 +267,25 @@ def advertising_summary(session, shop_id, start, end, timezone):
     result["gmv_pay"] = sum((r["amount"] for r in payments), ZERO)
     result["payment_basis"] = "statement_date; not campaign Cost"
     ids = {r.report_id for r in days if start <= r.metric_date <= end}
-    reports = list(session.scalars(select(SourceReport).where(SourceReport.id.in_(ids)))) if ids else []
+    reports = {r.id: r for r in session.scalars(select(SourceReport).where(SourceReport.id.in_(ids)))} if ids else {}
     result["reports"] = [{"filename": r.filename, "sha256": r.sha256,
                            "observed_at": r.observed_at, "timezone": r.timezone,
                            "timezone_basis": "operator_confirmed",
-                           "period_start": r.period_start, "period_end": r.period_end} for r in reports]
+                           "scope": (r.data or {}).get("scope", "shop_overview"),
+                           "period_start": r.period_start, "period_end": r.period_end} for r in reports.values()]
     result["days"] = [{"date": r.metric_date, "cost": r.cost, "partial": r.partial,
-                        "sku_orders": r.sku_orders, "gross_revenue": r.gross_revenue}
+                        "sku_orders": r.sku_orders, "gross_revenue": r.gross_revenue,
+                        "source": (reports.get(r.report_id).data or {}).get("scope", "shop_overview")
+                        if r.report_id in reports else "shop_overview",
+                        "observed_at": reports[r.report_id].observed_at if r.report_id in reports else None,
+                        "note": ((reports.get(r.report_id).data or {}).get("note") or None)
+                        if r.report_id in reports else None}
                        for r in sorted(days, key=lambda r: r.metric_date) if start <= r.metric_date <= end]
+    manual = sum(1 for d in result["days"] if d["source"] == MANUAL_SCOPE)
+    result["manual_days"] = manual
+    result["source"] = ("Campaign overview · Cost" if not manual else
+                        "Manual entry from Ads Manager · Cost (until Ads API)" if manual == len(result["days"])
+                        else "Campaign overview + manual entry · Cost")
     return result
 
 
