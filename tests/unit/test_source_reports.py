@@ -168,7 +168,7 @@ def test_manual_ad_day_guards_against_period_totals_and_thinner_records():
     with pytest.raises(R.NeedsConfirmation, match="SKU orders 87"):
         call(session_with(actual), "5062670", 87, "8636752")
     # GMV alone trips it too, when orders happen to look sane
-    with pytest.raises(R.NeedsConfirmation, match="Gross revenue"):
+    with pytest.raises(R.NeedsConfirmation, match=r"Gross revenue 8636752 is over 2x the 825000 GMV"):
         call(session_with(actual), "5062670", 10, "8636752")
     # the real day passes untouched
     out = call(session_with(actual), "450000", 10, "810904")
@@ -179,7 +179,7 @@ def test_manual_ad_day_guards_against_period_totals_and_thinner_records():
 
     # 2. a fuller record replaced by a thinner one
     prior = NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904"))
-    with pytest.raises(R.NeedsConfirmation, match="far below"):
+    with pytest.raises(R.NeedsConfirmation, match=r"Cost 2000 is far below the 450000 "):
         call(session_with(actual, prior), "2000", 10, "810904")
     with pytest.raises(R.NeedsConfirmation, match="blank SKU orders and gross revenue"):
         call(session_with(actual, prior), "450000", 0, "0")

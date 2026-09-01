@@ -204,6 +204,11 @@ def _shop_daily(session, shop_id, day):
                                                   ShopDaily.metric_date == day))
 
 
+def _plain(v):
+    """Money for an operator-facing message: 450000.000000 -> 450000."""
+    return f"{v.normalize():f}"
+
+
 def _range_hint(day):
     return (f"Ads Manager reports the selected date range; these look like period totals, not one day. "
             f"Re-select {day} alone, or confirm to save them as entered.")
@@ -220,13 +225,14 @@ def _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, pr
             raise NeedsConfirmation(f"SKU orders {sku_orders} is over {PERIOD_TOTAL_FACTOR}x the {units} "
                                     f"units the shop actually sold on {day}. " + _range_hint(day))
         if gmv > ZERO and gross_revenue > PERIOD_TOTAL_FACTOR * gmv:
-            raise NeedsConfirmation(f"Gross revenue {gross_revenue} is over {PERIOD_TOTAL_FACTOR}x the "
-                                    f"{gmv} GMV the shop actually made on {day}. " + _range_hint(day))
+            raise NeedsConfirmation(f"Gross revenue {_plain(gross_revenue)} is over {PERIOD_TOTAL_FACTOR}x the "
+                                    f"{_plain(gmv)} GMV the shop actually made on {day}. " + _range_hint(day))
     if prior_day is None:
         return
     prior_cost = number(prior_day.cost or 0)
     if prior_cost > ZERO and cost < prior_cost * COST_DROP_FACTOR:
-        raise NeedsConfirmation(f"Cost {cost} is far below the {prior_cost} already recorded for {day}, and "
+        raise NeedsConfirmation(f"Cost {_plain(cost)} is far below the {_plain(prior_cost)} already "
+                                f"recorded for {day}, and "
                                 f"ad spend does not fall within a day. This would overwrite a fuller record; "
                                 f"check the figure, or confirm to replace it.")
     emptied = [name for name, old, new in (("SKU orders", int(prior_day.sku_orders or 0), sku_orders),
