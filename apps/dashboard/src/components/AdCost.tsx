@@ -3,7 +3,7 @@ import { useState } from "react";
 import { EnHint, useLang, useT } from "@/lib/i18n";
 import { dateTime, dayMon, idr, int, toISODate } from "@/lib/format";
 import { shopToday } from "@/lib/period";
-import { apiPost } from "@/lib/api";
+import { ApiError, apiPost } from "@/lib/api";
 import type { Advertising, ManualAdIn, ManualAdOut } from "@/lib/types";
 import { Pill } from "./ui";
 import { recomputedText } from "@/lib/orders";
@@ -14,31 +14,41 @@ export default function AdCost({ adv, onApplied, timezone }: { adv: Advertising 
   const [f, setF] = useState({ date: today, cost: "", sku_orders: "", gross_revenue: "", final: false, note: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Set when the server refused figures that look like a period's totals, or that would thin out a
+  // fuller record. Nothing is saved until the operator re-sends the same figures with confirm.
+  const [needsConfirm, setNeedsConfirm] = useState(false);
   const [ok, setOk] = useState<ManualAdOut | null>(null);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const post = async (confirm: boolean) => {
     setBusy(true); setErr(null); setOk(null);
-    const body: ManualAdIn = { date: f.date, cost: f.cost || "0", sku_orders: Number(f.sku_orders || 0), gross_revenue: f.gross_revenue || "0", final: f.final, note: f.note || null };
+    const body: ManualAdIn = { date: f.date, cost: f.cost || "0", sku_orders: Number(f.sku_orders || 0), gross_revenue: f.gross_revenue || "0", final: f.final, note: f.note || null, ...(confirm ? { confirm: true } : {}) };
     try {
       const res = await apiPost<ManualAdOut>("/api/advertising/manual", body);
-      setOk(res); setF((x) => ({ ...x, cost: "", sku_orders: "", gross_revenue: "", note: "" })); onApplied();
-    } catch (x) { setErr(x instanceof Error ? x.message : String(x)); }
+      setOk(res); setNeedsConfirm(false); setF((x) => ({ ...x, cost: "", sku_orders: "", gross_revenue: "", note: "" })); onApplied();
+    } catch (x) {
+      setErr(x instanceof Error ? x.message : String(x));
+      setNeedsConfirm(x instanceof ApiError && x.confirmable);
+    }
     setBusy(false);
   };
+  const submit = (e: React.FormEvent) => { e.preventDefault(); void post(false); };
+  // Any edit invalidates the warning: the operator is now confirming different figures.
+  const edit = (patch: Partial<typeof f>) => { setF({ ...f, ...patch }); setNeedsConfirm(false); setErr(null); };
   const days = adv?.days ?? [];
   const last = days.length ? days[days.length - 1] : null;
   return (
     <div className="card" style={{ padding: 14 }}>
       <form className="form" style={{ padding: "10px 0 0", gridTemplateColumns: "repeat(6, 1fr)" }} onSubmit={submit} aria-label={t("Enter today's ad Cost from Ads Manager")}>
-        <div className="wide" style={{ fontWeight: 600 }}>{t("Enter today's ad Cost from Ads Manager")} <Pill tone="warn">{t("Manual entry")}</Pill></div>
-        <label>{t("Date")}<input type="date" required max={today} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
-        <label>{t("Cost (IDR)")}<input type="number" min="0" step="1" required inputMode="numeric" value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} /></label>
-        <label>{t("SKU orders")}<input type="number" min="0" step="1" inputMode="numeric" value={f.sku_orders} onChange={(e) => setF({ ...f, sku_orders: e.target.value })} /></label>
-        <label>{t("Gross revenue")}<input type="number" min="0" step="1" inputMode="numeric" value={f.gross_revenue} onChange={(e) => setF({ ...f, gross_revenue: e.target.value })} /></label>
-        <label>{t("Note (optional)")}<input maxLength={500} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
-        <label className="inline"><input type="checkbox" checked={f.final} onChange={(e) => setF({ ...f, final: e.target.checked })} />{t("Day complete (final figures)")}</label>
+        <div className="wide" style={{ fontWeight: 600 }}>{t("Enter today's ad Cost from Ads Manager")} <Pill tone="warn">{t("Manual entry")}</Pill> <Pill tone="gray">{t("One day only — not a date range")}</Pill></div>
+        <div className="wide tiny">{t("Ads Manager shows the date range you selected. Select this one day there before copying the figures.")}</div>
+        <label>{t("Date")}<input type="date" required max={today} value={f.date} onChange={(e) => edit({ date: e.target.value })} /></label>
+        <label>{t("Cost (IDR)")}<input type="number" min="0" step="1" required inputMode="numeric" value={f.cost} onChange={(e) => edit({ cost: e.target.value })} /></label>
+        <label>{t("SKU orders")}<input type="number" min="0" step="1" inputMode="numeric" value={f.sku_orders} onChange={(e) => edit({ sku_orders: e.target.value })} /></label>
+        <label>{t("Gross revenue")}<input type="number" min="0" step="1" inputMode="numeric" value={f.gross_revenue} onChange={(e) => edit({ gross_revenue: e.target.value })} /></label>
+        <label>{t("Note (optional)")}<input maxLength={500} value={f.note} onChange={(e) => edit({ note: e.target.value })} /></label>
+        <label className="inline"><input type="checkbox" checked={f.final} onChange={(e) => edit({ final: e.target.checked })} />{t("Day complete (final figures)")}</label>
         <div className="actions">
           {err && <span className="err" role="alert">{err}</span>}
+          {needsConfirm && <button type="button" className="btn" disabled={busy} onClick={() => void post(true)}>{t("Save as entered")}</button>}
           {ok && <span className="up small" style={{ marginRight: "auto" }}>{t("Applied")}{ok.recomputed ? ` — ${recomputedText(ok.recomputed.orders, lang)}` : ""}{ok.day?.partial ? ` · ${t("Partial")}` : ""}</span>}
           <button className="btn pri" disabled={busy}>{busy ? t("Applying…") : t("Apply")}</button>
         </div>

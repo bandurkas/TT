@@ -1,25 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TaskIn, TaskPatch, Task } from "./types";
+import { ApiError, fail } from "./errors";
+
+export { ApiError, readableError } from "./errors";
+export type { ErrorDetail } from "./errors";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
-
-export class ApiError extends Error {
-  status: number;
-  constructor(status: number, msg: string) { super(msg); this.status = status; }
-}
-
-/** FastAPI errors: {"detail": "text"} or {"detail": [{loc, msg, type}]} -> readable message. */
-export const readableError = async (r: Response): Promise<string> => {
-  const raw = await r.text().catch(() => "");
-  try {
-    const j = JSON.parse(raw) as { detail?: unknown };
-    const d = j.detail;
-    if (typeof d === "string") return d;
-    if (Array.isArray(d) && d.length) { const f = d[0] as { msg?: string; loc?: unknown[] }; return `${(f.loc ?? []).slice(-1).join("")}: ${f.msg ?? "invalid"}`; }
-  } catch { /* not JSON */ }
-  return raw || r.statusText || `HTTP ${r.status}`;
-};
 
 export const qs = (p: Record<string, string | undefined>): string => {
   const u = new URLSearchParams();
@@ -30,7 +17,7 @@ export const qs = (p: Record<string, string | undefined>): string => {
 
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, { signal, headers: { accept: "application/json" }, cache: "no-store" });
-  if (!r.ok) throw new ApiError(r.status, await readableError(r));
+  if (!r.ok) await fail(r);
   return r.json() as Promise<T>;
 }
 
@@ -38,7 +25,7 @@ async function send<T>(method: string, path: string, body: unknown): Promise<T> 
   const r = await fetch(`${API_BASE}${path}`, {
     method, headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(body),
   });
-  if (!r.ok) throw new ApiError(r.status, await readableError(r));
+  if (!r.ok) await fail(r);
   return r.json() as Promise<T>;
 }
 

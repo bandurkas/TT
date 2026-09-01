@@ -19,6 +19,7 @@ type Task = Record<string, unknown> & { id: number; status: string };
 type Lot = Record<string, unknown> & { id: number };
 const g = globalThis as unknown as { __mockTasks?: Task[]; __mockAd?: Record<string, unknown>; __mockCosts?: Record<string, unknown> & { lots: Lot[] } };
 const err = (status: number, detail: string) => NextResponse.json({ detail }, { status });
+const confirmable = (message: string) => NextResponse.json({ detail: { message, confirmable: true } }, { status: 422 });
 async function adv() { if (!g.__mockAd) g.__mockAd = await read("advertising.json"); return g.__mockAd!; }
 async function costs() { if (!g.__mockCosts) g.__mockCosts = await read("costs.json"); return g.__mockCosts!; }
 const recomputed = () => ({ versions: 6, skus_with_lots: 4, recomputed: { orders: 33, inserted: 33 } });
@@ -66,6 +67,18 @@ export async function POST(req: Request, ctx: { params: Promise<{ path: string[]
     if (body.final && body.date >= today) return err(422, "A day can only be marked final after it has ended in the shop timezone");
     const prior = days.find((d) => d.date === body.date);
     if (prior && prior.source === "manual_entry" && String(prior.observed_at) > new Date().toISOString()) return err(422, "A newer or equal observation for this day already exists; enter a later one");
+    // Sanity guard, mirroring src/domain/reports._check_manual_day. Only the "thinner record" half can
+    // be reproduced here: the period-totals half compares against analytics_shop_daily, which the
+    // fixtures have no per-day equivalent of, so that check is backend-only.
+    if (prior && !body.confirm) {
+      const orders = Number(body.sku_orders ?? 0), gross = Number(body.gross_revenue ?? 0);
+      const wasCost = Number(prior.cost), wasOrders = Number(prior.sku_orders), wasGross = Number(prior.gross_revenue);
+      if (wasCost > 0 && Number(body.cost) < wasCost * 0.5)
+        return confirmable(`Cost ${body.cost} is far below the ${wasCost} already recorded for ${body.date}, and ad spend does not fall within a day. This would overwrite a fuller record; check the figure, or confirm to replace it.`);
+      const emptied = [wasOrders && !orders ? "SKU orders" : "", wasGross && !gross ? "gross revenue" : ""].filter(Boolean);
+      if (emptied.length)
+        return confirmable(`This would blank ${emptied.join(" and ")} already recorded for ${body.date}. Enter the full figures, or confirm to replace the record as entered.`);
+    }
     const day = { date: body.date, cost: String(body.cost), partial: !body.final, sku_orders: body.sku_orders ?? 0, gross_revenue: String(body.gross_revenue ?? 0), source: "manual_entry", observed_at: new Date().toISOString(), note: body.note || null };
     if (prior) Object.assign(prior, day); else { days.push(day); days.sort((x, y) => String(x.date).localeCompare(String(y.date))); }
     a.manual_days = days.filter((d) => d.source === "manual_entry").length;

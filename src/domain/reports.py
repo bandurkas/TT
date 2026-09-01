@@ -188,9 +188,58 @@ def import_report(session, shop_id, path, kind, timezone, observed_at):
 
 MANUAL_SCOPE = "manual_entry"
 
+# Ads Manager reports the SELECTED DATE RANGE, so a range's totals are trivially entered as one day.
+# Both checks below compare only against facts already in the database, and are overridable, never silent.
+PERIOD_TOTAL_FACTOR = 2             # entered units / GMV above this multiple of the day's own actuals
+COST_DROP_FACTOR = Decimal("0.5")   # a replacement cost below this share of the one it replaces
+
+
+class NeedsConfirmation(ValueError):
+    """A deterministic sanity check rejected the entry; the operator may override it with confirm=True."""
+
+
+def _shop_daily(session, shop_id, day):
+    from src.db.models_profit import ShopDaily
+    return session.scalar(select(ShopDaily).where(ShopDaily.shop_id == shop_id,
+                                                  ShopDaily.metric_date == day))
+
+
+def _range_hint(day):
+    return (f"Ads Manager reports the selected date range; these look like period totals, not one day. "
+            f"Re-select {day} alone, or confirm to save them as entered.")
+
+
+def _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, prior_day):
+    """The two ways manual entry has actually corrupted live data: a period's totals typed into a
+    single day, and a fuller record replaced by a thinner one. Raises NeedsConfirmation."""
+    actual = _shop_daily(session, shop_id, day)
+    if actual is not None:
+        units = int(actual.units or 0)
+        gmv = number(actual.gmv or 0)
+        if units and sku_orders > PERIOD_TOTAL_FACTOR * units:
+            raise NeedsConfirmation(f"SKU orders {sku_orders} is over {PERIOD_TOTAL_FACTOR}x the {units} "
+                                    f"units the shop actually sold on {day}. " + _range_hint(day))
+        if gmv > ZERO and gross_revenue > PERIOD_TOTAL_FACTOR * gmv:
+            raise NeedsConfirmation(f"Gross revenue {gross_revenue} is over {PERIOD_TOTAL_FACTOR}x the "
+                                    f"{gmv} GMV the shop actually made on {day}. " + _range_hint(day))
+    if prior_day is None:
+        return
+    prior_cost = number(prior_day.cost or 0)
+    if prior_cost > ZERO and cost < prior_cost * COST_DROP_FACTOR:
+        raise NeedsConfirmation(f"Cost {cost} is far below the {prior_cost} already recorded for {day}, and "
+                                f"ad spend does not fall within a day. This would overwrite a fuller record; "
+                                f"check the figure, or confirm to replace it.")
+    emptied = [name for name, old, new in (("SKU orders", int(prior_day.sku_orders or 0), sku_orders),
+                                           ("gross revenue", number(prior_day.gross_revenue or 0), gross_revenue))
+               if old and not new]
+    if emptied:
+        raise NeedsConfirmation(f"This would blank {' and '.join(emptied)} already recorded for {day}. "
+                                f"Enter the full figures, or confirm to replace the record as entered.")
+
+
 
 def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue, observed_at, timezone,
-                         final=False, note="", entered_by="dashboard"):
+                         final=False, note="", entered_by="dashboard", confirm=False):
     """Operator-entered daily Cost (from the Ads Manager / GMV Max overview screen) until the Ads API
     is approved. Same audit trail as XLSX imports: a SourceReport (kind=ads, scope manual_entry) with a
     content hash, and a ShopAdDay row that only a NEWER observation may replace. `final=False` keeps the
@@ -214,7 +263,8 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
                "cost": str(cost), "sku_orders": sku_orders, "reported_gross_revenue": str(gross_revenue),
                "revenue_rounding_difference": "0", "scope": MANUAL_SCOPE, "metric": "Cost",
                "taxes_and_credits": "not_reconciled", "final": bool(final), "note": (note or "")[:500],
-               "entered_by": entered_by, "observed_at": observed_at.isoformat(timespec="seconds")}
+               "entered_by": entered_by, "observed_at": observed_at.isoformat(timespec="seconds"),
+               **({"confirmed_override": True} if confirm else {})}
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     prior = session.scalar(select(SourceReport).where(SourceReport.shop_id == shop_id,
                            SourceReport.kind == "ads", SourceReport.sha256 == digest))
@@ -225,6 +275,8 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
                            .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date == day)).first()
     if pair and pair[1].observed_at >= observed_at:
         raise ValueError("A newer or equal observation for this day already exists; enter a later one")
+    if not confirm:
+        _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, pair[0] if pair else None)
     report = SourceReport(shop_id=shop_id, kind="ads", sha256=digest,
                           filename=f"manual-entry {day} @ {observed_at.astimezone(ZoneInfo(timezone)):%H:%M} {timezone}",
                           currency=shop.currency, timezone=timezone, period_start=day, period_end=day,

@@ -21,7 +21,7 @@ from src.domain.dashboard import loaders as L
 from src.domain.dashboard import order_loaders as OL
 from src.domain.profit import aggregates as profit_aggregates
 from src.domain.profit import jobs as profit_jobs
-from src.domain.reports import advertising_summary, record_manual_ad_day
+from src.domain.reports import NeedsConfirmation, advertising_summary, record_manual_ad_day
 
 router = APIRouter(prefix="/api")
 TASK_STATUSES = ("today", "in_progress", "review", "done")
@@ -280,6 +280,7 @@ class ManualAdDay(BaseModel):
     final: bool = False  # True = the day is over and these are its closing figures
     note: str | None = Field(None, max_length=500)
     observed_at: datetime | None = None  # default now; must be tz-aware
+    confirm: bool = False  # operator saw the sanity-check warning and stands by the figures
 
 
 @router.get("/advertising")
@@ -298,7 +299,11 @@ def advertising_manual(body: ManualAdDay, dep: Any = Depends(shop_dep)) -> dict[
         raise HTTPException(422, "observed_at must be timezone-aware")
     try:
         res = record_manual_ad_day(session, shop.id, body.date, body.cost, body.sku_orders, body.gross_revenue,
-                                   observed, tz, final=body.final, note=body.note or "")
+                                   observed, tz, final=body.final, note=body.note or "",
+                                   confirm=body.confirm)
+    except NeedsConfirmation as e:
+        # Overridable: the figures are implausible for one day, not invalid. Re-post with confirm=true.
+        raise HTTPException(422, {"message": str(e), "confirmable": True}) from e
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     if not res.get("unchanged"):

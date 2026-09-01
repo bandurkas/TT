@@ -328,7 +328,7 @@ export interface AdDay {
   date: string; cost: Dec; partial: boolean; sku_orders: number; gross_revenue: Dec;
   source: "shop_overview" | "manual_entry" | string; observed_at: string | null; note: string | null;
 }
-export interface ManualAdIn { date: string; cost: string; sku_orders: number; gross_revenue: string; final: boolean; note?: string | null }
+export interface ManualAdIn { date: string; cost: string; sku_orders: number; gross_revenue: string; final: boolean; note?: string | null; confirm?: boolean }
 export interface ManualAdOut { report_id: number; partial?: boolean; unchanged?: boolean; recomputed?: { orders: number; inserted: number }; day: AdDay | null }
 
 // GET /api/costs — src/domain/costs.cost_overview

@@ -158,6 +158,25 @@ def test_manual_advertising_endpoint_recomputes():
         with patch.object(A, "record_manual_ad_day", reject):
             r = c.post("/api/advertising/manual", json={"date": "2026-09-01", "cost": "1"})
             assert r.status_code == 422 and "newer" in r.json()["detail"]
+
+        # a sanity-check rejection is marked confirmable so the form can offer an override
+        def needs_confirm(*a, **k):
+            raise A.NeedsConfirmation("looks like period totals")
+        with patch.object(A, "record_manual_ad_day", needs_confirm):
+            r = c.post("/api/advertising/manual", json={"date": "2026-09-01", "cost": "1"})
+            assert r.status_code == 422
+            assert r.json()["detail"] == {"message": "looks like period totals", "confirmable": True}
+
+        # confirm=true is passed straight through to the domain
+        seen = {}
+
+        def capture(*a, **k):
+            seen.update(k)
+            return {"report_id": 9, "unchanged": False, "partial": True}
+        with patch.object(A, "record_manual_ad_day", capture):
+            assert c.post("/api/advertising/manual",
+                          json={"date": "2026-09-01", "cost": "1", "confirm": True}).status_code == 201
+            assert seen["confirm"] is True
     app.dependency_overrides.clear()
 
 

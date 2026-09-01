@@ -139,6 +139,72 @@ def test_record_manual_ad_day_validation_and_payload(monkeypatch):
         R.record_manual_ad_day(session, 1, date(2026, 8, 30), 2, 0, 0, now, "Asia/Jakarta", final=True)
 
 
+def test_manual_ad_day_guards_against_period_totals_and_thinner_records():
+    """The two live-data corruptions of 2026-09-01: a month's totals typed into one day, and a
+    full record replaced by a near-empty one. Both must be refused, both overridable."""
+    from datetime import UTC, date, datetime
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from src.domain import reports as R
+    day = date(2026, 9, 1)
+    now = datetime(2026, 9, 1, 15, 30, tzinfo=UTC)  # 22:30 Jakarta, same day
+
+    def session_with(actual=None, prior=None):
+        s = MagicMock()
+        s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+        s.scalar.side_effect = [None, actual]  # digest lookup, then analytics_shop_daily
+        s.execute.return_value.first.return_value = ((prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC)))
+                                                     if prior is not None else None)
+        return s
+
+    def call(s, cost, orders, gross, **kw):
+        return R.record_manual_ad_day(s, 1, day, cost, orders, gross, now, "Asia/Jakarta", **kw)
+
+    actual = NS(units=10, gmv=R.number("825000"))
+    # 1. a month's figures entered as one day
+    with pytest.raises(R.NeedsConfirmation, match="SKU orders 87"):
+        call(session_with(actual), "5062670", 87, "8636752")
+    # GMV alone trips it too, when orders happen to look sane
+    with pytest.raises(R.NeedsConfirmation, match="Gross revenue"):
+        call(session_with(actual), "5062670", 10, "8636752")
+    # the real day passes untouched
+    out = call(session_with(actual), "450000", 10, "810904")
+    assert out["unchanged"] is False and out["partial"] is True
+    # and the operator can still override
+    out = call(session_with(actual), "5062670", 87, "8636752", confirm=True)
+    assert out["unchanged"] is False
+
+    # 2. a fuller record replaced by a thinner one
+    prior = NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904"))
+    with pytest.raises(R.NeedsConfirmation, match="far below"):
+        call(session_with(actual, prior), "2000", 10, "810904")
+    with pytest.raises(R.NeedsConfirmation, match="blank SKU orders and gross revenue"):
+        call(session_with(actual, prior), "450000", 0, "0")
+    # a normal intraday update — cost grew, figures kept — passes
+    assert call(session_with(actual, prior), "460000", 10, "820000")["unchanged"] is False
+    # no actuals yet for the day: the period-total check cannot fire, and must not block a first entry
+    assert call(session_with(None), "450000", 10, "810904")["unchanged"] is False
+
+
+def test_manual_ad_day_confirmed_override_is_recorded_in_the_audit_trail():
+    from datetime import UTC, date, datetime
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    from src.domain import reports as R
+    s = MagicMock()
+    s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+    s.scalar.side_effect = [None, None]
+    s.execute.return_value.first.return_value = None
+    R.record_manual_ad_day(s, 1, date(2026, 9, 1), "5062670", 87, "8636752",
+                           datetime(2026, 9, 1, 15, 30, tzinfo=UTC), "Asia/Jakarta", confirm=True)
+    report = s.add.call_args_list[0].args[0]
+    assert report.data["confirmed_override"] is True
+
+
 def test_coverage_source_labels_manual(monkeypatch):
     from datetime import UTC, date, datetime
     from types import SimpleNamespace as NS
