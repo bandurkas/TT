@@ -152,10 +152,11 @@ def test_manual_ad_day_guards_against_period_totals_and_thinner_records():
     day = date(2026, 9, 1)
     now = datetime(2026, 9, 1, 15, 30, tzinfo=UTC)  # 22:30 Jakarta, same day
 
-    def session_with(actual=None, prior=None):
+    def session_with(actual=None, prior=None, recent=()):
         s = MagicMock()
         s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
         s.scalar.side_effect = [None, actual]  # digest lookup, then analytics_shop_daily
+        s.scalars.return_value.all.return_value = list(recent)  # recent daily Cost history
         s.execute.return_value.first.return_value = ((prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC)))
                                                      if prior is not None else None)
         return s
@@ -187,6 +188,89 @@ def test_manual_ad_day_guards_against_period_totals_and_thinner_records():
     assert call(session_with(actual, prior), "460000", 10, "820000")["unchanged"] is False
     # no actuals yet for the day: the period-total check cannot fire, and must not block a first entry
     assert call(session_with(None), "450000", 10, "810904")["unchanged"] is False
+
+
+def test_manual_ad_day_cost_spike_is_caught_without_any_analytics_for_the_day():
+    """The dangerous case the actuals-based checks cannot see: a period's Cost as the FIRST entry of
+    a day, with SKU orders and gross revenue left blank. Only Cost feeds net profit, so Cost needs a
+    baseline that exists the moment the day opens — the recent daily median, not analytics."""
+    from datetime import UTC, date, datetime
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from src.domain import reports as R
+    day, now = date(2026, 9, 1), datetime(2026, 9, 1, 15, 30, tzinfo=UTC)
+    history = ["450000", "421192", "480000", "398000", "512000", "455000", "430000"]
+
+    def session_with(recent=(), actual=None):
+        s = MagicMock()
+        s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+        s.scalar.side_effect = [None, actual]
+        s.scalars.return_value.all.return_value = list(recent)
+        s.execute.return_value.first.return_value = None  # nothing recorded for the day yet
+        return s
+
+    def call(s, cost, **kw):
+        return R.record_manual_ad_day(s, 1, day, cost, None, None, now, "Asia/Jakarta", **kw)
+
+    with pytest.raises(R.NeedsConfirmation, match=r"Cost 5062670 is over 4x the 450000 median"):
+        call(session_with(history), "5062670")
+    # the real day passes, and so does a plausible ramp-up
+    assert call(session_with(history), "450000")["unchanged"] is False
+    assert call(session_with(history), "900000")["unchanged"] is False
+    # too little history: a median of two days means nothing, so the check stands down
+    assert call(session_with(["450000", "421192"]), "5062670")["unchanged"] is False
+    # zero-spend days never enter the median
+    with pytest.raises(R.NeedsConfirmation, match=r"median"):
+        call(session_with(["0", "0", "0", *history]), "5062670")
+    # and it stays overridable
+    assert call(session_with(history), "5062670", confirm=True)["unchanged"] is False
+
+
+def test_manual_ad_day_omitted_figures_keep_the_day_instead_of_blanking_it():
+    """The operator enters Cost several times a day; the form clears the other two fields after each
+    apply. Omission must mean 'leave as is' — blanking has to be typed as an explicit 0."""
+    from datetime import UTC, date, datetime
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from src.domain import reports as R
+    day, now = date(2026, 9, 1), datetime(2026, 9, 1, 15, 30, tzinfo=UTC)
+
+    def session_with(prior):
+        s = MagicMock()
+        s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+        s.scalar.side_effect = [None, NS(units=10, gmv=R.number("825000"))]
+        s.scalars.return_value.all.return_value = []
+        s.execute.return_value.first.return_value = (prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC)))
+        return s
+
+    prior = NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904"))
+    s = session_with(prior)
+    out = R.record_manual_ad_day(s, 1, day, "460000", None, None, now, "Asia/Jakarta")
+    assert out["unchanged"] is False
+    assert prior.cost == R.number("460000")
+    assert prior.sku_orders == 10 and prior.gross_revenue == R.number("810904")
+    report = s.add.call_args_list[0].args[0]
+    assert report.data["sku_orders"] == 10 and report.data["reported_gross_revenue"] == "810904"
+
+    # an explicit 0 still trips the blanking guard
+    prior2 = NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904"))
+    with pytest.raises(R.NeedsConfirmation, match="blank SKU orders and gross revenue"):
+        R.record_manual_ad_day(session_with(prior2), 1, day, "460000", 0, 0, now, "Asia/Jakarta")
+
+    # with no record for the day at all, omission means zero, as before
+    s3 = MagicMock()
+    s3.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+    s3.scalar.side_effect = [None, None]
+    s3.scalars.return_value.all.return_value = []
+    s3.execute.return_value.first.return_value = None
+    R.record_manual_ad_day(s3, 1, day, "450000", None, None, now, "Asia/Jakarta")
+    assert s3.add.call_args_list[0].args[0].data["sku_orders"] == 0
 
 
 def test_manual_ad_day_confirmed_override_is_recorded_in_the_audit_trail():

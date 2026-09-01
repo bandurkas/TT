@@ -20,7 +20,8 @@ export default function AdCost({ adv, onApplied, timezone }: { adv: Advertising 
   const [ok, setOk] = useState<ManualAdOut | null>(null);
   const post = async (confirm: boolean) => {
     setBusy(true); setErr(null); setOk(null);
-    const body: ManualAdIn = { date: f.date, cost: f.cost || "0", sku_orders: Number(f.sku_orders || 0), gross_revenue: f.gross_revenue || "0", final: f.final, note: f.note || null, ...(confirm ? { confirm: true } : {}) };
+    // An empty field is "leave it alone", not zero — the day's Cost is re-entered several times.
+    const body: ManualAdIn = { date: f.date, cost: f.cost || "0", sku_orders: f.sku_orders === "" ? null : Number(f.sku_orders), gross_revenue: f.gross_revenue === "" ? null : f.gross_revenue, final: f.final, note: f.note || null, ...(confirm ? { confirm: true } : {}) };
     try {
       const res = await apiPost<ManualAdOut>("/api/advertising/manual", body);
       setOk(res); setNeedsConfirm(false); setF((x) => ({ ...x, cost: "", sku_orders: "", gross_revenue: "", note: "" })); onApplied();
@@ -35,6 +36,8 @@ export default function AdCost({ adv, onApplied, timezone }: { adv: Advertising 
   const edit = (patch: Partial<typeof f>) => { setF({ ...f, ...patch }); setNeedsConfirm(false); setErr(null); };
   const days = adv?.days ?? [];
   const last = days.length ? days[days.length - 1] : null;
+  const onFile = days.find((d) => d.date === f.date);   // an empty input keeps whatever this holds
+  const keep = (v: string | number | null | undefined) => (onFile && v !== null && v !== undefined ? `${t("keep")} ${v}` : undefined);
   return (
     <div className="card" style={{ padding: 14 }}>
       <form className="form" style={{ padding: "10px 0 0", gridTemplateColumns: "repeat(6, 1fr)" }} onSubmit={submit} aria-label={t("Enter today's ad Cost from Ads Manager")}>
@@ -42,8 +45,8 @@ export default function AdCost({ adv, onApplied, timezone }: { adv: Advertising 
         <div className="wide tiny">{t("Ads Manager shows the date range you selected. Select this one day there before copying the figures.")}</div>
         <label>{t("Date")}<input type="date" required max={today} value={f.date} onChange={(e) => edit({ date: e.target.value })} /></label>
         <label>{t("Cost (IDR)")}<input type="number" min="0" step="1" required inputMode="numeric" value={f.cost} onChange={(e) => edit({ cost: e.target.value })} /></label>
-        <label>{t("SKU orders")}<input type="number" min="0" step="1" inputMode="numeric" value={f.sku_orders} onChange={(e) => edit({ sku_orders: e.target.value })} /></label>
-        <label>{t("Gross revenue")}<input type="number" min="0" step="1" inputMode="numeric" value={f.gross_revenue} onChange={(e) => edit({ gross_revenue: e.target.value })} /></label>
+        <label>{t("SKU orders")}<input type="number" min="0" step="1" inputMode="numeric" placeholder={keep(onFile?.sku_orders)} value={f.sku_orders} onChange={(e) => edit({ sku_orders: e.target.value })} /></label>
+        <label>{t("Gross revenue")}<input type="number" min="0" step="1" inputMode="numeric" placeholder={keep(onFile?.gross_revenue)} value={f.gross_revenue} onChange={(e) => edit({ gross_revenue: e.target.value })} /></label>
         <label>{t("Note (optional)")}<input maxLength={500} value={f.note} onChange={(e) => edit({ note: e.target.value })} /></label>
         <label className="inline"><input type="checkbox" checked={f.final} onChange={(e) => edit({ final: e.target.checked })} />{t("Day complete (final figures)")}</label>
         <div className="actions">

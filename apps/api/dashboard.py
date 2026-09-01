@@ -275,8 +275,9 @@ def insights(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
 class ManualAdDay(BaseModel):
     date: date
     cost: Decimal = Field(ge=0)
-    sku_orders: int = Field(ge=0, default=0)
-    gross_revenue: Decimal = Field(ge=0, default=Decimal(0))
+    # None = leave the day's existing figure alone; 0 blanks it, but only when typed explicitly.
+    sku_orders: int | None = Field(ge=0, default=None)
+    gross_revenue: Decimal | None = Field(ge=0, default=None)
     final: bool = False  # True = the day is over and these are its closing figures
     note: str | None = Field(None, max_length=500)
     observed_at: datetime | None = None  # default now; must be tz-aware

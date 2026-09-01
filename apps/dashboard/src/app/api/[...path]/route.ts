@@ -70,16 +70,26 @@ export async function POST(req: Request, ctx: { params: Promise<{ path: string[]
     // Sanity guard, mirroring src/domain/reports._check_manual_day. Only the "thinner record" half can
     // be reproduced here: the period-totals half compares against analytics_shop_daily, which the
     // fixtures have no per-day equivalent of, so that check is backend-only.
+    // An omitted sku_orders / gross_revenue keeps the day's existing figure; 0 blanks it.
+    const orders = body.sku_orders ?? Number(prior?.sku_orders ?? 0);
+    const gross = body.gross_revenue ?? String(prior?.gross_revenue ?? 0);
+    if (!body.confirm) {
+      const spend = (days.filter((d) => String(d.date) < body.date).map((d) => Number(d.cost)).filter((c) => c > 0)).sort((a, b) => a - b);
+      if (spend.length >= 5) {
+        const m = spend.length >> 1, median = spend.length % 2 ? spend[m] : (spend[m - 1] + spend[m]) / 2;
+        if (Number(body.cost) > median * 4)
+          return confirmable(`Cost ${body.cost} is over 4x the ${median} median daily spend of the days before ${body.date}. Ads Manager reports the selected date range; these look like period totals, not one day. Re-select ${body.date} alone, or confirm to save them as entered.`);
+      }
+    }
     if (prior && !body.confirm) {
-      const orders = Number(body.sku_orders ?? 0), gross = Number(body.gross_revenue ?? 0);
       const wasCost = Number(prior.cost), wasOrders = Number(prior.sku_orders), wasGross = Number(prior.gross_revenue);
       if (wasCost > 0 && Number(body.cost) < wasCost * 0.5)
         return confirmable(`Cost ${body.cost} is far below the ${wasCost} already recorded for ${body.date}, and ad spend does not fall within a day. This would overwrite a fuller record; check the figure, or confirm to replace it.`);
-      const emptied = [wasOrders && !orders ? "SKU orders" : "", wasGross && !gross ? "gross revenue" : ""].filter(Boolean);
+      const emptied = [wasOrders && !orders ? "SKU orders" : "", wasGross && !Number(gross) ? "gross revenue" : ""].filter(Boolean);
       if (emptied.length)
         return confirmable(`This would blank ${emptied.join(" and ")} already recorded for ${body.date}. Enter the full figures, or confirm to replace the record as entered.`);
     }
-    const day = { date: body.date, cost: String(body.cost), partial: !body.final, sku_orders: body.sku_orders ?? 0, gross_revenue: String(body.gross_revenue ?? 0), source: "manual_entry", observed_at: new Date().toISOString(), note: body.note || null };
+    const day = { date: body.date, cost: String(body.cost), partial: !body.final, sku_orders: orders, gross_revenue: String(gross), source: "manual_entry", observed_at: new Date().toISOString(), note: body.note || null };
     if (prior) Object.assign(prior, day); else { days.push(day); days.sort((x, y) => String(x.date).localeCompare(String(y.date))); }
     a.manual_days = days.filter((d) => d.source === "manual_entry").length;
     return NextResponse.json({ report_id: 900 + days.length, partial: day.partial, recomputed: { orders: 33, inserted: 33 }, day }, { status: 201 });

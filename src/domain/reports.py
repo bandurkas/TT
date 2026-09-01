@@ -192,6 +192,9 @@ MANUAL_SCOPE = "manual_entry"
 # Both checks below compare only against facts already in the database, and are overridable, never silent.
 PERIOD_TOTAL_FACTOR = 2             # entered units / GMV above this multiple of the day's own actuals
 COST_DROP_FACTOR = Decimal("0.5")   # a replacement cost below this share of the one it replaces
+COST_SPIKE_FACTOR = Decimal(4)      # a cost above this multiple of the recent daily median
+COST_SPIKE_WINDOW = 14              # days of spend history the median is taken over
+COST_SPIKE_MIN_DAYS = 5             # below this much history the median means nothing
 
 
 class NeedsConfirmation(ValueError):
@@ -214,9 +217,27 @@ def _range_hint(day):
             f"Re-select {day} alone, or confirm to save them as entered.")
 
 
+def _recent_cost_median(session, shop_id, day):
+    """Median daily Cost over the days with spend before `day`. Deliberately reads only ShopAdDay:
+    it is the one baseline available the moment a day opens, before any order has synced."""
+    rows = session.scalars(select(ShopAdDay.cost)
+                           .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date < day)
+                           .order_by(ShopAdDay.metric_date.desc()).limit(COST_SPIKE_WINDOW)).all()
+    costs = sorted(c for c in (number(r) for r in rows) if c > ZERO)
+    if len(costs) < COST_SPIKE_MIN_DAYS:
+        return None
+    mid = len(costs) // 2
+    return costs[mid] if len(costs) % 2 else (costs[mid - 1] + costs[mid]) / 2
+
+
 def _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, prior_day):
     """The two ways manual entry has actually corrupted live data: a period's totals typed into a
     single day, and a fuller record replaced by a thinner one. Raises NeedsConfirmation."""
+    # When the day has no synced orders yet (units = gmv = 0) these two checks stand down: Ads Manager
+    # legitimately runs ahead of our hourly order sync, so comparing against zero would refuse every
+    # early-morning entry. That gap is deliberate and bounded — sku_orders and gross_revenue are
+    # reported figures that no profit line reads; Cost is the field that moves net profit, and it is
+    # covered independently by the median check below, which needs no analytics at all.
     actual = _shop_daily(session, shop_id, day)
     if actual is not None:
         units = int(actual.units or 0)
@@ -227,6 +248,10 @@ def _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, pr
         if gmv > ZERO and gross_revenue > PERIOD_TOTAL_FACTOR * gmv:
             raise NeedsConfirmation(f"Gross revenue {_plain(gross_revenue)} is over {PERIOD_TOTAL_FACTOR}x the "
                                     f"{_plain(gmv)} GMV the shop actually made on {day}. " + _range_hint(day))
+    median = _recent_cost_median(session, shop_id, day)
+    if median is not None and cost > median * COST_SPIKE_FACTOR:
+        raise NeedsConfirmation(f"Cost {_plain(cost)} is over {COST_SPIKE_FACTOR}x the {_plain(median)} "
+                                f"median daily spend of the days before {day}. " + _range_hint(day))
     if prior_day is None:
         return
     prior_cost = number(prior_day.cost or 0)
@@ -249,21 +274,33 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
     """Operator-entered daily Cost (from the Ads Manager / GMV Max overview screen) until the Ads API
     is approved. Same audit trail as XLSX imports: a SourceReport (kind=ads, scope manual_entry) with a
     content hash, and a ShopAdDay row that only a NEWER observation may replace. `final=False` keeps the
-    day flagged partial (figures still moving); `final=True` marks the day complete."""
+    day flagged partial (figures still moving); `final=True` marks the day complete.
+
+    `sku_orders` / `gross_revenue` of None mean "leave whatever the day already has": the operator
+    updates Cost several times a day and must not blank the other figures by omitting them. Blanking
+    stays possible, but only by entering 0 explicitly."""
     if observed_at.tzinfo is None or observed_at > datetime.now(UTC) + timedelta(minutes=5):
         raise ValueError("Observed-at must be timezone-aware and not in the future")
     shop = session.get(Shop, shop_id)
     if not shop or timezone != shop.timezone:
         raise ValueError("Explicit report timezone must match the shop timezone")
-    cost, gross_revenue = number(cost), number(gross_revenue)
-    sku_orders = int(sku_orders)
-    if min(cost, gross_revenue) < 0 or sku_orders < 0:
-        raise ValueError("Cost, SKU orders and gross revenue must be non-negative")
     observed_day = observed_at.astimezone(ZoneInfo(timezone)).date()
     if day > observed_day:
         raise ValueError("Report contains future dates")
     if final and day >= observed_day:
         raise ValueError("A day can only be marked final after it has ended in the shop timezone")
+    pair = session.execute(select(ShopAdDay, SourceReport)
+                           .join(SourceReport, SourceReport.id == ShopAdDay.report_id)
+                           .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date == day)).first()
+    prior_day = pair[0] if pair else None
+    if sku_orders is None:
+        sku_orders = int(prior_day.sku_orders or 0) if prior_day is not None else 0
+    if gross_revenue is None:
+        gross_revenue = number(prior_day.gross_revenue or 0) if prior_day is not None else ZERO
+    cost, gross_revenue = number(cost), number(gross_revenue)
+    sku_orders = int(sku_orders)
+    if min(cost, gross_revenue) < 0 or sku_orders < 0:
+        raise ValueError("Cost, SKU orders and gross revenue must be non-negative")
     payload = {"days": [{"date": str(day), "cost": str(cost), "sku_orders": sku_orders,
                          "gross_revenue": str(gross_revenue), "row": 1}],
                "cost": str(cost), "sku_orders": sku_orders, "reported_gross_revenue": str(gross_revenue),
@@ -276,20 +313,17 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
                            SourceReport.kind == "ads", SourceReport.sha256 == digest))
     if prior:
         return {"report_id": prior.id, "unchanged": True}
-    pair = session.execute(select(ShopAdDay, SourceReport)
-                           .join(SourceReport, SourceReport.id == ShopAdDay.report_id)
-                           .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date == day)).first()
     if pair and pair[1].observed_at >= observed_at:
         raise ValueError("A newer or equal observation for this day already exists; enter a later one")
     if not confirm:
-        _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, pair[0] if pair else None)
+        _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, prior_day)
     report = SourceReport(shop_id=shop_id, kind="ads", sha256=digest,
                           filename=f"manual-entry {day} @ {observed_at.astimezone(ZoneInfo(timezone)):%H:%M} {timezone}",
                           currency=shop.currency, timezone=timezone, period_start=day, period_end=day,
                           observed_at=observed_at, imported_at=datetime.now(UTC), data=payload)
     session.add(report)
     session.flush()
-    d = pair[0] if pair else ShopAdDay(shop_id=shop_id, metric_date=day)
+    d = prior_day if prior_day is not None else ShopAdDay(shop_id=shop_id, metric_date=day)
     d.report_id, d.currency = report.id, shop.currency
     d.cost, d.sku_orders, d.gross_revenue = cost, sku_orders, gross_revenue
     d.partial = (day >= observed_day) or not final
