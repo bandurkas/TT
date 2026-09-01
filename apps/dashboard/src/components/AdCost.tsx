@@ -2,16 +2,16 @@
 import { useState } from "react";
 import { EnHint, useLang, useT } from "@/lib/i18n";
 import { dateTime, dayMon, idr, int, toISODate } from "@/lib/format";
+import { shopToday } from "@/lib/period";
 import { apiPost } from "@/lib/api";
 import type { Advertising, ManualAdIn, ManualAdOut } from "@/lib/types";
 import { Pill } from "./ui";
 import { recomputedText } from "@/lib/orders";
 
-const jakartaToday = () => toISODate(new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date()) + "T00:00:00Z"));
-
-export default function AdCost({ adv, onApplied }: { adv: Advertising | null | undefined; onApplied: () => void }) {
+export default function AdCost({ adv, onApplied, timezone }: { adv: Advertising | null | undefined; onApplied: () => void; timezone?: string }) {
   const lang = useLang(), t = useT();
-  const [f, setF] = useState({ date: jakartaToday(), cost: "", sku_orders: "", gross_revenue: "", final: false, note: "" });
+  const today = toISODate(shopToday(timezone));   // the business day is the shop's, never the browser's
+  const [f, setF] = useState({ date: today, cost: "", sku_orders: "", gross_revenue: "", final: false, note: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<ManualAdOut | null>(null);
@@ -31,7 +31,7 @@ export default function AdCost({ adv, onApplied }: { adv: Advertising | null | u
     <div className="card" style={{ padding: 14 }}>
       <form className="form" style={{ padding: "10px 0 0", gridTemplateColumns: "repeat(6, 1fr)" }} onSubmit={submit} aria-label={t("Enter today's ad Cost from Ads Manager")}>
         <div className="wide" style={{ fontWeight: 600 }}>{t("Enter today's ad Cost from Ads Manager")} <Pill tone="warn">{t("Manual entry")}</Pill></div>
-        <label>{t("Date")}<input type="date" required max={jakartaToday()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
+        <label>{t("Date")}<input type="date" required max={today} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
         <label>{t("Cost (IDR)")}<input type="number" min="0" step="1" required inputMode="numeric" value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} /></label>
         <label>{t("SKU orders")}<input type="number" min="0" step="1" inputMode="numeric" value={f.sku_orders} onChange={(e) => setF({ ...f, sku_orders: e.target.value })} /></label>
         <label>{t("Gross revenue")}<input type="number" min="0" step="1" inputMode="numeric" value={f.gross_revenue} onChange={(e) => setF({ ...f, gross_revenue: e.target.value })} /></label>

@@ -111,6 +111,8 @@ export const RU: Record<string, string> = {
   "Now": "Сейчас", "Break-even product cost": "Себестоимость в ноль",
   "what if": "что если", "Actual": "Факт", "Reset": "Сбросить", "last": "последний",
   "Change": "Изменить", "What if…": "Что если…", "Enter Cost": "Внести расход", "vs actual": "к факту",
+  "Previous year": "Предыдущий год", "Previous month": "Предыдущий месяц", "Next month": "Следующий месяц", "Next year": "Следующий год",
+  "Start": "Начало", "pick the end date": "выберите конечную дату",
   "Advertising Cost for this period has not been entered": "Расход на рекламу за период не внесён",
   "Profit is overstated until it is.": "Пока его нет, прибыль завышена.",
   "A day in this period is still open": "День в периоде ещё не закрыт",

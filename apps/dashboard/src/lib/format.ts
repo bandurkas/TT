@@ -47,8 +47,10 @@ export const int = (v: Dec | number | null | undefined, lang: Lang = "en"): stri
 
 const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTHS_RU = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+export const MONTHS_SHORT = { en: MONTHS_EN, ru: MONTHS_RU };
 const MONTHS_EN_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const MONTHS_RU_FULL = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+export const MONTHS_FULL = { en: MONTHS_EN_FULL, ru: MONTHS_RU_FULL };
 
 export const parseDate = (s: string): Date => {
   const [y, m, d] = s.slice(0, 10).split("-").map(Number);

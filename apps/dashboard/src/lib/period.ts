@@ -3,7 +3,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { toISODate } from "./format";
 
-export type Preset = "month" | "30d" | "custom";
+export type Preset = "today" | "yesterday" | "7d" | "30d" | "month" | "prev_month" | "3m" | "custom";
 
 export interface PeriodState {
   preset: Preset;
@@ -14,21 +14,27 @@ export interface PeriodState {
   query: string; // for API: ?from=&to=&shop_id=
 }
 
-// Shop-local "today" (Asia/Jakarta) computed client-side only for presets; API defaults do the same server-side.
-const jakartaToday = (): Date => {
-  const s = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+// Shop-local "today" — the business day is the shop's, never the browser's. API defaults do the same server-side.
+export const shopToday = (tz = "Asia/Jakarta"): Date => {
+  const s = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const [y, m, d] = s.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d));
 };
 
-export const presetRange = (p: Preset): { from?: string; to?: string } => {
-  const today = jakartaToday();
-  if (p === "30d") {
-    const from = new Date(today);
-    from.setUTCDate(from.getUTCDate() - 29);
-    return { from: toISODate(from), to: toISODate(today) };
+const back = (d: Date, days: number) => { const x = new Date(d); x.setUTCDate(x.getUTCDate() - days); return x; };
+
+export const presetRange = (p: Preset, tz?: string): { from?: string; to?: string } => {
+  const today = shopToday(tz);
+  const y = today.getUTCFullYear(), m = today.getUTCMonth();
+  switch (p) {
+    case "today": return { from: toISODate(today), to: toISODate(today) };
+    case "yesterday": { const d = back(today, 1); return { from: toISODate(d), to: toISODate(d) }; }
+    case "7d": return { from: toISODate(back(today, 6)), to: toISODate(today) };
+    case "30d": return { from: toISODate(back(today, 29)), to: toISODate(today) };
+    case "prev_month": return { from: toISODate(new Date(Date.UTC(y, m - 1, 1))), to: toISODate(new Date(Date.UTC(y, m, 0))) };
+    case "3m": return { from: toISODate(new Date(Date.UTC(y, m - 2, 1))), to: toISODate(today) };
+    default: return {};   // "month" keeps the server default (current month to date)
   }
-  return {};
 };
 
 export function usePeriod() {

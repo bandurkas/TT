@@ -155,7 +155,7 @@ export default function Health({ ov, loading, error, reload, query, tick, onAdAp
               <span className="sp" />
               <button className="btn sm" aria-expanded={adOpen} onClick={() => setAdOpen(!adOpen)}>{adOpen ? t("Done") : t("Change")}</button>
             </div>
-            {adOpen && <div className="ctrl-body"><AdCost adv={ov.advertising} onApplied={onAdApplied} /></div>}
+            {adOpen && <div className="ctrl-body"><AdCost adv={ov.advertising} onApplied={onAdApplied} timezone={ov.shop.timezone} /></div>}
           </div>
           <div>
             <div className={`ctrl ${costOpen ? "on" : ""}`}>

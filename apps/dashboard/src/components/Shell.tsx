@@ -3,6 +3,7 @@ import { useT, type Lang } from "@/lib/i18n";
 import { dateTime, periodLabel } from "@/lib/format";
 import type { Overview } from "@/lib/types";
 import type { PeriodState, Preset } from "@/lib/period";
+import DateRange from "./DateRange";
 import { useEffect, useState } from "react";
 import { orderText } from "@/lib/orders";
 import { useLang } from "@/lib/i18n";
@@ -46,34 +47,19 @@ export function Rail({ shop, counts }: { shop?: string; counts: { recs: number; 
 
 interface HeaderProps {
   lang: Lang; setLang: (l: Lang) => void; period: PeriodState;
-  onPeriod: (p: { preset?: string; from?: string; to?: string }) => void;
+  onPeriod: (p: { preset?: Preset; from?: string; to?: string }) => void;
   overview: Overview | null; onRefresh: () => void; refreshing: boolean;
 }
 
 export function Header({ lang, setLang, period, onPeriod, overview, onRefresh, refreshing }: HeaderProps) {
   const t = useT();
-  const [from, setFrom] = useState(period.from ?? "");
-  const [to, setTo] = useState(period.to ?? "");
-  useEffect(() => { setFrom(period.from ?? ""); setTo(period.to ?? ""); }, [period.from, period.to]);
   const dq = overview?.data_quality;
   const dqCls = dq ? dq.state.toLowerCase() : "na";
   return (
     <div className="head">
       <span className="chip"><b>{overview?.shop.name ?? "—"}</b></span>
-      <span className="chip">{t("Period")}
-        <select aria-label={t("Period")} value={period.preset} onChange={(e) => onPeriod({ preset: e.target.value as Preset, from: undefined, to: undefined })}>
-          <option value="month">{t("This month")}</option>
-          <option value="30d">{t("Last 30 days")}</option>
-          <option value="custom">{t("Custom")}</option>
-        </select>
-        {period.preset === "custom" ? (
-          <>
-            <input type="date" aria-label="from" value={from} onChange={(e) => setFrom(e.target.value)} />–
-            <input type="date" aria-label="to" value={to} onChange={(e) => setTo(e.target.value)} />
-            <button className="btn xs" disabled={!from || !to} onClick={() => onPeriod({ preset: "custom", from, to })}>{t("Apply")}</button>
-          </>
-        ) : overview ? <b>{periodLabel(overview.period.start, overview.period.end, lang)}</b> : null}
-      </span>
+      <DateRange preset={period.preset} from={period.from ?? overview?.period.start} to={period.to ?? overview?.period.end}
+        timezone={overview?.shop.timezone} onPick={onPeriod} />
       <span className="chip">{t("Compare")} <b>{overview ? periodLabel(overview.compare.start, overview.compare.end, lang) : "—"}</b></span>
       <span className="sp" />
       <span className="sync">
