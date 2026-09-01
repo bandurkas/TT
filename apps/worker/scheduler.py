@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from src.config.settings import settings
 from src.db.models import IntegrationSyncState
+from src.domain import costs as product_costs
 from src.domain.ingest import jobs as ingest
 from src.domain.ingest.state import DbSyncStateStore
 from src.domain.profit import aggregates
@@ -37,10 +38,13 @@ STALE_AFTER = {"finance_cycle": timedelta(hours=3), "order_statements": timedelt
 
 
 def _compute_profit(session: Any, shop: Any) -> dict[str, Any]:
+    tz = shop.timezone or profit.DEFAULT_TZ
+    rebuilt = product_costs.rebuild_cost_versions(session, shop.id, shop.currency, tz)
     res = profit.compute_order_profits(session, shop.id)  # full run: small shop, always consistent
     agg = aggregates.recompute_daily(session, shop.id, res["dates"] or None,
                                      shop.timezone or profit.DEFAULT_TZ)
-    return {"profit": {k: v for k, v in res.items() if k != "dates"}, "aggregates": agg}
+    return {"cost_versions": {k: rebuilt[k] for k in ("skus_with_lots", "versions")},
+            "profit": {k: v for k, v in res.items() if k != "dates"}, "aggregates": agg}
 
 
 def finance_cycle(session: Any, build_context: Callable[[Any], Any]) -> dict[str, Any]:

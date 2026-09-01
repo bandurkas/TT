@@ -40,3 +40,142 @@ def test_lots_for_sku_scope_precedence():
     assert [x.id for x in C.lots_for_sku(batches, sku)] == [2]  # product beats all; inactive sku lot ignored
     assert [x.id for x in C.lots_for_sku(batches, NS(id=9, product_id=4))] == [1]
     assert C.lots_for_sku([], sku) == []
+
+
+# --- rebuild_cost_versions: shared batches + seed clamping (in-memory fake session) ---------------
+class FakeSession:
+    def __init__(self, batches, skus, versions, order_rows):
+        self._batches, self._skus, self._versions, self._order_rows = batches, skus, list(versions), order_rows
+        self.deleted: list = []
+        self.added: list = []
+        self.committed = False
+
+    def scalars(self, stmt):
+        text = str(stmt)
+        if "cost_batches" in text:
+            return list(self._batches)
+        if "sku_cost_versions" in text:
+            return list(self._versions)
+        if "skus" in text and "products" in text:
+            return list(self._skus)
+        raise AssertionError("unexpected scalars() call: " + text[:120])
+
+    def execute(self, stmt):
+        return list(self._order_rows)
+
+    def delete(self, obj):
+        self.deleted.append(obj)
+        self._versions.remove(obj)
+
+    def flush(self):
+        pass
+
+    def add(self, obj):
+        self.added.append(obj)
+
+    def commit(self):
+        self.committed = True
+
+
+def _sku(id_, product_id, ext=None, title=None):
+    return NS(id=id_, product_id=product_id, external_sku_id=ext or f"sku{id_}", title=title)
+
+
+def _batch(id_, scope, received_on, unit_cost, quantity, product_id=None, sku_id=None, active=True):
+    return NS(id=id_, shop_id=1, scope=scope, product_id=product_id, sku_id=sku_id, received_on=received_on,
+              unit_cost=unit_cost, quantity=quantity, currency="IDR", note=None, active=active)
+
+
+def _order_row(sku_id, qty, day, status="COMPLETED"):
+    return (sku_id, qty, NS(astimezone=lambda tz: NS(date=lambda: day)), status)
+
+
+def test_rebuild_shares_quantity_across_skus_of_one_batch(monkeypatch):
+    from src.domain import costs as C
+    skus = [_sku(1, 100), _sku(2, 100)]  # same product, both fall under one scope="all" batch
+    batch = _batch(1, "all", d(2026, 9, 1), D(20000), 5)
+    rows = [_order_row(1, 3, d(2026, 9, 2)), _order_row(2, 3, d(2026, 9, 3))]  # 6 units total, sku1+sku2
+    session = FakeSession([batch], skus, [], rows)
+    monkeypatch.setattr(C, "local_date", lambda ts, tz: ts.astimezone(tz).date())
+    out = C.rebuild_cost_versions(session, shop_id=1, currency="IDR", tz="Asia/Jakarta")
+    assert out["skus_with_lots"] == 2 and session.committed is True
+    versions = [v for v in session.added if hasattr(v, "sku_id")]
+    v1 = [v for v in versions if v.sku_id == 1]
+    v2 = [v for v in versions if v.sku_id == 2]
+    # both SKUs see the SAME segment boundaries because the batch is shared: lot exhausted at day 2 (6 >= 5 qty)
+    assert len(v1) == 1 and len(v2) == 1
+    assert v1[0].effective_from == v2[0].effective_from == d(2026, 9, 1)
+    assert "shared_batch=1" in v1[0].notes and "shared_skus=2" in v1[0].notes
+    assert "consumed=6" in v1[0].notes and "remaining=0" in v1[0].notes  # combined consumption, not 3 each
+
+
+def test_rebuild_sku_scope_batch_is_not_shared(monkeypatch):
+    from src.domain import costs as C
+    skus = [_sku(1, 100), _sku(2, 100)]
+    b1 = _batch(1, "sku", d(2026, 9, 1), D(20000), None, sku_id=1)
+    b2 = _batch(2, "sku", d(2026, 9, 1), D(18000), None, sku_id=2)
+    session = FakeSession([b1, b2], skus, [], [])
+    monkeypatch.setattr(C, "local_date", lambda ts, tz: ts.astimezone(tz).date())
+    out = C.rebuild_cost_versions(session, shop_id=1, currency="IDR", tz="Asia/Jakarta")
+    assert out["skus_with_lots"] == 2
+    versions = [v for v in session.added if hasattr(v, "sku_id")]
+    assert {v.sku_id: v.cogs_per_unit for v in versions} == {1: D(20000), 2: D(18000)}
+    assert all("shared_batch" not in v.notes for v in versions)
+
+
+def test_rebuild_clamps_seed_version_around_lot_and_zeroes_later_seed(monkeypatch):
+    from src.domain import costs as C
+    skus = [_sku(1, 100)]
+    seed_before = NS(id=901, sku_id=1, effective_from=d(2026, 1, 1), effective_to=None, cogs_per_unit=D(25000),
+                     currency="IDR", notes=None)
+    batch = _batch(1, "sku", d(2026, 8, 20), D(20000), None, sku_id=1)
+    session = FakeSession([batch], skus, [seed_before], [])
+    monkeypatch.setattr(C, "local_date", lambda ts, tz: ts.astimezone(tz).date())
+    C.rebuild_cost_versions(session, shop_id=1, currency="IDR", tz="Asia/Jakarta")
+    assert seed_before.effective_to == d(2026, 8, 20)  # seed still covers Jan-Aug, lot takes over after
+
+    seed_after = NS(id=902, sku_id=1, effective_from=d(2026, 9, 1), effective_to=None, cogs_per_unit=D(30000),
+                    currency="IDR", notes=None)
+    session2 = FakeSession([batch], skus, [seed_after], [])
+    C.rebuild_cost_versions(session2, shop_id=1, currency="IDR", tz="Asia/Jakarta")
+    assert seed_after.effective_to == seed_after.effective_from  # zero-length: fully superseded, never selected
+
+
+def test_rebuild_no_active_batches_is_a_cheap_noop(monkeypatch):
+    from src.domain import costs as C
+    called = []
+    monkeypatch.setattr(C, "_sold_by_sku", lambda *a, **k: called.append(1) or {})
+    session = FakeSession([_batch(1, "all", d(2026, 1, 1), D(1), None, active=False)], [_sku(1, 100)], [], [])
+    out = C.rebuild_cost_versions(session, shop_id=1, currency="IDR", tz="Asia/Jakarta")
+    assert out == {"skus_with_lots": 0, "versions": 0, "segments": {}}
+    assert not called and session.committed is True
+
+
+def test_cost_overview_reports_shared_lot_once(monkeypatch):
+    from src.domain import costs as C
+    batch = _batch(1, "all", d(2026, 9, 1), D(20000), 5)
+    v1 = NS(sku_id=1, effective_from=d(2026, 9, 1), effective_to=None, cogs_per_unit=D(20000), currency="IDR",
+           notes="lot:1 consumed=6 remaining=0 shared_batch=1 shared_skus=2")
+    v2 = NS(sku_id=2, effective_from=d(2026, 9, 1), effective_to=None, cogs_per_unit=D(20000), currency="IDR",
+           notes="lot:1 consumed=6 remaining=0 shared_batch=1 shared_skus=2")
+    prod = NS(id=100, title="Socks")
+    session = MockSession(rows=[(_sku(1, 100, title="A"), prod), (_sku(2, 100, title="A"), prod)], versions=[v1, v2], batches=[batch])
+    out = C.cost_overview(session, shop_id=1, cfg=None, today=d(2026, 9, 5), tz="Asia/Jakarta")
+    assert out["lots"][0]["consumed"] == 6 and out["lots"][0]["remaining"] == 0 and out["lots"][0]["shared_skus"] == 2
+    assert {s["sku_id"]: s["current_cost"] for s in out["skus"]} == {1: D(20000), 2: D(20000)}
+
+
+class MockSession:
+    def __init__(self, rows, versions, batches):
+        self.rows, self.versions, self.batches = rows, versions, batches
+
+    def scalars(self, stmt):
+        text = str(stmt)
+        if "cost_batches" in text:
+            return list(self.batches)
+        if "sku_cost_versions" in text:
+            return list(self.versions)
+        raise AssertionError(text[:120])
+
+    def execute(self, stmt):
+        return list(self.rows)

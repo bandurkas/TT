@@ -36,4 +36,5 @@ class ShopAdDay(PKMixin, Base):
     sku_orders: Mapped[int] = mapped_column(Integer)
     gross_revenue: Mapped[Decimal] = mapped_column(Money)
     partial: Mapped[bool] = mapped_column(Boolean)
+    manual: Mapped[bool] = mapped_column(Boolean, default=False)
     __table_args__ = (UniqueConstraint("shop_id", "metric_date"),)

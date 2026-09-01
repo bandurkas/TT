@@ -179,6 +179,7 @@ def import_report(session, shop_id, path, kind, timezone, observed_at):
             d.report_id, d.currency = report.id, shop.currency
             d.cost, d.sku_orders, d.gross_revenue = number(v["cost"]), v["sku_orders"], number(v["gross_revenue"])
             d.partial = day >= observed_day
+            d.manual = False
             session.add(d)
     session.commit()
     return {"report_id": report.id, "unchanged": False, "sha256": digest,
@@ -234,6 +235,7 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
     d.report_id, d.currency = report.id, shop.currency
     d.cost, d.sku_orders, d.gross_revenue = cost, sku_orders, gross_revenue
     d.partial = (day >= observed_day) or not final
+    d.manual = True
     session.add(d)
     session.commit()
     return {"report_id": report.id, "unchanged": False, "sha256": digest, "period": [str(day), str(day)],

@@ -217,6 +217,18 @@ def test_compute_allocates_reported_cost_not_payments_across_same_day_orders():
     assert res[0].snapshot["ad_method"] == "BLENDED" and res[0].snapshot["ad_window_days"] == 1
 
 
+def test_ad_source_label_distinguishes_manual_entry_from_campaign_overview():
+    o = order(1, "A", created=jkt(2026, 8, 22))
+    inp = inputs([ctx(o, rec=record("A", 1))])
+    inp.advertising = [NS(metric_date=date(2026, 8, 22), cost=D(1000), currency="IDR", partial=False, report_id=1,
+                          manual=True)]
+    res = compute_from_inputs(inp, NOW)
+    assert res[0].snapshot["ad_source"] == "manual_entry_cost"
+    inp.advertising[0] = NS(metric_date=date(2026, 8, 22), cost=D(1000), currency="IDR", partial=False, report_id=1)
+    res = compute_from_inputs(inp, NOW)  # no `manual` attribute at all (older fixtures/rows) -> defaults False
+    assert res[0].snapshot["ad_source"] == "campaign_overview_cost"
+
+
 # --- provisional estimate ---------------------------------------------------------------------
 def test_trailing_fee_ratio():
     recs = [record(rid=1, st=jkt(2026, 8, 20)), record(rid=2, st=jkt(2026, 6, 1)),

@@ -65,23 +65,29 @@ def test_run_job_exception_rolls_back_and_marks_error():
 
 def test_finance_cycle_order_of_calls():
     calls = []
-    ctx = NS(shop=NS(id=1, timezone="Asia/Jakarta"))
+    ctx = NS(shop=NS(id=1, timezone="Asia/Jakarta", currency="IDR"))
     with patch.object(S.ingest, "sync_orders", lambda c: calls.append("orders") or {}), \
          patch.object(S.ingest, "sync_statements", lambda c: calls.append("stm") or {}), \
+         patch.object(S.product_costs, "rebuild_cost_versions",
+                      lambda s, sid, cur, tz: calls.append(("costs", cur, tz)) or
+                      {"skus_with_lots": 0, "versions": 0}), \
          patch.object(S.profit, "compute_order_profits",
                       lambda s, sid: calls.append("profit") or {"dates": [], "orders": 0}), \
          patch.object(S.aggregates, "recompute_daily",
                       lambda s, sid, d, tz: calls.append(("agg", tz)) or {}):
         out = S.finance_cycle(MagicMock(), lambda s: ctx)
-    assert calls == ["orders", "stm", "profit", ("agg", "Asia/Jakarta")]
-    assert out["profit"] == {"orders": 0}
+    # cost lots (FIFO batches) must be rebuilt BEFORE profit compute, so newly exhausted lots apply
+    assert calls == ["orders", "stm", ("costs", "IDR", "Asia/Jakarta"), "profit", ("agg", "Asia/Jakarta")]
+    assert out["profit"] == {"orders": 0} and out["cost_versions"] == {"skus_with_lots": 0, "versions": 0}
 
 
 def test_order_statements_job_uses_poll_horizon():
     seen = {}
-    ctx = NS(shop=NS(id=1, timezone=None))
+    ctx = NS(shop=NS(id=1, timezone=None, currency="IDR"))
     with patch.object(S.ingest, "sync_order_statements",
                       lambda c, unsettled_days: seen.setdefault("days", unsettled_days) or {}), \
+         patch.object(S.product_costs, "rebuild_cost_versions",
+                      lambda s, sid, cur, tz: {"skus_with_lots": 0, "versions": 0}), \
          patch.object(S.profit, "compute_order_profits", lambda s, sid: {"dates": []}), \
          patch.object(S.aggregates, "recompute_daily", lambda s, sid, d, tz: {"tz": tz}):
         out = S.order_statements(MagicMock(), lambda s: ctx)
