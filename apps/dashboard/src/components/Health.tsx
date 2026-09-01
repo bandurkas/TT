@@ -5,6 +5,8 @@ import type { Card, Overview } from "@/lib/types";
 import { kpiChange } from "@/lib/kpi";
 import { orderMoney } from "@/lib/orders";
 import { ErrorNote, Pill, Skeleton, Sparkline, ZoneHeader, statusTone } from "./ui";
+import AdCost from "./AdCost";
+import Costs from "./Costs";
 import AdvertisingSource from "./AdvertisingSource";
 
 const MAIN = ["net_profit", "gmv", "net_seller_revenue", "orders", "ad_spend", "net_margin"];
@@ -89,7 +91,8 @@ const COMP = ["margin", "ad_efficiency", "conversion", "refunds", "data_quality"
 const COMP_LABEL: Record<string, string> = { margin: "Margin", ad_efficiency: "Ad efficiency", conversion: "Conversion", refunds: "Refunds", data_quality: "Data quality" };
 const barColor = (v: number) => (v < 40 ? "var(--bad)" : v < 60 ? "var(--warn)" : v >= 75 ? "var(--good)" : "var(--accent)");
 
-export default function Health({ ov, loading, error, reload }: { ov: Overview | null; loading: boolean; error: string | null; reload: () => void }) {
+interface HealthProps { ov: Overview | null; loading: boolean; error: string | null; reload: () => void; query: string; tick: number; onAdApplied: () => void; onCostApplied: () => void }
+export default function Health({ ov, loading, error, reload, query, tick, onAdApplied, onCostApplied }: HealthProps) {
   const lang = useLang(), t = useT();
   const byKey = new Map((ov?.cards ?? []).map((c) => [c.key, c]));
   const health = ov?.health;
@@ -154,6 +157,10 @@ export default function Health({ ov, loading, error, reload }: { ov: Overview | 
                 </>
               ) : <div className="muted small" style={{ marginTop: 8 }}>—</div>}
             </div>
+          </div>
+          <div className="two">
+            <AdCost adv={ov.advertising} onApplied={onAdApplied} />
+            <Costs query={query} tick={tick} onApplied={onCostApplied} />
           </div>
           <div className="note"><b>{t("Notes")}:</b> {ov.notes.map((n, i) => { const k = noteKey(n); return <span key={i}>{k ? t(k) : n}{!k && <EnHint lang={lang} />} </span>; })}</div>
         </>

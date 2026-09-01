@@ -1,0 +1,118 @@
+{
+ "shop": {
+  "id": 1,
+  "name": "Lomira.product",
+  "currency": "IDR",
+  "timezone": "Asia/Jakarta"
+ },
+ "period": {
+  "start": "2026-08-01",
+  "end": "2026-08-31"
+ },
+ "compare": {
+  "start": "2026-07-02",
+  "end": "2026-08-01"
+ },
+ "generated_at": "2026-08-31T09:12:00Z",
+ "default_cogs_per_unit": "50000",
+ "lots": [
+  {
+   "id": 1,
+   "scope": "all",
+   "product_id": null,
+   "sku_id": null,
+   "received_on": "2026-01-01",
+   "unit_cost": "25000",
+   "quantity": null,
+   "currency": "IDR",
+   "note": "opening stock",
+   "active": true,
+   "consumed": 32,
+   "remaining": null
+  },
+  {
+   "id": 2,
+   "scope": "all",
+   "product_id": null,
+   "sku_id": null,
+   "received_on": "2026-09-01",
+   "unit_cost": "20000",
+   "quantity": 300,
+   "currency": "IDR",
+   "note": "September purchase",
+   "active": true
+  }
+ ],
+ "skus": [
+  {
+   "sku_id": 101,
+   "external_sku_id": "SKU-HITAM-5",
+   "product_id": 1,
+   "product_title": "Socks Kaos Kaki Pria Hitam 5 Pasang",
+   "sku_title": "Hitam · 5 pasang · 41-47",
+   "current_cost": "25000",
+   "source": "seed",
+   "lot_id": null,
+   "effective_from": "2026-01-01",
+   "history": [
+    {
+     "effective_from": "2026-01-01",
+     "effective_to": null,
+     "cogs_per_unit": "25000",
+     "notes": "seed"
+    }
+   ]
+  },
+  {
+   "sku_id": 102,
+   "external_sku_id": "SKU-ABU-5",
+   "product_id": 2,
+   "product_title": "Kaos Kaki Abu-Abu 5 pasang",
+   "sku_title": "Abu-abu · 5 pasang",
+   "current_cost": "25000",
+   "source": "seed",
+   "lot_id": null,
+   "effective_from": "2026-01-01",
+   "history": [
+    {
+     "effective_from": "2026-01-01",
+     "effective_to": null,
+     "cogs_per_unit": "25000",
+     "notes": "seed"
+    }
+   ]
+  },
+  {
+   "sku_id": 103,
+   "external_sku_id": "SKU-WANITA-5",
+   "product_id": 3,
+   "product_title": "Kaos Kaki Wanita Putih 5 Pasang",
+   "sku_title": "Putih · 5 pasang",
+   "current_cost": "25000",
+   "source": "seed",
+   "lot_id": null,
+   "effective_from": "2026-01-01",
+   "history": [
+    {
+     "effective_from": "2026-01-01",
+     "effective_to": null,
+     "cogs_per_unit": "25000",
+     "notes": "seed"
+    }
+   ]
+  },
+  {
+   "sku_id": 104,
+   "external_sku_id": "SKU-ANAK-10",
+   "product_id": 4,
+   "product_title": "Kaos Kaki Anak Putih Isi 10 Pasang",
+   "sku_title": "Anak · 10 pasang",
+   "current_cost": "50000",
+   "source": "default",
+   "lot_id": null,
+   "effective_from": null,
+   "history": []
+  }
+ ],
+ "note": "Lots are consumed FIFO by sold units per SKU; a lot without quantity applies until the next lot; the day a lot runs out is still charged at its cost. Versions are regenerated on every change and past orders are recomputed."
+}

@@ -52,8 +52,9 @@ export interface Advertising {
   cost: string | null; known_cost: string; gmv_pay: string;
   covered_days: number; expected_days: number; missing_days: string[]; partial_days: string[];
   status: "reported" | "partial" | "missing";
-  reports: { filename: string; sha256: string; observed_at: string; timezone: string }[];
-  days: { date: string; cost: string; partial: boolean; sku_orders: number; gross_revenue: string }[];
+  source: string; payment_basis?: string; taxes_and_credits?: string;
+  reports: { filename: string; sha256: string; observed_at: string; timezone?: string; timezone_basis?: string; scope?: string; period_start?: string; period_end?: string }[];
+  days: AdDay[]; manual_days: number; entry_note?: string;
 }
 
 export interface DataQuality {
@@ -69,7 +70,8 @@ export interface Overview extends Meta {
   health: Health;
   unit_economics: UnitEconomics | null;
   data_quality: DataQuality;
-  totals: Record<string, Dec | number>;
+  advertising?: Advertising;
+  totals: Record<string, Dec | number | null>;
   notes: string[];
 }
 
@@ -320,3 +322,26 @@ export interface VPHistVideo {
   days: VPHistVideoDay[]; peak_day: string; peak_views: number; recent_vs_peak: Dec | null; phase: VideoPhase;
 }
 export interface VPHistory { products: VPHistProduct[]; videos: VPHistVideo[]; notes: string[] }
+
+// GET /api/advertising (also embedded as overview.advertising) — src/domain/reports.advertising_summary
+export interface AdDay {
+  date: string; cost: Dec; partial: boolean; sku_orders: number; gross_revenue: Dec;
+  source: "shop_overview" | "manual_entry" | string; observed_at: string | null; note: string | null;
+}
+export interface ManualAdIn { date: string; cost: string; sku_orders: number; gross_revenue: string; final: boolean; note?: string | null }
+export interface ManualAdOut { report_id: number; partial?: boolean; unchanged?: boolean; recomputed?: { orders: number; inserted: number }; day: AdDay | null }
+
+// GET /api/costs — src/domain/costs.cost_overview
+export interface CostLot {
+  id: number; scope: "all" | "product" | "sku"; product_id: number | null; sku_id: number | null; received_on: string;
+  unit_cost: Dec; quantity: number | null; currency: string; note: string | null; active: boolean; consumed?: number; remaining?: number | null;
+}
+export interface CostSku {
+  sku_id: number; external_sku_id: string | null; product_id: number; product_title: string; sku_title: string | null;
+  current_cost: Dec | null; source: "lot" | "seed" | "default" | "none"; lot_id: number | null; effective_from: string | null;
+  history: { effective_from: string; effective_to: string | null; cogs_per_unit: Dec; notes: string | null }[];
+}
+export interface Costs extends Meta { default_cogs_per_unit: Dec | null; lots: CostLot[]; skus: CostSku[]; note: string }
+export interface LotIn { scope: "all" | "product" | "sku"; product_id?: number | null; sku_id?: number | null; received_on: string; unit_cost: string; quantity?: number | null; note?: string | null }
+export interface LotPatch { received_on?: string; unit_cost?: string; quantity?: number; note?: string | null; active?: boolean }
+export interface CostWriteOut { lot_id?: number; default_cogs_per_unit?: Dec | null; versions: number; skus_with_lots: number; recomputed: { orders: number; inserted: number } }

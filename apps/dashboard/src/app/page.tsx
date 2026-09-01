@@ -48,7 +48,9 @@ function Dashboard() {
           <Header lang={lang} setLang={setLang} period={state} onPeriod={(p) => update(p)} overview={ov.data} onRefresh={() => setTick((x) => x + 1)} refreshing={refreshing} />
           <div className="wrap">
             {apiDown && <div className="banner bad" role="alert"><b>{tr(lang, "API unreachable")}</b> <span className="mono small">{ov.error}</span><button className="btn sm" onClick={() => setTick((x) => x + 1)}>{tr(lang, "Retry")}</button></div>}
-            <Health ov={ov.data} loading={ov.loading} error={apiDown ? null : ov.error} reload={ov.reload} />
+            <Health ov={ov.data} loading={ov.loading} error={apiDown ? null : ov.error} reload={ov.reload} query={q} tick={tick}
+              onAdApplied={() => { ov.reload(); trd.reload(); ins.reload(); fn.reload(); vp.reload(); }}
+              onCostApplied={() => { ov.reload(); prods.reload(); fn.reload(); vp.reload(); }} />
             <Orders key={q} query={q} shopId={state.shopId} tick={tick} />
             <Diagnosis ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
             <Trend tr={trd.data} ov={ov.data} loading={trd.loading} error={apiDown ? null : trd.error} reload={trd.reload} />

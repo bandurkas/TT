@@ -30,7 +30,9 @@ src/lib/format.ts            Rp 1.87m / Rp 254k / Rp 25,000, percentages, dates 
 src/lib/i18n.tsx             EN keys → RU map (mock strings reused), LangContext
 src/lib/period.ts            ?preset=month|30d|custom&from&to&tab&shop_id → API query
 src/components/Shell.tsx     rail + header (period picker, compare, last sync, data-quality badge, Refresh, EN/RU)
-src/components/Health.tsx    zone 1  /api/dashboard/overview
+src/components/Health.tsx    zone 1  /api/dashboard/overview (+ AdCost, Costs panels)
+src/components/AdCost.tsx    zone 1  manual daily ad Cost: POST /api/advertising/manual + per-day table (overview.advertising / GET /api/advertising)
+src/components/Costs.tsx     zone 1  product cost (COGS): GET /api/costs, POST /api/costs/default, POST/PATCH /api/costs/lots — lock checkbox, FIFO lots, per-SKU table
 src/components/Diagnosis.tsx zone 2  /api/dashboard/insights (findings → Create task)
 src/components/Trend.tsx     zone 3  /api/dashboard/trends (SVG: GMV bars, ad bars, cum. net profit, ◆ events)
 src/components/Explorer.tsx  zone 4  /api/analytics/{products,videos,campaigns,creators}

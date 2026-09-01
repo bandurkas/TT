@@ -11,12 +11,17 @@ const FIX = path.join(process.cwd(), "fixtures");
 const FILES: Record<string, string> = {
   "dashboard/overview": "overview.json", "dashboard/trends": "trends.json", "dashboard/funnel": "funnel.json",
   "dashboard/insights": "insights.json", "analytics/products": "products.json", "analytics/videos": "videos.json",
-  "analytics/campaigns": "campaigns.json", "analytics/video-products": "video-products.json", "analytics/creators": "creators.json",
+  "analytics/campaigns": "campaigns.json", "analytics/video-products": "video-products.json", "advertising": "advertising.json", "costs": "costs.json", "analytics/creators": "creators.json",
 };
 const STATUSES = ["today", "in_progress", "review", "done"] as const;
 
 type Task = Record<string, unknown> & { id: number; status: string };
-const g = globalThis as unknown as { __mockTasks?: Task[] };
+type Lot = Record<string, unknown> & { id: number };
+const g = globalThis as unknown as { __mockTasks?: Task[]; __mockAd?: Record<string, unknown>; __mockCosts?: Record<string, unknown> & { lots: Lot[] } };
+const err = (status: number, detail: string) => NextResponse.json({ detail }, { status });
+async function adv() { if (!g.__mockAd) g.__mockAd = await read("advertising.json"); return g.__mockAd!; }
+async function costs() { if (!g.__mockCosts) g.__mockCosts = await read("costs.json"); return g.__mockCosts!; }
+const recomputed = () => ({ versions: 6, skus_with_lots: 4, recomputed: { orders: 33, inserted: 33 } });
 
 const off = () => NextResponse.json({ detail: "mock disabled" }, { status: 404 });
 const read = async (f: string) => JSON.parse(await fs.readFile(path.join(FIX, f), "utf8"));
@@ -42,6 +47,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ path: string[]
     return detail ? NextResponse.json(detail) : NextResponse.json({ detail: "order not found" }, { status: 404 });
   }
   if (key === "tasks") return NextResponse.json(await listTasks());
+  if (key === "advertising") return NextResponse.json(await adv());
+  if (key === "costs") return NextResponse.json(await costs());
   const f = FILES[key];
   if (!f) return NextResponse.json({ detail: "not found" }, { status: 404 });
   return NextResponse.json(await read(f));
@@ -49,8 +56,34 @@ export async function GET(_req: Request, ctx: { params: Promise<{ path: string[]
 
 export async function POST(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   if (process.env.MOCK !== "1") return off();
-  if ((await ctx.params).path.join("/") !== "tasks") return NextResponse.json({ detail: "not found" }, { status: 404 });
+  const key = (await ctx.params).path.join("/");
   const body = await req.json();
+  if (key === "advertising/manual") {
+    const a = await adv();
+    const days = a.days as Record<string, unknown>[];
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date());
+    if (body.date > today) return err(422, "Report contains future dates");
+    if (body.final && body.date >= today) return err(422, "A day can only be marked final after it has ended in the shop timezone");
+    const prior = days.find((d) => d.date === body.date);
+    if (prior && prior.source === "manual_entry" && String(prior.observed_at) > new Date().toISOString()) return err(422, "A newer or equal observation for this day already exists; enter a later one");
+    const day = { date: body.date, cost: String(body.cost), partial: !body.final, sku_orders: body.sku_orders ?? 0, gross_revenue: String(body.gross_revenue ?? 0), source: "manual_entry", observed_at: new Date().toISOString(), note: body.note || null };
+    if (prior) Object.assign(prior, day); else { days.push(day); days.sort((x, y) => String(x.date).localeCompare(String(y.date))); }
+    a.manual_days = days.filter((d) => d.source === "manual_entry").length;
+    return NextResponse.json({ report_id: 900 + days.length, partial: day.partial, recomputed: { orders: 33, inserted: 33 }, day }, { status: 201 });
+  }
+  if (key === "costs/default") {
+    const c = await costs();
+    c.default_cogs_per_unit = body.default_cogs_per_unit === null || body.default_cogs_per_unit === undefined ? null : String(body.default_cogs_per_unit);
+    return NextResponse.json({ default_cogs_per_unit: c.default_cogs_per_unit, ...recomputed() });
+  }
+  if (key === "costs/lots") {
+    const c = await costs();
+    if ((body.scope === "product" && !body.product_id) || (body.scope === "sku" && !body.sku_id)) return err(422, "product_id / sku_id required for that scope");
+    const lot: Lot = { id: Math.max(0, ...c.lots.map((l) => l.id)) + 1, scope: body.scope ?? "all", product_id: body.scope === "product" ? body.product_id : null, sku_id: body.scope === "sku" ? body.sku_id : null, received_on: body.received_on, unit_cost: String(body.unit_cost), quantity: body.quantity ?? null, currency: "IDR", note: body.note ?? null, active: true };
+    c.lots.push(lot);
+    return NextResponse.json({ lot_id: lot.id, ...recomputed() }, { status: 201 });
+  }
+  if (key !== "tasks") return NextResponse.json({ detail: "not found" }, { status: 404 });
   const all = await tasks();
   const now = new Date().toISOString();
   const { source, ...evidence } = (body.evidence ?? {}) as Record<string, unknown>;
@@ -68,6 +101,15 @@ export async function POST(req: Request, ctx: { params: Promise<{ path: string[]
 export async function PATCH(req: Request, ctx: { params: Promise<{ path: string[] }> }) {
   if (process.env.MOCK !== "1") return off();
   const p = (await ctx.params).path;
+  if (p[0] === "costs" && p[1] === "lots" && p.length === 3) {
+    const c = await costs();
+    const lot = c.lots.find((l) => l.id === Number(p[2]));
+    if (!lot) return err(404, "lot not found");
+    const b = await req.json();
+    if ("quantity" in b) lot.quantity = b.quantity || null;
+    for (const k of ["received_on", "unit_cost", "note", "active"]) if (k in b) lot[k] = k === "unit_cost" ? String(b[k]) : b[k];
+    return NextResponse.json({ lot_id: lot.id, ...recomputed() });
+  }
   if (p[0] !== "tasks" || p.length !== 2) return NextResponse.json({ detail: "not found" }, { status: 404 });
   const all = await tasks();
   const t = all.find((x) => x.id === Number(p[1]));

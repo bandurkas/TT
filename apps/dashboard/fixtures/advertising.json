@@ -1,0 +1,352 @@
+{
+ "shop": {
+  "id": 1,
+  "name": "Lomira.product",
+  "currency": "IDR",
+  "timezone": "Asia/Jakarta"
+ },
+ "period": {
+  "start": "2026-08-01",
+  "end": "2026-08-31"
+ },
+ "compare": {
+  "start": "2026-07-02",
+  "end": "2026-08-01"
+ },
+ "generated_at": "2026-08-31T09:12:00Z",
+ "cost": "2351033",
+ "known_cost": "2351033",
+ "covered_days": 31,
+ "expected_days": 31,
+ "missing_days": 0,
+ "partial_days": [
+  "2026-08-31"
+ ],
+ "status": "partial",
+ "source": "Campaign overview + manual entry · Cost",
+ "taxes_and_credits": "not_reconciled",
+ "gmv_pay": "2231033",
+ "payment_basis": "statement_date; not campaign Cost",
+ "reports": [
+  {
+   "filename": "campaign_overview_2026-08.csv",
+   "sha256": "ab12…",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "scope": "shop_overview"
+  }
+ ],
+ "days": [
+  {
+   "date": "2026-08-01",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-02",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-03",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-04",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-05",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-06",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-07",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-08",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-09",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-10",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-11",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-12",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-13",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-14",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-15",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-16",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-17",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-18",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-19",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-20",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-21",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-22",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-23",
+   "cost": "1110000",
+   "partial": false,
+   "sku_orders": 3,
+   "gross_revenue": "285000",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-24",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-25",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-26",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-27",
+   "cost": "699000",
+   "partial": false,
+   "sku_orders": 2,
+   "gross_revenue": "190000",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-28",
+   "cost": "0",
+   "partial": false,
+   "sku_orders": 0,
+   "gross_revenue": "0",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-29",
+   "cost": "422033",
+   "partial": false,
+   "sku_orders": 1,
+   "gross_revenue": "95000",
+   "source": "shop_overview",
+   "observed_at": "2026-08-30T15:58:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-30",
+   "cost": "68000",
+   "partial": false,
+   "sku_orders": 1,
+   "gross_revenue": "95000",
+   "source": "manual_entry",
+   "observed_at": "2026-08-30T14:05:00Z",
+   "note": null
+  },
+  {
+   "date": "2026-08-31",
+   "cost": "52000",
+   "partial": true,
+   "sku_orders": 1,
+   "gross_revenue": "95000",
+   "source": "manual_entry",
+   "observed_at": "2026-08-31T14:05:00Z",
+   "note": "entered 21:00 WIB, campaign still running"
+  }
+ ],
+ "manual_days": 2,
+ "entry_note": "Manual entry = operator-transcribed Ads Manager figures; replaced only by a newer observation; superseded automatically once the Ads API is connected."
+}

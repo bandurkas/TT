@@ -42,6 +42,8 @@ async function send<T>(method: string, path: string, body: unknown): Promise<T> 
   return r.json() as Promise<T>;
 }
 
+export const apiPost = <T,>(path: string, body: unknown) => send<T>("POST", path, body);
+export const apiPatch = <T,>(path: string, body: unknown) => send<T>("PATCH", path, body);
 export const createTask = (body: TaskIn, shopId?: string) => send<Task>("POST", `/api/tasks${qs({ shop_id: shopId })}`, body);
 export const patchTask = (id: number, body: TaskPatch) => send<Task>("PATCH", `/api/tasks/${id}`, body);
 
