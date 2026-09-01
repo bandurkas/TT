@@ -120,6 +120,33 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .vb .rs{grid-column:1/-1;color:var(--muted);font-size:11px;margin-top:4px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stack{display:grid;grid-template-columns:1fr;gap:10px}
+
+/* data-entry panels (ad cost, product cost) */
+.field{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.field>input,.field>select{text-transform:none;letter-spacing:0;font-weight:400}
+.panel-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.lockbox{display:inline-flex;gap:6px;align-items:center;margin-left:auto;font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer}
+.lockbox.on{color:var(--muted)}
+.locked-hint{color:var(--muted);font-weight:400}
+
+/* what-if: a calculator, not a table row */
+.whatif{background:var(--surface2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r);padding:14px 16px;margin-top:8px}
+.whatif .row{display:flex;gap:16px;align-items:end;flex-wrap:wrap}
+.eq{font:600 13px Manrope,sans-serif;color:var(--ink2);padding-bottom:7px}
+.eq b{color:var(--ink)}
+.presets{display:inline-flex;gap:4px;flex-wrap:wrap;padding-bottom:1px}
+.presets button{padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font:600 12px "IBM Plex Sans",sans-serif;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+.presets button:hover{border-color:var(--accent);color:var(--accent)}
+.presets button.win{background:var(--good-soft);color:var(--good);border-color:transparent}
+.presets button.lose{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.presets button.on{outline:2px solid var(--accent);outline-offset:1px}
+.wi-out{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.wi-out .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.wi-out .v{font:700 23px/1.2 Manrope,sans-serif;margin-top:3px;letter-spacing:-.01em}
+.wi-out .was{font-size:12px;color:var(--muted);margin-top:3px}
+.wi-be{margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:12px;color:var(--ink2)}
+.wi-be b{font-family:Manrope,sans-serif}
+@media (max-width:820px){.wi-out{grid-template-columns:1fr}}
 .funnel{padding:16px}
 .step{display:grid;grid-template-columns:150px 1fr 90px 90px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
 .step:first-of-type{border-top:0}
@@ -169,9 +196,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 @keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .form{padding:14px 16px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .form label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-.form label.wide{grid-column:1/-1}
+.form .wide{grid-column:1/-1}
 .form .actions{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;align-items:center}
 .form .err{color:var(--bad);font-size:12px;margin-right:auto}
+.form label.inline{flex-direction:row;align-items:center;gap:7px;text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;color:var(--ink2);align-self:end;padding-bottom:7px;cursor:pointer}
 .muted{color:var(--muted)}
 .small{font-size:12px}
 .tiny{font-size:11px;color:var(--muted)}

@@ -1,617 +1,617 @@
 {
- "shop": {
-  "id": 1,
-  "name": "Lomira.product",
-  "currency": "IDR",
-  "timezone": "Asia/Jakarta"
- },
- "period": {
-  "start": "2026-08-01",
-  "end": "2026-08-31"
- },
- "compare": {
-  "start": "2026-07-02",
-  "end": "2026-08-01"
- },
- "generated_at": "2026-08-31T09:12:00Z",
- "cards": [
-  {
-   "key": "net_profit",
-   "kind": "money",
-   "value": "-894000",
-   "prev": "120000",
-   "change_abs": "-1014000",
-   "change_pct": "-8.45",
-   "sparkline": [
-    "-40000",
-    "10000",
-    "-120000",
-    "-60000",
-    "-699000",
-    "30000",
-    "-15000"
-   ],
-   "status": "bad",
-   "note": "accrual; ad cost BLENDED estimate",
-   "provisional": true,
-   "meta": {}
+  "shop": {
+    "id": 1,
+    "name": "Lomira.product",
+    "currency": "IDR",
+    "timezone": "Asia/Jakarta"
   },
-  {
-   "key": "gmv",
-   "kind": "money",
-   "value": "3200000",
-   "prev": "2900000",
-   "change_abs": "300000",
-   "change_pct": "0.1034",
-   "sparkline": [
-    "100000",
-    "200000",
-    "0",
-    "100000",
-    "200000",
-    "100000",
-    "100000"
-   ],
-   "status": "good",
-   "note": "32 units",
-   "provisional": false,
-   "meta": {
-    "units": 32
-   }
+  "period": {
+    "start": "2026-08-01",
+    "end": "2026-08-31"
   },
-  {
-   "key": "net_seller_revenue",
-   "kind": "money",
-   "value": "2400000",
-   "prev": "2350000",
-   "change_abs": "50000",
-   "change_pct": "0.0213",
-   "sparkline": [
-    "87000",
-    "174000",
-    "0",
-    "87000",
-    "174000",
-    "87000",
-    "87000"
-   ],
-   "status": "good",
-   "note": "after fees & refunds",
-   "provisional": true,
-   "meta": {}
+  "compare": {
+    "start": "2026-07-02",
+    "end": "2026-08-01"
   },
-  {
-   "key": "orders",
-   "kind": "count",
-   "value": "33",
-   "prev": "31",
-   "change_abs": "2",
-   "change_pct": "0.0645",
-   "sparkline": [
-    "1",
-    "2",
-    "0",
-    "1",
-    "2",
-    "1",
-    "1"
-   ],
-   "status": "good",
-   "note": "4 refunded",
-   "provisional": false,
-   "meta": {
-    "refunded": 4
-   }
+  "generated_at": "2026-08-31T09:12:00Z",
+  "cards": [
+    {
+      "key": "net_profit",
+      "kind": "money",
+      "value": "-322240",
+      "prev": "120000",
+      "change_abs": "-1014000",
+      "change_pct": "-8.45",
+      "sparkline": [
+        "-40000",
+        "10000",
+        "-120000",
+        "-60000",
+        "-699000",
+        "30000",
+        "-15000"
+      ],
+      "status": "bad",
+      "note": "accrual; ad cost BLENDED estimate",
+      "provisional": true,
+      "meta": {}
+    },
+    {
+      "key": "gmv",
+      "kind": "money",
+      "value": "3200000",
+      "prev": "2900000",
+      "change_abs": "300000",
+      "change_pct": "0.1034",
+      "sparkline": [
+        "100000",
+        "200000",
+        "0",
+        "100000",
+        "200000",
+        "100000",
+        "100000"
+      ],
+      "status": "good",
+      "note": "32 units",
+      "provisional": false,
+      "meta": {
+        "units": 32
+      }
+    },
+    {
+      "key": "net_seller_revenue",
+      "kind": "money",
+      "value": "2708800",
+      "prev": "2350000",
+      "change_abs": "50000",
+      "change_pct": "0.0213",
+      "sparkline": [
+        "87000",
+        "174000",
+        "0",
+        "87000",
+        "174000",
+        "87000",
+        "87000"
+      ],
+      "status": "good",
+      "note": "after fees & refunds",
+      "provisional": true,
+      "meta": {}
+    },
+    {
+      "key": "orders",
+      "kind": "count",
+      "value": "33",
+      "prev": "31",
+      "change_abs": "2",
+      "change_pct": "0.0645",
+      "sparkline": [
+        "1",
+        "2",
+        "0",
+        "1",
+        "2",
+        "1",
+        "1"
+      ],
+      "status": "good",
+      "note": "4 refunded",
+      "provisional": false,
+      "meta": {
+        "refunded": 4
+      }
+    },
+    {
+      "key": "ad_spend",
+      "kind": "money",
+      "value": "2231033",
+      "prev": "1800000",
+      "change_abs": "431033",
+      "change_pct": "0.2395",
+      "sparkline": [
+        "0",
+        "0",
+        "0",
+        "0",
+        "699000",
+        "0",
+        "422000"
+      ],
+      "status": "neutral",
+      "note": "0.9296 of net revenue",
+      "provisional": true,
+      "meta": {
+        "ad_share": "0.9296"
+      }
+    },
+    {
+      "key": "net_margin",
+      "kind": "pct",
+      "value": "-0.11896",
+      "prev": "0.0511",
+      "change_abs": "-0.3303",
+      "change_pct": null,
+      "sparkline": [],
+      "status": "bad",
+      "note": "floor 0.10",
+      "provisional": true,
+      "meta": {
+        "floor": "0.10"
+      }
+    },
+    {
+      "key": "reported_roas",
+      "kind": "ratio",
+      "value": null,
+      "prev": null,
+      "change_abs": null,
+      "change_pct": null,
+      "sparkline": [],
+      "status": "neutral",
+      "note": "NOT_AVAILABLE: Ads API",
+      "provisional": false,
+      "meta": {}
+    },
+    {
+      "key": "blended_roas",
+      "kind": "ratio",
+      "value": "1.08",
+      "prev": "1.31",
+      "change_abs": "-0.23",
+      "change_pct": "-0.1756",
+      "sparkline": [],
+      "status": "bad",
+      "note": "break-even 1.62",
+      "provisional": true,
+      "meta": {
+        "break_even": "1.62"
+      }
+    },
+    {
+      "key": "aov",
+      "kind": "money",
+      "value": "96970",
+      "prev": "93548",
+      "change_abs": "3422",
+      "change_pct": "0.0366",
+      "sparkline": [],
+      "status": "good",
+      "note": null,
+      "provisional": false,
+      "meta": {}
+    },
+    {
+      "key": "cvr",
+      "kind": "pct",
+      "value": "0.1053",
+      "prev": "0.0980",
+      "change_abs": "0.0073",
+      "change_pct": "0.0745",
+      "sparkline": [],
+      "status": "good",
+      "note": "orders / product clicks",
+      "provisional": false,
+      "meta": {}
+    },
+    {
+      "key": "refund_rate",
+      "kind": "pct",
+      "value": "0.1212",
+      "prev": "0.0645",
+      "change_abs": "0.0567",
+      "change_pct": "0.8791",
+      "sparkline": [],
+      "status": "bad",
+      "note": "refunded orders / orders",
+      "provisional": false,
+      "meta": {}
+    },
+    {
+      "key": "settlement_coverage",
+      "kind": "pct",
+      "value": "0.92",
+      "prev": "1",
+      "change_abs": "-0.08",
+      "change_pct": "-0.08",
+      "sparkline": [],
+      "status": "good",
+      "note": "3 provisional",
+      "provisional": false,
+      "meta": {
+        "settled": 30,
+        "provisional": 3
+      }
+    }
+  ],
+  "health": {
+    "score": 34,
+    "grade": "POOR",
+    "components": {
+      "margin": 12,
+      "ad_efficiency": 21,
+      "conversion": 64,
+      "refunds": 58,
+      "data_quality": 84
+    }
   },
-  {
-   "key": "ad_spend",
-   "kind": "money",
-   "value": "2231033",
-   "prev": "1800000",
-   "change_abs": "431033",
-   "change_pct": "0.2395",
-   "sparkline": [
-    "0",
-    "0",
-    "0",
-    "0",
-    "699000",
-    "0",
-    "422000"
-   ],
-   "status": "neutral",
-   "note": "0.9296 of net revenue",
-   "provisional": true,
-   "meta": {
-    "ad_share": "0.9296"
-   }
+  "unit_economics": {
+    "units": 32,
+    "revenue_per_unit": "96700",
+    "fees_per_unit": "12050",
+    "cogs_per_unit": "25000",
+    "contribution_per_unit": "59650",
+    "ad_cost_per_unit": "69720",
+    "net_per_unit": "-10070",
+    "ad_cost_is_estimate": true
   },
-  {
-   "key": "net_margin",
-   "kind": "pct",
-   "value": "-0.2792",
-   "prev": "0.0511",
-   "change_abs": "-0.3303",
-   "change_pct": null,
-   "sparkline": [],
-   "status": "bad",
-   "note": "floor 0.10",
-   "provisional": true,
-   "meta": {
-    "floor": "0.10"
-   }
+  "data_quality": {
+    "score": 84,
+    "state": "PARTIAL",
+    "reasons": [
+      "3 provisional orders (fees estimated)",
+      "1 order missing COGS"
+    ],
+    "last_sync": "2026-08-30T15:58:00Z",
+    "freshness_minutes": 62
   },
-  {
-   "key": "reported_roas",
-   "kind": "ratio",
-   "value": null,
-   "prev": null,
-   "change_abs": null,
-   "change_pct": null,
-   "sparkline": [],
-   "status": "neutral",
-   "note": "NOT_AVAILABLE: Ads API",
-   "provisional": false,
-   "meta": {}
+  "totals": {
+    "orders": 33,
+    "units": 32,
+    "gmv": "3200000",
+    "net_seller_revenue": "2400000",
+    "fees": "385600",
+    "affiliate": "54000",
+    "cogs": "800000",
+    "contribution": "1908800",
+    "ad_cost": "2231033",
+    "net_profit": "-894000",
+    "refunds": "391000",
+    "settled_orders": 30,
+    "provisional_orders": 3,
+    "refunded_orders": 4
   },
-  {
-   "key": "blended_roas",
-   "kind": "ratio",
-   "value": "1.08",
-   "prev": "1.31",
-   "change_abs": "-0.23",
-   "change_pct": "-0.1756",
-   "sparkline": [],
-   "status": "bad",
-   "note": "break-even 1.62",
-   "provisional": true,
-   "meta": {
-    "break_even": "1.62"
-   }
-  },
-  {
-   "key": "aov",
-   "kind": "money",
-   "value": "96970",
-   "prev": "93548",
-   "change_abs": "3422",
-   "change_pct": "0.0366",
-   "sparkline": [],
-   "status": "good",
-   "note": null,
-   "provisional": false,
-   "meta": {}
-  },
-  {
-   "key": "cvr",
-   "kind": "pct",
-   "value": "0.1053",
-   "prev": "0.0980",
-   "change_abs": "0.0073",
-   "change_pct": "0.0745",
-   "sparkline": [],
-   "status": "good",
-   "note": "orders / product clicks",
-   "provisional": false,
-   "meta": {}
-  },
-  {
-   "key": "refund_rate",
-   "kind": "pct",
-   "value": "0.1212",
-   "prev": "0.0645",
-   "change_abs": "0.0567",
-   "change_pct": "0.8791",
-   "sparkline": [],
-   "status": "bad",
-   "note": "refunded orders / orders",
-   "provisional": false,
-   "meta": {}
-  },
-  {
-   "key": "settlement_coverage",
-   "kind": "pct",
-   "value": "0.92",
-   "prev": "1",
-   "change_abs": "-0.08",
-   "change_pct": "-0.08",
-   "sparkline": [],
-   "status": "good",
-   "note": "3 provisional",
-   "provisional": false,
-   "meta": {
-    "settled": 30,
-    "provisional": 3
-   }
+  "notes": [
+    "Ad spend = GMV Max payout deductions, BLENDED over trailing 7 days (estimate, LOW).",
+    "Provisional orders: fees estimated from trailing settled ratio; not final.",
+    "Reported ROAS / per-campaign cost: NOT AVAILABLE until the TikTok Ads app is approved."
+  ],
+  "advertising": {
+    "cost": "2351033",
+    "known_cost": "2351033",
+    "covered_days": 31,
+    "expected_days": 31,
+    "missing_days": 0,
+    "partial_days": [
+      "2026-08-31"
+    ],
+    "status": "partial",
+    "source": "Campaign overview + manual entry · Cost",
+    "taxes_and_credits": "not_reconciled",
+    "gmv_pay": "2231033",
+    "payment_basis": "statement_date; not campaign Cost",
+    "reports": [
+      {
+        "filename": "campaign_overview_2026-08.csv",
+        "sha256": "ab12…",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "scope": "shop_overview"
+      }
+    ],
+    "days": [
+      {
+        "date": "2026-08-01",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-02",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-03",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-04",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-05",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-06",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-07",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-08",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-09",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-10",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-11",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-12",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-13",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-14",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-15",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-16",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-17",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-18",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-19",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-20",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-21",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-22",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-23",
+        "cost": "1110000",
+        "partial": false,
+        "sku_orders": 3,
+        "gross_revenue": "285000",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-24",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-25",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-26",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-27",
+        "cost": "699000",
+        "partial": false,
+        "sku_orders": 2,
+        "gross_revenue": "190000",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-28",
+        "cost": "0",
+        "partial": false,
+        "sku_orders": 0,
+        "gross_revenue": "0",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-29",
+        "cost": "422033",
+        "partial": false,
+        "sku_orders": 1,
+        "gross_revenue": "95000",
+        "source": "shop_overview",
+        "observed_at": "2026-08-30T15:58:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-30",
+        "cost": "68000",
+        "partial": false,
+        "sku_orders": 1,
+        "gross_revenue": "95000",
+        "source": "manual_entry",
+        "observed_at": "2026-08-30T14:05:00Z",
+        "note": null
+      },
+      {
+        "date": "2026-08-31",
+        "cost": "52000",
+        "partial": true,
+        "sku_orders": 1,
+        "gross_revenue": "95000",
+        "source": "manual_entry",
+        "observed_at": "2026-08-31T14:05:00Z",
+        "note": "entered 21:00 WIB, campaign still running"
+      }
+    ],
+    "manual_days": 2,
+    "entry_note": "Manual entry = operator-transcribed Ads Manager figures; replaced only by a newer observation; superseded automatically once the Ads API is connected."
   }
- ],
- "health": {
-  "score": 34,
-  "grade": "POOR",
-  "components": {
-   "margin": 12,
-   "ad_efficiency": 21,
-   "conversion": 64,
-   "refunds": 58,
-   "data_quality": 84
-  }
- },
- "unit_economics": {
-  "units": 32,
-  "revenue_per_unit": "96700",
-  "fees_per_unit": "12050",
-  "cogs_per_unit": "25000",
-  "contribution_per_unit": "59650",
-  "ad_cost_per_unit": "69720",
-  "net_per_unit": "-10070",
-  "ad_cost_is_estimate": true
- },
- "data_quality": {
-  "score": 84,
-  "state": "PARTIAL",
-  "reasons": [
-   "3 provisional orders (fees estimated)",
-   "1 order missing COGS"
-  ],
-  "last_sync": "2026-08-30T15:58:00Z",
-  "freshness_minutes": 62
- },
- "totals": {
-  "orders": 33,
-  "units": 32,
-  "gmv": "3200000",
-  "net_seller_revenue": "2400000",
-  "fees": "385600",
-  "affiliate": "54000",
-  "cogs": "800000",
-  "contribution": "1908800",
-  "ad_cost": "2231033",
-  "net_profit": "-894000",
-  "refunds": "391000",
-  "settled_orders": 30,
-  "provisional_orders": 3,
-  "refunded_orders": 4
- },
- "notes": [
-  "Ad spend = GMV Max payout deductions, BLENDED over trailing 7 days (estimate, LOW).",
-  "Provisional orders: fees estimated from trailing settled ratio; not final.",
-  "Reported ROAS / per-campaign cost: NOT AVAILABLE until the TikTok Ads app is approved."
- ],
- "advertising": {
-  "cost": "2351033",
-  "known_cost": "2351033",
-  "covered_days": 31,
-  "expected_days": 31,
-  "missing_days": 0,
-  "partial_days": [
-   "2026-08-31"
-  ],
-  "status": "partial",
-  "source": "Campaign overview + manual entry · Cost",
-  "taxes_and_credits": "not_reconciled",
-  "gmv_pay": "2231033",
-  "payment_basis": "statement_date; not campaign Cost",
-  "reports": [
-   {
-    "filename": "campaign_overview_2026-08.csv",
-    "sha256": "ab12…",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "scope": "shop_overview"
-   }
-  ],
-  "days": [
-   {
-    "date": "2026-08-01",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-02",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-03",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-04",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-05",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-06",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-07",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-08",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-09",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-10",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-11",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-12",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-13",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-14",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-15",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-16",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-17",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-18",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-19",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-20",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-21",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-22",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-23",
-    "cost": "1110000",
-    "partial": false,
-    "sku_orders": 3,
-    "gross_revenue": "285000",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-24",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-25",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-26",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-27",
-    "cost": "699000",
-    "partial": false,
-    "sku_orders": 2,
-    "gross_revenue": "190000",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-28",
-    "cost": "0",
-    "partial": false,
-    "sku_orders": 0,
-    "gross_revenue": "0",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-29",
-    "cost": "422033",
-    "partial": false,
-    "sku_orders": 1,
-    "gross_revenue": "95000",
-    "source": "shop_overview",
-    "observed_at": "2026-08-30T15:58:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-30",
-    "cost": "68000",
-    "partial": false,
-    "sku_orders": 1,
-    "gross_revenue": "95000",
-    "source": "manual_entry",
-    "observed_at": "2026-08-30T14:05:00Z",
-    "note": null
-   },
-   {
-    "date": "2026-08-31",
-    "cost": "52000",
-    "partial": true,
-    "sku_orders": 1,
-    "gross_revenue": "95000",
-    "source": "manual_entry",
-    "observed_at": "2026-08-31T14:05:00Z",
-    "note": "entered 21:00 WIB, campaign still running"
-   }
-  ],
-  "manual_days": 2,
-  "entry_note": "Manual entry = operator-transcribed Ads Manager figures; replaced only by a newer observation; superseded automatically once the Ads API is connected."
- }
 }

@@ -36,7 +36,7 @@ export default function AdCost({ adv, onApplied }: { adv: Advertising | null | u
         <label>{t("SKU orders")}<input type="number" min="0" step="1" inputMode="numeric" value={f.sku_orders} onChange={(e) => setF({ ...f, sku_orders: e.target.value })} /></label>
         <label>{t("Gross revenue")}<input type="number" min="0" step="1" inputMode="numeric" value={f.gross_revenue} onChange={(e) => setF({ ...f, gross_revenue: e.target.value })} /></label>
         <label>{t("Note (optional)")}<input maxLength={500} value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
-        <label style={{ textTransform: "none", letterSpacing: 0, justifyContent: "flex-end" }}><span style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={f.final} onChange={(e) => setF({ ...f, final: e.target.checked })} />{t("Day complete (final figures)")}</span></label>
+        <label className="inline"><input type="checkbox" checked={f.final} onChange={(e) => setF({ ...f, final: e.target.checked })} />{t("Day complete (final figures)")}</label>
         <div className="actions">
           {err && <span className="err" role="alert">{err}</span>}
           {ok && <span className="up small" style={{ marginRight: "auto" }}>{t("Applied")}{ok.recomputed ? ` — ${recomputedText(ok.recomputed.orders, lang)}` : ""}{ok.day?.partial ? ` · ${t("Partial")}` : ""}</span>}

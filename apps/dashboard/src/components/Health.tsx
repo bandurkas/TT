@@ -160,7 +160,8 @@ export default function Health({ ov, loading, error, reload, query, tick, onAdAp
           </div>
           <div className="stack">
             <AdCost adv={ov.advertising} onApplied={onAdApplied} />
-            <Costs query={query} tick={tick} onApplied={onCostApplied} />
+            <Costs query={query} tick={tick} onApplied={onCostApplied} ue={ue ?? null}
+              netProfit={byKey.get("net_profit")?.value ?? null} netRevenue={byKey.get("net_seller_revenue")?.value ?? null} />
           </div>
           <div className="note"><b>{t("Notes")}:</b> {ov.notes.map((n, i) => { const k = noteKey(n); return <span key={i}>{k ? t(k) : n}{!k && <EnHint lang={lang} />} </span>; })}</div>
         </>
