@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLang, useT } from "@/lib/i18n";
 import { MONTHS_FULL, MONTHS_SHORT, parseDate, toISODate } from "@/lib/format";
 import { shopToday, type Preset } from "@/lib/period";
@@ -45,21 +45,28 @@ export default function DateRange({ preset, from, to, timezone, onPick }: Props)
   const ru = lang === "ru";
   const today = useMemo(() => shopToday(timezone), [timezone]);
   const [open, setOpen] = useState(false);
-  const [anchor, setAnchor] = useState<Date>(() => startOfMonth(to ? parseDate(to) : today));
+  // open so the range's end month sits on the RIGHT: a range inside the current month would
+  // otherwise show the current month plus a fully-disabled future one, with nothing to click.
+  const initialAnchor = useCallback(() => {
+    const end = startOfMonth(to ? parseDate(to) : today);
+    const start = from ? startOfMonth(parseDate(from)) : end;
+    return start.getTime() === end.getTime() ? addMonths(end, -1) : start;
+  }, [from, to, today]);
+  const [anchor, setAnchor] = useState<Date>(initialAnchor);
   const [pending, setPending] = useState<string | null>(null);   // first click of a range
   const [hover, setHover] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    setAnchor(startOfMonth(to ? parseDate(to) : today));
+    setAnchor(initialAnchor());
     setPending(null);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
     const onDown = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);
     return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onDown); };
-  }, [open, to, today]);
+  }, [open, initialAnchor]);
 
   const iso = { today: toISODate(today), from, to };
   const label = from && to
