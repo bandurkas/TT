@@ -98,7 +98,8 @@ export default function Health({ ov, loading, error, reload }: { ov: Overview | 
   const ringColor = health ? barColor(health.score) : "var(--gray-soft)";
   const previousOrders = num(byKey.get("orders")?.prev);
   const money = (value: string | null | undefined) => orderMoney(value, lang, ov?.shop.currency);
-  const expense = (value: string) => money(value.startsWith("-") ? value.slice(1) : `-${value}`);
+  const expense = (value: string | null | undefined) =>
+    value == null ? "—" : money(value.startsWith("-") ? value.slice(1) : `-${value}`);
   return (
     <section className="zone" id="zone1">
       <ZoneHeader id="z1" eyebrow={t("1 · Business health")} title={t("Where the money went")} hint={t("Open “How to read this” for definitions")} />
