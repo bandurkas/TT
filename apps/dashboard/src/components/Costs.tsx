@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { EnHint, useLang, useT } from "@/lib/i18n";
-import { dayMon, idr, int, num, pct } from "@/lib/format";
+import { dayMon, idr, int, num } from "@/lib/format";
 import { apiPatch, apiPost, useApi } from "@/lib/api";
-import type { CostLot, CostSku, CostWriteOut, Costs as CostsT, Dec, LotIn, LotPatch, UnitEconomics } from "@/lib/types";
+import type { CostLot, CostSku, CostWriteOut, Costs as CostsT, LotIn, LotPatch } from "@/lib/types";
 import { recomputedText } from "@/lib/orders";
 import { ErrorNote, Pill, Skeleton } from "./ui";
 
@@ -17,7 +17,7 @@ const lotState = (l: CostLot, skus: CostSku[]): { label: string; tone: "good" | 
 
 const EMPTY_LOT = { scope: "all" as LotIn["scope"], product_id: "", sku_id: "", received_on: "", unit_cost: "", quantity: "", note: "" };
 
-export default function Costs({ query, tick, onApplied, ue, netProfit, netRevenue }: { query: string; tick: number; onApplied: () => void; ue?: UnitEconomics | null; netProfit?: Dec | null; netRevenue?: Dec | null }) {
+export default function Costs({ query, tick, onApplied }: { query: string; tick: number; onApplied: () => void }) {
   const lang = useLang(), t = useT();
   const c = useApi<CostsT>(`/api/costs${query}`, tick);
   const [locked, setLocked] = useState(true);
@@ -28,8 +28,6 @@ export default function Costs({ query, tick, onApplied, ue, netProfit, netRevenu
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [openSku, setOpenSku] = useState<number | null>(null);
-  const [pieces, setPieces] = useState("5");
-  const [perPiece, setPerPiece] = useState("");
   useEffect(() => { if (locked) setDef(c.data?.default_cogs_per_unit ?? ""); }, [c.data, locked]);
   const run = async (fn: () => Promise<CostWriteOut>) => {
     setBusy(true); setErr(null); setOk(null);
@@ -43,22 +41,6 @@ export default function Costs({ query, tick, onApplied, ue, netProfit, netRevenu
   const d = c.data;
   const products = d ? [...new Map(d.skus.map((s) => [s.product_id, s.product_title])).entries()] : [];
   const ro = locked || busy;
-  const units = ue?.units ?? 0;
-  const nowCogsUnit = num(ue?.cogs_per_unit);
-  const nowNet = num(netProfit);
-  const marginBase = num(netRevenue);
-  const nPieces = Number(pieces) > 0 ? Number(pieces) : 0;
-  const nPerPiece = perPiece === "" ? null : Number(perPiece);
-  const whatIfUnit = nPerPiece !== null && nPieces > 0 ? nPerPiece * nPieces : null;
-  const canWhatIf = units > 0 && nowNet !== null && nowCogsUnit !== null;
-  // only product cost moves; revenue, fees and advertising stay at the period's actual figures
-  const ifNet = canWhatIf && whatIfUnit !== null ? nowNet! + (nowCogsUnit! - whatIfUnit) * units : null;
-  const margin = (net: number | null) => (net !== null && marginBase ? net / marginBase : null);
-  const breakEvenUnit = canWhatIf ? nowCogsUnit! + nowNet! / units : null;
-  const bePiece = breakEvenUnit !== null && nPieces > 0 ? breakEvenUnit / nPieces : null;
-  const PRESETS = [2000, 3000, 4000, 5000];
-  const delta = ifNet !== null && nowNet !== null ? ifNet - nowNet : null;
-  const money = (v: number | null | undefined) => (v === null || v === undefined ? "—" : idr(v, lang));
   return (
     <div className="card" style={{ padding: 14 }}>
       <div className="panel-h">
@@ -123,55 +105,8 @@ export default function Costs({ query, tick, onApplied, ue, netProfit, netRevenu
               <div className="actions"><button className="btn pri" disabled={busy}>{busy ? t("Applying…") : t("Add lot")}</button></div>
             </form>
           )}
-          <div className="k lbl" style={{ marginTop: 14 }}>{t("What if")} · {t("recalculate at a different product cost")}</div>
-          {!canWhatIf ? <div className="tiny" style={{ marginTop: 6 }}>{t("No units sold in this period — nothing to recalculate.")}</div> : (
-            <div className="whatif">
-              <div className="row">
-                <label className="field">{t("Pieces per unit")}
-                  <input type="number" min="1" step="1" inputMode="numeric" value={pieces} onChange={(e) => setPieces(e.target.value)} style={{ width: 84 }} /></label>
-                <label className="field">{t("Cost per piece")}
-                  <input type="number" min="0" step="1" inputMode="numeric" placeholder="3000" value={perPiece} onChange={(e) => setPerPiece(e.target.value)} style={{ width: 116 }} /></label>
-                <span className="presets" role="group" aria-label={t("Cost per piece")}>
-                  {PRESETS.map((v) => (
-                    <button key={v} type="button" onClick={() => setPerPiece(String(v))}
-                      className={`${bePiece === null ? "" : v < bePiece ? "win" : "lose"} ${Number(perPiece) === v ? "on" : ""}`}>
-                      {int(v, lang)}
-                    </button>
-                  ))}
-                </span>
-                {whatIfUnit !== null && <span className="eq">= <b>{money(whatIfUnit)}</b> {t("per unit")} × {int(units, lang)}</span>}
-              </div>
-              {ifNet === null ? <div className="tiny" style={{ marginTop: 10 }}>{t("Enter a price per piece to see the recalculation.")}</div> : (
-                <div className="wi-out">
-                  <div>
-                    <div className="k">{t("Product cost for the period")}</div>
-                    <div className="v">{money(whatIfUnit! * units)}</div>
-                    <div className="was">{t("Now")}: {money(nowCogsUnit! * units)}</div>
-                  </div>
-                  <div>
-                    <div className="k">{t("Net profit")}</div>
-                    <div className={`v ${ifNet < 0 ? "dn" : "up"}`}>{money(ifNet)}</div>
-                    <div className="was">{t("Now")}: {money(nowNet)}{delta !== null && delta !== 0 && <> · {delta > 0 ? "+" : "−"}{money(Math.abs(delta))}</>}</div>
-                  </div>
-                  <div>
-                    <div className="k">{t("Net margin")}</div>
-                    <div className={`v ${(margin(ifNet) ?? 0) < 0 ? "dn" : "up"}`}>{pct(margin(ifNet), lang)}</div>
-                    <div className="was">{t("Now")}: {pct(margin(nowNet), lang)}</div>
-                  </div>
-                </div>
-              )}
-              <div className="wi-be">
-                {t("Break-even product cost")}: {breakEvenUnit !== null && breakEvenUnit < 0
-                  ? <b>{t("unreachable — the period is unprofitable even at zero product cost")}</b>
-                  : <><b>{money(breakEvenUnit)}</b> {t("per unit")}{bePiece !== null && <> · <b>{money(bePiece)}</b> {t("per piece")}</>}</>}
-                <div className="tiny" style={{ marginTop: 5 }}>{t("Revenue, TikTok fees and advertising are the period's actual figures; only product cost changes. Applied uniformly to every SKU, so it is an estimate when SKUs differ in cost.")}</div>
-              </div>
-              {!locked && ifNet !== null && <button className="btn sm" style={{ marginTop: 10 }} disabled={busy}
-                onClick={() => run(() => apiPost<CostWriteOut>("/api/costs/default", { default_cogs_per_unit: String(whatIfUnit) }))}>
-                {t("Apply as default cost")} ({money(whatIfUnit)})</button>}
-            </div>
-          )}
-          <div className="k lbl" style={{ marginTop: 12 }}>{t("Per-SKU cost")}</div>
+          <details className="drawer">
+            <summary><span className="k lbl">{t("Per-SKU cost")}</span><span className="tiny">{int(d.skus.length, lang)} SKU</span></summary>
           <div className="scroll"><table className="tbl">
             <thead><tr><th></th><th>{t("Product")} / {t("sku")}</th><th className="r">{t("Current cost")}</th><th>{t("Source")}</th><th>{t("Effective from")}</th></tr></thead>
             <tbody>
@@ -196,6 +131,7 @@ export default function Costs({ query, tick, onApplied, ue, netProfit, netRevenu
               })}
             </tbody>
           </table></div>
+          </details>
           <div className="tiny" style={{ marginTop: 8 }}>{d.note}<EnHint lang={lang} /> {num(d.default_cogs_per_unit) === null && `· ${t("none")}`}</div>
         </>
       )}

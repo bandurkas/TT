@@ -26,9 +26,9 @@ export default function AdCost({ adv, onApplied }: { adv: Advertising | null | u
     setBusy(false);
   };
   const days = adv?.days ?? [];
+  const last = days.length ? days[days.length - 1] : null;
   return (
     <div className="card" style={{ padding: 14 }}>
-      <div className="k lbl">{t("Ad cost source")} · <span style={{ textTransform: "none", letterSpacing: 0 }}>{adv?.source ?? "—"}</span>{adv && <> · {int(adv.manual_days, lang)} {t("manual days")}</>}</div>
       <form className="form" style={{ padding: "10px 0 0", gridTemplateColumns: "repeat(6, 1fr)" }} onSubmit={submit} aria-label={t("Enter today's ad Cost from Ads Manager")}>
         <div className="wide" style={{ fontWeight: 600 }}>{t("Enter today's ad Cost from Ads Manager")} <Pill tone="warn">{t("Manual entry")}</Pill></div>
         <label>{t("Date")}<input type="date" required max={jakartaToday()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
@@ -43,8 +43,9 @@ export default function AdCost({ adv, onApplied }: { adv: Advertising | null | u
           <button className="btn pri" disabled={busy}>{busy ? t("Applying…") : t("Apply")}</button>
         </div>
       </form>
-      <div className="k lbl" style={{ marginTop: 10 }}>{t("Ad cost by day")}</div>
-      <div className="scroll" style={{ maxHeight: 220, overflowY: "auto" }}>
+      <details className="drawer">
+        <summary><span className="k lbl">{t("Ad cost by day")}</span><span className="tiny">{int(days.length, lang)} {t("days")}{last && <> · {t("last")}: {dayMon(last.date, lang)}</>}</span></summary>
+      <div className="scroll" style={{ maxHeight: 260, overflowY: "auto" }}>
         <table className="tbl">
           <thead><tr><th>{t("Date")}</th><th className="r">{t("Cost (IDR)")}</th><th className="r">{t("SKU orders")}</th><th className="r">{t("Gross revenue")}</th><th>{t("Source")}</th><th>{t("Status")}</th><th>{t("Observed")}</th></tr></thead>
           <tbody>
@@ -64,6 +65,7 @@ export default function AdCost({ adv, onApplied }: { adv: Advertising | null | u
         </table>
       </div>
       <div className="tiny" style={{ marginTop: 8 }}>{t(adv?.entry_note ?? "Manual entry = operator-transcribed Ads Manager figures; replaced only by a newer observation; superseded automatically once the Ads API is connected.")} · {t("BLENDED estimate · LOW confidence")}{adv?.entry_note && t(adv.entry_note) === adv.entry_note && <EnHint lang={lang} />}</div>
+      </details>
     </div>
   );
 }
