@@ -41,7 +41,8 @@ export default function WhatIf({ ue, netProfit, pieces, setPieces, perPiece, set
   // The calculator anchors on the period's actual net profit; without one there is nothing to move.
   // Say which input is missing — rendering nothing leaves an empty panel and no way to act on it.
   if (!canWhatIf) {
-    const why = units === 0 ? t("no units were sold in it")
+    const why = !ue ? t("unit economics is not available for it")
+      : units === 0 ? t("no units were sold in it")
       : nowCogsUnit === null ? t("product cost per unit is not set")
       : missingCostDays.length ? `${t("advertising Cost is missing for")} ${missingCostDays.join(", ")}`
       : t("the period's net profit could not be computed");

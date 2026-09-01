@@ -100,6 +100,7 @@ export const RU: Record<string, string> = {
   "Windsor.ai GMV Max": "Windsor.ai GMV Max",
   "Nothing to recalculate for this period yet": "За этот период пока нечего пересчитывать",
   "no units were sold in it": "в нём не было продаж",
+  "unit economics is not available for it": "юнит-экономика за него недоступна",
   "product cost per unit is not set": "не задана себестоимость за единицу",
   "advertising Cost is missing for": "не внесён расход на рекламу за",
   "the period's net profit could not be computed": "чистая прибыль за период не посчитана",

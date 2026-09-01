@@ -17,7 +17,10 @@ BASE = "https://connectors.windsor.ai/tiktok"
 # widen the contract; see docs/windsor-ingest.md §1.
 FIELDS = ("date", "account_id", "account_name", "campaign_id", "campaign",
           "gmv_max_ads_spend", "gmv_max_ads_billed_cost")
-REQUIRED = ("date", "campaign_id", "gmv_max_ads_spend")
+REQUIRED = ("date", "account_id", "campaign_id", "gmv_max_ads_spend")
+# Presence is not enough: this connector answers `null` for anything it cannot fill, and a null
+# spend read as 0 would overwrite a correct figure with a measurement that was never taken.
+NOT_NULL = ("date", "campaign_id", "gmv_max_ads_spend")
 
 
 class WindsorError(RuntimeError):
@@ -38,7 +41,10 @@ class WindsorClient:
 
     @staticmethod
     def redact(url: str) -> str:
-        return url.split("&api_key=")[0] + "&api_key=***"
+        """Strip the key wherever it sits in the query — the result is stored in raw_api_responses."""
+        u = urllib.parse.urlsplit(url)
+        q = [(k, "***" if k == "api_key" else v) for k, v in urllib.parse.parse_qsl(u.query)]
+        return urllib.parse.urlunsplit(u._replace(query=urllib.parse.urlencode(q)))
 
     def fetch_gmv_max(self, start: date, end: date) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Rows plus request metadata for the raw layer. Raises WindsorError on anything ambiguous."""
@@ -63,6 +69,10 @@ class WindsorClient:
             if missing:
                 # A renamed or dropped field would otherwise read as "no spend".
                 raise WindsorError(f"Windsor rows are missing {missing}; refusing to treat as data")
+            empty = [k for k in NOT_NULL if r.get(k) is None]
+            if empty:
+                raise WindsorError(f"Windsor row {r.get('date')} has null {empty}; "
+                                   "a null is not a measured zero and is not ingested")
         meta = {"url": self.redact(url), "fields": list(FIELDS),
                 "date_from": str(start), "date_to": str(end), "rows": len(rows)}
         return rows, meta

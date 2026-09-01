@@ -303,14 +303,12 @@ def record_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue, observ
                            .join(SourceReport, SourceReport.id == ShopAdDay.report_id)
                            .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date == day)).first()
     prior_day = pair[0] if pair else None
-    carried = []
+    carried, unknown = [], []
     if sku_orders is None:
-        if prior_day is not None:
-            carried.append("sku_orders")
+        (carried if prior_day is not None else unknown).append("sku_orders")
         sku_orders = int(prior_day.sku_orders or 0) if prior_day is not None else 0
     if gross_revenue is None:
-        if prior_day is not None:
-            carried.append("gross_revenue")
+        (carried if prior_day is not None else unknown).append("gross_revenue")
         gross_revenue = number(prior_day.gross_revenue or 0) if prior_day is not None else ZERO
     cost, gross_revenue = number(cost), number(gross_revenue)
     sku_orders = int(sku_orders)
@@ -326,7 +324,10 @@ def record_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue, observ
                # Not freshly observed: inherited from the day's previous entry because the operator
                # left the field empty. Matters most under final=True, where these become the day's
                # closing figures without having been read off the screen again.
-               **({"carried_over": carried} if carried else {})}
+               **({"carried_over": carried} if carried else {}),
+               # Stored as 0 because the columns are not nullable, but never observed — a platform
+               # source that does not report these must not appear to have measured zero.
+               **({"figures_unknown": unknown} if unknown else {})}
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     prior = session.scalar(select(SourceReport).where(SourceReport.shop_id == shop_id,
                            SourceReport.kind == "ads", SourceReport.sha256 == digest))
@@ -390,14 +391,18 @@ def advertising_summary(session, shop_id, start, end, timezone):
                            "timezone_basis": "operator_confirmed",
                            "scope": (r.data or {}).get("scope", "shop_overview"),
                            "period_start": r.period_start, "period_end": r.period_end} for r in reports.values()]
-    result["days"] = [{"date": r.metric_date, "cost": r.cost, "partial": r.partial,
-                        "sku_orders": r.sku_orders, "gross_revenue": r.gross_revenue,
-                        "source": (reports.get(r.report_id).data or {}).get("scope", "shop_overview")
-                        if r.report_id in reports else "shop_overview",
-                        "observed_at": reports[r.report_id].observed_at if r.report_id in reports else None,
-                        "note": ((reports.get(r.report_id).data or {}).get("note") or None)
-                        if r.report_id in reports else None}
-                       for r in sorted(days, key=lambda r: r.metric_date) if start <= r.metric_date <= end]
+    def _day(r):
+        data = (reports[r.report_id].data or {}) if r.report_id in reports else {}
+        unknown = set(data.get("figures_unknown") or ())
+        return {"date": r.metric_date, "cost": r.cost, "partial": r.partial,
+                "sku_orders": None if "sku_orders" in unknown else r.sku_orders,
+                "gross_revenue": None if "gross_revenue" in unknown else r.gross_revenue,
+                "source": data.get("scope", "shop_overview"),
+                "observed_at": reports[r.report_id].observed_at if r.report_id in reports else None,
+                "note": (data.get("note") or None)}
+
+    result["days"] = [_day(r) for r in sorted(days, key=lambda r: r.metric_date)
+                      if start <= r.metric_date <= end]
     names = {MANUAL_SCOPE: "manual entry", WINDSOR_SCOPE: "Windsor.ai GMV Max", "shop_overview": "Campaign overview"}
     scopes = [d["source"] for d in result["days"]]
     result["manual_days"] = sum(1 for s_ in scopes if s_ == MANUAL_SCOPE)

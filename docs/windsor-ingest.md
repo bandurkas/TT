@@ -44,6 +44,8 @@ No migration: `ad_accounts`, `campaigns` and `ad_metrics` already exist with the
 - **An absent date is never written as zero.** Only dates the response actually contains are touched.
   A day Windsor does not mention keeps whatever it had — including "no data at all", which the
   dashboard already renders as `—` rather than as profit.
+- **A null is not a zero.** The connector answers `null` for any field it cannot fill, so the client
+  rejects a row whose `gmv_max_ads_spend` is null rather than let it be read as spend of 0.
 - **An empty or malformed response writes nothing** and fails the job loudly into
   `integration_sync_state` (`job:ads_windsor`), so `/health` shows it. Every row must carry every
   requested key; a response whose rows lack `gmv_max_ads_spend` is treated as a contract change, not
@@ -63,9 +65,13 @@ No migration: `ad_accounts`, `campaigns` and `ad_metrics` already exist with the
 
 ## 4. Scheduling and configuration
 
-`ads_windsor` runs hourly at :25 (shop tz), refetching a rolling window that ends at
-`min(shop_today, windsor_today)` and starts `WINDSOR_BACKFILL_DAYS` earlier (default 7) so late
-restatements are picked up. Recorded in `integration_sync_state` as `job:ads_windsor`, stale after 3h.
+`ads_windsor` runs hourly at :25 (shop tz), refetching a rolling window that **ends on the last day
+that has ended in the shop's timezone** and starts `WINDSOR_BACKFILL_DAYS` earlier (default 7) so late
+restatements are picked up. Yesterday, not `min(shop_today, windsor_today)`: the connector's clock
+trails ours and rejects a later date outright, and the open day belongs to the manual form anyway.
+A day whose stored Cost and finality already match is skipped, so a quiet hour writes nothing —
+`observed_at` is inside the content hash, so writing an unchanged day would insert a report and force
+a full profit recompute every tick. Recorded in `integration_sync_state` as `job:ads_windsor`, stale after 3h.
 
 `WINDSOR_API_KEY` lives only in `/root/TT/.env`. **With no key the job is skipped, not failed** — dev
 and CI never reach the network.
