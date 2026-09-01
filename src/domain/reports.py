@@ -218,12 +218,16 @@ def _range_hint(day):
 
 
 def _recent_cost_median(session, shop_id, day):
-    """Median daily Cost over the days with spend before `day`. Deliberately reads only ShopAdDay:
-    it is the one baseline available the moment a day opens, before any order has synced."""
-    rows = session.scalars(select(ShopAdDay.cost)
-                           .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date < day)
+    """Median over the last COST_SPIKE_WINDOW days *with spend* before `day` — zero-spend days are
+    excluded in SQL, not after the limit, so a pause in advertising cannot empty the window and
+    silently disarm the check on the day spend resumes. Deliberately reads only ShopAdDay: it is the
+    one baseline available the moment a day opens, before any order has synced. Currency is matched
+    to the shop's, on the same rule as ad_days(): never mix incompatible money."""
+    rows = session.scalars(select(ShopAdDay.cost).join(Shop, Shop.id == ShopAdDay.shop_id)
+                           .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date < day,
+                                  ShopAdDay.cost > 0, ShopAdDay.currency == Shop.currency)
                            .order_by(ShopAdDay.metric_date.desc()).limit(COST_SPIKE_WINDOW)).all()
-    costs = sorted(c for c in (number(r) for r in rows) if c > ZERO)
+    costs = sorted(number(r) for r in rows)
     if len(costs) < COST_SPIKE_MIN_DAYS:
         return None
     mid = len(costs) // 2
@@ -293,9 +297,14 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
                            .join(SourceReport, SourceReport.id == ShopAdDay.report_id)
                            .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date == day)).first()
     prior_day = pair[0] if pair else None
+    carried = []
     if sku_orders is None:
+        if prior_day is not None:
+            carried.append("sku_orders")
         sku_orders = int(prior_day.sku_orders or 0) if prior_day is not None else 0
     if gross_revenue is None:
+        if prior_day is not None:
+            carried.append("gross_revenue")
         gross_revenue = number(prior_day.gross_revenue or 0) if prior_day is not None else ZERO
     cost, gross_revenue = number(cost), number(gross_revenue)
     sku_orders = int(sku_orders)
@@ -307,7 +316,11 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
                "revenue_rounding_difference": "0", "scope": MANUAL_SCOPE, "metric": "Cost",
                "taxes_and_credits": "not_reconciled", "final": bool(final), "note": (note or "")[:500],
                "entered_by": entered_by, "observed_at": observed_at.isoformat(timespec="seconds"),
-               **({"confirmed_override": True} if confirm else {})}
+               **({"confirmed_override": True} if confirm else {}),
+               # Not freshly observed: inherited from the day's previous entry because the operator
+               # left the field empty. Matters most under final=True, where these become the day's
+               # closing figures without having been read off the screen again.
+               **({"carried_over": carried} if carried else {})}
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
     prior = session.scalar(select(SourceReport).where(SourceReport.shop_id == shop_id,
                            SourceReport.kind == "ads", SourceReport.sha256 == digest))

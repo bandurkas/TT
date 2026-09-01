@@ -222,9 +222,12 @@ def test_manual_ad_day_cost_spike_is_caught_without_any_analytics_for_the_day():
     assert call(session_with(history), "900000")["unchanged"] is False
     # too little history: a median of two days means nothing, so the check stands down
     assert call(session_with(["450000", "421192"]), "5062670")["unchanged"] is False
-    # zero-spend days never enter the median
-    with pytest.raises(R.NeedsConfirmation, match=r"median"):
-        call(session_with(["0", "0", "0", *history]), "5062670")
+    # zero-spend days are excluded in SQL, so a pause in advertising cannot empty the window and
+    # disarm the check on the day spend resumes — the query must carry that filter itself
+    s = session_with(history)
+    call(s, "450000")
+    where = str(s.scalars.call_args.args[0])
+    assert "shop_ad_days.cost > " in where and "shop_ad_days.currency = shops.currency" in where
     # and it stays overridable
     assert call(session_with(history), "5062670", confirm=True)["unchanged"] is False
 
@@ -271,6 +274,36 @@ def test_manual_ad_day_omitted_figures_keep_the_day_instead_of_blanking_it():
     s3.execute.return_value.first.return_value = None
     R.record_manual_ad_day(s3, 1, day, "450000", None, None, now, "Asia/Jakarta")
     assert s3.add.call_args_list[0].args[0].data["sku_orders"] == 0
+
+
+def test_manual_ad_day_records_which_figures_were_carried_over():
+    """An omitted figure is inherited, not observed. Under final=True it silently becomes the day's
+    closing number, so the audit trail has to say it was never read off the screen again."""
+    from datetime import UTC, date, datetime
+    from types import SimpleNamespace as NS
+    from unittest.mock import MagicMock
+
+    from src.domain import reports as R
+    now = datetime(2026, 9, 1, 15, 30, tzinfo=UTC)  # 22:30 Jakarta on the 1st -> 31 Aug is over
+
+    def session_with(prior):
+        s = MagicMock()
+        s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+        s.scalar.side_effect = [None, None]
+        s.scalars.return_value.all.return_value = []
+        s.execute.return_value.first.return_value = (prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC)))
+        return s
+
+    prior = NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904"))
+    s = session_with(prior)
+    R.record_manual_ad_day(s, 1, date(2026, 8, 31), "470000", None, None, now, "Asia/Jakarta", final=True)
+    data = s.add.call_args_list[0].args[0].data
+    assert data["final"] is True and data["carried_over"] == ["sku_orders", "gross_revenue"]
+
+    # figures actually typed in are not flagged
+    s2 = session_with(NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904")))
+    R.record_manual_ad_day(s2, 1, date(2026, 8, 31), "470000", 11, "820000", now, "Asia/Jakarta", final=True)
+    assert "carried_over" not in s2.add.call_args_list[0].args[0].data
 
 
 def test_manual_ad_day_confirmed_override_is_recorded_in_the_audit_trail():

@@ -74,7 +74,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ path: string[]
     const orders = body.sku_orders ?? Number(prior?.sku_orders ?? 0);
     const gross = body.gross_revenue ?? String(prior?.gross_revenue ?? 0);
     if (!body.confirm) {
-      const spend = (days.filter((d) => String(d.date) < body.date).map((d) => Number(d.cost)).filter((c) => c > 0)).sort((a, b) => a - b);
+      // Same window as the backend: the last 14 days WITH spend before this date, zero days excluded first.
+      const spend = days.filter((d) => String(d.date) < body.date && Number(d.cost) > 0)
+        .map((d) => Number(d.cost)).slice(-14).sort((a, b) => a - b);
       if (spend.length >= 5) {
         const m = spend.length >> 1, median = spend.length % 2 ? spend[m] : (spend[m - 1] + spend[m]) / 2;
         if (Number(body.cost) > median * 4)

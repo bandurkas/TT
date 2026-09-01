@@ -96,6 +96,7 @@ export const RU: Record<string, string> = {
   "Ads Manager shows the date range you selected. Select this one day there before copying the figures.": "Ads Manager показывает выбранный вами диапазон дат. Выберите там именно этот один день, прежде чем переносить цифры.",
   "Save as entered": "Всё равно сохранить",
   "keep": "оставить",
+  "leave unchanged": "не менять",
   "Ad cost source": "Источник расходов на рекламу", "Enter today's ad Cost from Ads Manager": "Внести расход на рекламу из Ads Manager",
   "Date": "Дата", "Cost (IDR)": "Расход (IDR)", "SKU orders": "Заказы SKU", "Gross revenue": "Валовая выручка", "Day complete (final figures)": "День закрыт (итоговые цифры)",
   "Note (optional)": "Примечание (необязательно)", "Applying…": "Применяю…", "Applied": "Применено", "orders recomputed": "заказов пересчитано",

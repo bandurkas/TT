@@ -36,8 +36,11 @@ export default function AdCost({ adv, onApplied, timezone }: { adv: Advertising 
   const edit = (patch: Partial<typeof f>) => { setF({ ...f, ...patch }); setNeedsConfirm(false); setErr(null); };
   const days = adv?.days ?? [];
   const last = days.length ? days[days.length - 1] : null;
-  const onFile = days.find((d) => d.date === f.date);   // an empty input keeps whatever this holds
-  const keep = (v: string | number | null | undefined) => (onFile && v !== null && v !== undefined ? `${t("keep")} ${v}` : undefined);
+  // An empty input always means "leave the day's figure alone" — say so even when the entry date
+  // falls outside the selected period and `days` therefore carries no record to quote.
+  const onFile = days.find((d) => d.date === f.date);
+  const keep = (v: string | number | null | undefined) =>
+    (onFile && v !== null && v !== undefined ? `${t("keep")} ${v}` : t("leave unchanged"));
   return (
     <div className="card" style={{ padding: 14 }}>
       <form className="form" style={{ padding: "10px 0 0", gridTemplateColumns: "repeat(6, 1fr)" }} onSubmit={submit} aria-label={t("Enter today's ad Cost from Ads Manager")}>
