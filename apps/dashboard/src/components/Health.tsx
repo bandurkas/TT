@@ -158,7 +158,7 @@ export default function Health({ ov, loading, error, reload, query, tick, onAdAp
               ) : <div className="muted small" style={{ marginTop: 8 }}>—</div>}
             </div>
           </div>
-          <div className="two">
+          <div className="stack">
             <AdCost adv={ov.advertising} onApplied={onAdApplied} />
             <Costs query={query} tick={tick} onApplied={onCostApplied} />
           </div>

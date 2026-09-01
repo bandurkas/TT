@@ -18,7 +18,7 @@ Phase 0 → 6 deliverables (capability matrix, data-model, profit-calculation, a
 план → код (минимальный дифф) → тесты (весь набор) → независимое код-ревью → правки → подтверждающее ревью → деплой → live-check по логам. Комментарии в коде минимальные.
 
 ## Инфра
-- Локально: `~/Desktop/TT`, репо `git@github.com:bandurkas/TT.git`, ветка `main`.
+- Локально: `~/dev/TT` (перенесён с Desktop 2026-09-01: iCloud рвал сборки и git-refs), репо `git@github.com:bandurkas/TT.git`, ветка `main`.
 - VPS3 (187.127.114.34): `/root/TT`, remote `github-tt` (deploy key `~/.ssh/tt_deploy_key`). Порты: API **8400**, dashboard **3400**; postgres/redis без host-портов. На VPS3 живут Jony (8200) и BUBU (8300) — не трогать.
 - Деплой: `git pull && docker compose build <svc> && docker compose up -d --force-recreate <svc>`. Файлы на VPS руками не править. `.env` только на VPS, в репо не попадает.
 - Время: бизнес-день = таймзона магазина (Asia/Jakarta), хранение в UTC.

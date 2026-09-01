@@ -23,7 +23,9 @@ Next.js 15 App Router, TypeScript, one global stylesheet with the mock's CSS var
 | Zone | Component | Endpoint |
 |---|---|---|
 | Header | `Shell.tsx` | `overview.shop/period/compare/data_quality` |
-| 1 Business health | `Health.tsx` | `/api/dashboard/overview` (`cards`, `health`, `unit_economics`, `totals`, `notes`) |
+| 1 Business health | `Health.tsx` | `/api/dashboard/overview` (`cards`, `health`, `unit_economics`, `totals`, `notes`, `advertising`) |
+| 1 Manual ad cost | `AdCost.tsx` | `POST /api/advertising/manual` (422 detail shown inline; success refetches overview/trends/insights/funnel/video-products), day table from `overview.advertising.days` with source chips (Campaign overview export / Manual entry), partial flag, observed time |
+| 1 Product cost | `Costs.tsx` | `GET /api/costs`; `POST /api/costs/default`, `POST /api/costs/lots`, `PATCH /api/costs/lots/{id}` — "Locked" checkbox (read-only until unchecked), lot chips active/queued/sold out/inactive, per-SKU cost with history; success shows "Applied — N orders recomputed", re-locks, refetches overview/products/funnel/video-products |
 | 2 Diagnosis | `Diagnosis.tsx` | `/api/dashboard/insights.findings` (labelled "Deterministic rules · no LLM") |
 | 3 Trend | `Trend.tsx` | `/api/dashboard/trends` (`series`, `events`, `gmv_sources`) |
 | 4 Explorer | `Explorer.tsx` | `/api/analytics/products`, `/videos`, `/campaigns`, `/creators` |

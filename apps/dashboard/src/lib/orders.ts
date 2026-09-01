@@ -104,3 +104,7 @@ const FIELDS: Record<string, [string, string]> = {
   refund_administration_fee_amount: ["Обработка возврата", "Refund administration"], retail_delivery_fee_amount: ["Сбор за розничную доставку", "Retail delivery fee"], sales_tax_amount: ["Налог с продаж", "Sales tax"], isr_income_tax_amount: ["Подоходное удержание ISR", "ISR income tax"], iva_vat_amount: ["НДС / IVA", "VAT / IVA"], pit_amount: ["Подоходное удержание PIT", "PIT withholding"], adjustment_amount: LABELS.adjustments,
 };
 export const orderText = (lang: Lang, key: string): string => (LABELS[key] ?? FIELDS[key])?.[lang === "ru" ? 0 : 1] ?? key;
+
+/** "33 orders recomputed" / "пересчитано заказов: 33" — RU count goes last, so no plural forms are needed. */
+export const recomputedText = (n: number, lang: Lang): string =>
+  lang === "ru" ? `пересчитано заказов: ${n.toLocaleString("ru-RU")}` : `${n.toLocaleString("en-US")} orders recomputed`;

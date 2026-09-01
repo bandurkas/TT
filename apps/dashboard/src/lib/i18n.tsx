@@ -103,7 +103,7 @@ export const RU: Record<string, string> = {
   "Unit cost": "Цена за единицу", "Quantity (optional)": "Количество (необязательно)", "until next lot": "до следующей партии", "queued": "в очереди", "active": "активна", "sold out": "распродана", "inactive": "отключена",
   "consumed": "списано", "remaining": "остаток", "Deactivate": "Отключить", "Activate": "Включить", "Edit": "Править", "Per-SKU cost": "Себестоимость по SKU", "Current cost": "Текущая себестоимость",
   "Effective from": "Действует с", "lot": "партия", "seed": "начальная", "default": "по умолчанию", "none": "нет", "History": "История", "No SKUs.": "Нет SKU.", "No lots yet.": "Партий пока нет.",
-  "Choose product": "Выберите товар", "Choose SKU": "Выберите SKU", "Clear quantity (0)": "Сбросить количество (0)", "FIFO": "FIFO", "Set": "Задать",
+  "shared batch across": "общая партия на", "Choose product": "Выберите товар", "Choose SKU": "Выберите SKU", "Clear quantity (0)": "Сбросить количество (0)", "FIFO": "FIFO", "Set": "Задать",
   "Notes": "Примечания", "Generated": "Сформировано", "Keep": "Оставить", "Reduce priority": "Снизить приоритет",
   "Previously": "Было", "pp": "п.п.", "How to read this": "Что это значит",
   "Open “How to read this” for definitions": "Пояснения — в «Что это значит»",

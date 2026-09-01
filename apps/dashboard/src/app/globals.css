@@ -119,6 +119,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .vb .id{grid-column:1/-1;font:600 13px Manrope,sans-serif;margin-bottom:4px}
 .vb .rs{grid-column:1/-1;color:var(--muted);font-size:11px;margin-top:4px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stack{display:grid;grid-template-columns:1fr;gap:10px}
 .funnel{padding:16px}
 .step{display:grid;grid-template-columns:150px 1fr 90px 90px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
 .step:first-of-type{border-top:0}
@@ -179,7 +180,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 @media (max-width:760px){.app{grid-template-columns:1fr}.rail{display:none}.kpis,.sec{grid-template-columns:repeat(2,1fr)}.gallery,.board{grid-template-columns:1fr}.step{grid-template-columns:110px 1fr 70px 70px}.wrow{grid-template-columns:120px 1fr 90px}.wrap{padding:14px 12px 40px}.head{padding:10px 12px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .main{overflow-x:clip}
-.two>*,.trend>*,.health>*,.kpis>*,.sec>*,.board>*{min-width:0}
+.stack>*,.two>*,.trend>*,.health>*,.kpis>*,.sec>*,.board>*{min-width:0}
 .card{min-width:0}
 .chart>div,.pace{min-width:0;overflow:hidden}
 .tbl tr[role=button]:focus-visible td{outline:2px solid var(--accent);outline-offset:-2px}

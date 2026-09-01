@@ -5,6 +5,7 @@ import { dateTime, dayMon, idr, int, toISODate } from "@/lib/format";
 import { apiPost } from "@/lib/api";
 import type { Advertising, ManualAdIn, ManualAdOut } from "@/lib/types";
 import { Pill } from "./ui";
+import { recomputedText } from "@/lib/orders";
 
 const jakartaToday = () => toISODate(new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(new Date()) + "T00:00:00Z"));
 
@@ -38,7 +39,7 @@ export default function AdCost({ adv, onApplied }: { adv: Advertising | null | u
         <label style={{ textTransform: "none", letterSpacing: 0, justifyContent: "flex-end" }}><span style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={f.final} onChange={(e) => setF({ ...f, final: e.target.checked })} />{t("Day complete (final figures)")}</span></label>
         <div className="actions">
           {err && <span className="err" role="alert">{err}</span>}
-          {ok && <span className="up small" style={{ marginRight: "auto" }}>{t("Applied")}{ok.recomputed ? ` — ${int(ok.recomputed.orders, lang)} ${t("orders recomputed")}` : ""}{ok.day?.partial ? ` · ${t("Partial")}` : ""}</span>}
+          {ok && <span className="up small" style={{ marginRight: "auto" }}>{t("Applied")}{ok.recomputed ? ` — ${recomputedText(ok.recomputed.orders, lang)}` : ""}{ok.day?.partial ? ` · ${t("Partial")}` : ""}</span>}
           <button className="btn pri" disabled={busy}>{busy ? t("Applying…") : t("Apply")}</button>
         </div>
       </form>

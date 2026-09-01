@@ -22,6 +22,7 @@ function Dashboard() {
   useEffect(() => { try { const s = localStorage.getItem("tt-lang"); if (s === "ru" || s === "en") setLangState(s); } catch { /* no storage */ } }, []);
   const setLang = (l: Lang) => { setLangState(l); document.documentElement.lang = l; try { localStorage.setItem("tt-lang", l); } catch { /* ignore */ } };
   const [tick, setTick] = useState(0);
+  const refreshAll = useCallback(() => setTick((x) => x + 1), []);  // every write recomputes all orders server-side
   const q = state.query;
   const ov = useApi<Overview>(`/api/dashboard/overview${q}`, tick);
   const ins = useApi<Insights>(`/api/dashboard/insights${q}`, tick);
@@ -45,12 +46,11 @@ function Dashboard() {
       <div className="app">
         <Rail shop={ov.data?.shop.name} counts={counts} />
         <div className="main">
-          <Header lang={lang} setLang={setLang} period={state} onPeriod={(p) => update(p)} overview={ov.data} onRefresh={() => setTick((x) => x + 1)} refreshing={refreshing} />
+          <Header lang={lang} setLang={setLang} period={state} onPeriod={(p) => update(p)} overview={ov.data} onRefresh={refreshAll} refreshing={refreshing} />
           <div className="wrap">
             {apiDown && <div className="banner bad" role="alert"><b>{tr(lang, "API unreachable")}</b> <span className="mono small">{ov.error}</span><button className="btn sm" onClick={() => setTick((x) => x + 1)}>{tr(lang, "Retry")}</button></div>}
             <Health ov={ov.data} loading={ov.loading} error={apiDown ? null : ov.error} reload={ov.reload} query={q} tick={tick}
-              onAdApplied={() => { ov.reload(); trd.reload(); ins.reload(); fn.reload(); vp.reload(); }}
-              onCostApplied={() => { ov.reload(); prods.reload(); fn.reload(); vp.reload(); }} />
+              onAdApplied={refreshAll} onCostApplied={refreshAll} />
             <Orders key={q} query={q} shopId={state.shopId} tick={tick} />
             <Diagnosis ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
             <Trend tr={trd.data} ov={ov.data} loading={trd.loading} error={apiDown ? null : trd.error} reload={trd.reload} />

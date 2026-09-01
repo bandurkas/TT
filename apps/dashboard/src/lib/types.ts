@@ -335,6 +335,7 @@ export interface ManualAdOut { report_id: number; partial?: boolean; unchanged?:
 export interface CostLot {
   id: number; scope: "all" | "product" | "sku"; product_id: number | null; sku_id: number | null; received_on: string;
   unit_cost: Dec; quantity: number | null; currency: string; note: string | null; active: boolean; consumed?: number; remaining?: number | null;
+  shared_skus?: number | null;
 }
 export interface CostSku {
   sku_id: number; external_sku_id: string | null; product_id: number; product_title: string; sku_title: string | null;

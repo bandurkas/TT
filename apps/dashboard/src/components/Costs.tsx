@@ -4,6 +4,7 @@ import { EnHint, useLang, useT } from "@/lib/i18n";
 import { dayMon, idr, int, num } from "@/lib/format";
 import { apiPatch, apiPost, useApi } from "@/lib/api";
 import type { CostLot, CostSku, CostWriteOut, Costs as CostsT, LotIn, LotPatch } from "@/lib/types";
+import { recomputedText } from "@/lib/orders";
 import { ErrorNote, Pill, Skeleton } from "./ui";
 
 const lotState = (l: CostLot, skus: CostSku[]): { label: string; tone: "good" | "gray" | "warn" | "bad" } => {
@@ -27,13 +28,13 @@ export default function Costs({ query, tick, onApplied }: { query: string; tick:
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [openSku, setOpenSku] = useState<number | null>(null);
-  useEffect(() => { setDef(c.data?.default_cogs_per_unit ?? ""); }, [c.data]);
+  useEffect(() => { if (locked) setDef(c.data?.default_cogs_per_unit ?? ""); }, [c.data, locked]);
   const run = async (fn: () => Promise<CostWriteOut>) => {
     setBusy(true); setErr(null); setOk(null);
     try {
       const r = await fn();
-      setOk(`${t("Applied")} — ${int(r.recomputed.orders, lang)} ${t("orders recomputed")}`);
-      setLocked(true); setEdit(null); setLot(EMPTY_LOT); c.reload(); onApplied();
+      setOk(`${t("Applied")} — ${recomputedText(r.recomputed.orders, lang)}`);
+      setLocked(true); setEdit(null); setLot(EMPTY_LOT); onApplied();
     } catch (x) { setErr(x instanceof Error ? x.message : String(x)); }
     setBusy(false);
   };
@@ -65,10 +66,11 @@ export default function Costs({ query, tick, onApplied }: { query: string; tick:
               {d.lots.map((l) => {
                 const st = lotState(l, d.skus);
                 const scope = l.scope === "all" ? t("all SKUs") : l.scope === "product" ? `${t("product")} ${d.skus.find((s) => s.product_id === l.product_id)?.product_title ?? l.product_id}` : `${t("sku")} ${d.skus.find((s) => s.sku_id === l.sku_id)?.sku_title ?? l.sku_id}`;
+                const shared = l.scope !== "sku" && l.quantity !== null && l.shared_skus ? l.shared_skus : null;
                 const e = edit?.id === l.id ? edit : null;
                 return (
                   <tr key={l.id} title={l.note ?? undefined}>
-                    <td className="mono">{l.id}</td><td style={{ whiteSpace: "normal" }}>{scope}</td>
+                    <td className="mono">{l.id}</td><td style={{ whiteSpace: "normal" }}>{scope}{shared !== null && <><br /><span className="tiny">{t("shared batch across")} {int(shared, lang)} SKU</span></>}</td>
                     <td>{e ? <input type="date" value={e.received_on} onChange={(x) => setEdit({ ...e, received_on: x.target.value })} /> : dayMon(l.received_on, lang)}</td>
                     <td className="r">{e ? <input type="number" min="0" step="1" value={e.unit_cost} style={{ width: 110 }} onChange={(x) => setEdit({ ...e, unit_cost: x.target.value })} /> : idr(l.unit_cost, lang)}</td>
                     <td className="r">{e ? <input type="number" min="0" step="1" value={e.quantity} placeholder={t("Clear quantity (0)")} style={{ width: 110 }} onChange={(x) => setEdit({ ...e, quantity: x.target.value })} /> : l.quantity === null ? <span className="tiny">{t("until next lot")}</span> : int(l.quantity, lang)}</td>
