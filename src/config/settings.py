@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     tiktok_ads_app_id: str = ""
     tiktok_ads_secret: str = ""
 
+    # Windsor.ai TikTok connector (interim GMV Max Cost until the Ads app is approved).
+    # Empty key = the ingest job is skipped, so dev and CI never reach the network.
+    windsor_api_key: str = ""
+    windsor_backfill_days: int = 7
+
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 

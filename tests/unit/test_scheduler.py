@@ -97,12 +97,14 @@ def test_order_statements_job_uses_poll_horizon():
 def test_build_scheduler_fixed_slots_single_executor():
     sched = S.build_scheduler(lambda name: None, tz="Asia/Jakarta", immediate=True)
     ids = {j.id: j for j in sched.get_jobs()}
-    assert set(ids) == set(S.SLOTS) == {"finance_cycle", "order_statements", "withdrawals", "daily_metrics"}
+    assert set(ids) == set(S.SLOTS) == {"finance_cycle", "order_statements", "withdrawals",
+                                        "daily_metrics", "ads_windsor"}
     assert str(sched.timezone) == "Asia/Jakarta"
     assert ids["finance_cycle"].next_run_time <= datetime.now(UTC)
     assert getattr(ids["withdrawals"], "next_run_time", None) is None  # scheduled at start, not now
     assert "hour='3'" in str(ids["daily_metrics"].trigger)
     assert "minute='5'" in str(ids["finance_cycle"].trigger)
+    assert "minute='25'" in str(ids["ads_windsor"].trigger)  # hourly, off the other jobs' slots
     assert sched._executors["default"]._pool._max_workers == 1
     lazy = S.build_scheduler(lambda name: None, tz="Asia/Jakarta", immediate=False)
     assert getattr({j.id: j for j in lazy.get_jobs()}["finance_cycle"], "next_run_time", None) is None

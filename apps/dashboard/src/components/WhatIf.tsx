@@ -19,9 +19,11 @@ interface Props {
   ue?: UnitEconomics | null; netProfit?: Dec | null;
   pieces: string; setPieces: (v: string) => void;
   perPiece: string; setPerPiece: (v: string) => void;
+  /** Days in the period with no ad Cost — the usual reason the period has no net profit to anchor on. */
+  missingCostDays?: string[];
 }
 
-export default function WhatIf({ ue, netProfit, pieces, setPieces, perPiece, setPerPiece }: Props) {
+export default function WhatIf({ ue, netProfit, pieces, setPieces, perPiece, setPerPiece, missingCostDays = [] }: Props) {
   const lang = useLang(), t = useT();
   const units = ue?.units ?? 0;
   const nowCogsUnit = num(ue?.cogs_per_unit);
@@ -36,7 +38,20 @@ export default function WhatIf({ ue, netProfit, pieces, setPieces, perPiece, set
   const delta = ifNet !== null && nowNet !== null ? ifNet - nowNet : null;
   const money = (v: number | null | undefined) => (v === null || v === undefined ? "—" : idr(v, lang));
 
-  if (!canWhatIf) return null;
+  // The calculator anchors on the period's actual net profit; without one there is nothing to move.
+  // Say which input is missing — rendering nothing leaves an empty panel and no way to act on it.
+  if (!canWhatIf) {
+    const why = units === 0 ? t("no units were sold in it")
+      : nowCogsUnit === null ? t("product cost per unit is not set")
+      : missingCostDays.length ? `${t("advertising Cost is missing for")} ${missingCostDays.join(", ")}`
+      : t("the period's net profit could not be computed");
+    return (
+      <div className="whatif">
+        <div className="tiny">{t("Nothing to recalculate for this period yet")} — {why}.</div>
+        <div className="tiny" style={{ marginTop: 4 }}>{t("Pick a period whose figures are complete, or enter the missing Cost above.")}</div>
+      </div>
+    );
+  }
   return (
     <div className="whatif">
       <div className="row">

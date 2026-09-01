@@ -72,7 +72,9 @@ export default function AdCost({ adv, onApplied, timezone }: { adv: Advertising 
                 <td className="r">{idr(d.cost, lang)}</td>
                 <td className="r">{int(d.sku_orders, lang)}</td>
                 <td className="r">{idr(d.gross_revenue, lang)}</td>
-                <td>{d.source === "manual_entry" ? <Pill tone="warn">{t("Manual entry")}</Pill> : <Pill tone="info">{t("Campaign overview export")}</Pill>}</td>
+                <td>{d.source === "manual_entry" ? <Pill tone="warn">{t("Manual entry")}</Pill>
+                  : d.source === "windsor_gmv_max" ? <Pill tone="good">{t("Windsor.ai GMV Max")}</Pill>
+                  : <Pill tone="info">{t("Campaign overview export")}</Pill>}</td>
                 <td>{d.partial ? <Pill tone="gray">{t("Partial")} · {t("still moving")}</Pill> : <Pill tone="good">{t("Final")}</Pill>}</td>
                 <td className="tiny">{dateTime(d.observed_at, lang)}{d.note ? ` · ${d.note}` : ""}</td>
               </tr>

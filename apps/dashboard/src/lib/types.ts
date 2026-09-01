@@ -326,7 +326,7 @@ export interface VPHistory { products: VPHistProduct[]; videos: VPHistVideo[]; n
 // GET /api/advertising (also embedded as overview.advertising) — src/domain/reports.advertising_summary
 export interface AdDay {
   date: string; cost: Dec; partial: boolean; sku_orders: number; gross_revenue: Dec;
-  source: "shop_overview" | "manual_entry" | string; observed_at: string | null; note: string | null;
+  source: "shop_overview" | "manual_entry" | "windsor_gmv_max" | string; observed_at: string | null; note: string | null;
 }
 // sku_orders / gross_revenue: null = leave the day's existing figure alone (0 blanks it).
 export interface ManualAdIn { date: string; cost: string; sku_orders: number | null; gross_revenue: string | null; final: boolean; note?: string | null; confirm?: boolean }

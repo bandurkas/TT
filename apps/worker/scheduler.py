@@ -31,10 +31,12 @@ SLOTS: dict[str, dict[str, Any]] = {
     "order_statements": {"hour": "*/6", "minute": 40},
     "withdrawals": {"hour": "*/6", "minute": 20},
     "daily_metrics": {"hour": 3, "minute": 0},
+    "ads_windsor": {"minute": 25},
 }
 # /health: a job older than this (or stuck "running") is stale
 STALE_AFTER = {"finance_cycle": timedelta(hours=3), "order_statements": timedelta(hours=13),
-               "withdrawals": timedelta(hours=13), "daily_metrics": timedelta(hours=27)}
+               "withdrawals": timedelta(hours=13), "daily_metrics": timedelta(hours=27),
+               "ads_windsor": timedelta(hours=3)}
 
 
 def _compute_profit(session: Any, shop: Any) -> dict[str, Any]:
@@ -45,6 +47,24 @@ def _compute_profit(session: Any, shop: Any) -> dict[str, Any]:
                                      shop.timezone or profit.DEFAULT_TZ)
     return {"cost_versions": {k: rebuilt[k] for k in ("skus_with_lots", "versions")},
             "profit": {k: v for k, v in res.items() if k != "dates"}, "aggregates": agg}
+
+
+def ads_windsor(session: Any, build_context: Callable[[Any], Any]) -> dict[str, Any]:
+    """Hourly: GMV Max daily Cost per campaign from Windsor.ai, for days that have already ended.
+    Skipped, not failed, when no key is configured. See docs/windsor-ingest.md."""
+    from src.domain.ads import windsor as W
+    from src.integrations.windsor.client import WindsorClient
+
+    if not settings.windsor_api_key:
+        return {"skipped": "WINDSOR_API_KEY not configured"}
+    ctx = build_context(session)
+    shop = ctx.shop
+    start, end = W.window(shop.timezone or "Asia/Jakarta", settings.windsor_backfill_days)
+    rows, meta = WindsorClient(settings.windsor_api_key).fetch_gmv_max(start, end)
+    out = W.ingest(session, shop, rows, meta)
+    if out.get("written"):
+        out.update(_compute_profit(session, shop))
+    return out
 
 
 def finance_cycle(session: Any, build_context: Callable[[Any], Any]) -> dict[str, Any]:
@@ -79,7 +99,7 @@ def daily_metrics(session: Any, build_context: Callable[[Any], Any]) -> dict[str
 
 JOBS: dict[str, Callable[[Any, Callable[[Any], Any]], dict[str, Any]]] = {
     "finance_cycle": finance_cycle, "order_statements": order_statements,
-    "withdrawals": withdrawals, "daily_metrics": daily_metrics,
+    "withdrawals": withdrawals, "daily_metrics": daily_metrics, "ads_windsor": ads_windsor,
 }
 
 

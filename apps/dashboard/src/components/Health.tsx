@@ -168,7 +168,7 @@ export default function Health({ ov, loading, error, reload, query, tick, onAdAp
               <button className="btn sm" aria-expanded={costOpen} onClick={() => setCostOpen(!costOpen)}>{costOpen ? t("Done") : t("What if…")}</button>
             </div>
             {costOpen && <div className="ctrl-body">
-              <WhatIf ue={ue ?? null} netProfit={byKey.get("net_profit")?.value ?? null} pieces={pieces} setPieces={setPieces} perPiece={perPiece} setPerPiece={setPerPiece} />
+              <WhatIf ue={ue ?? null} netProfit={byKey.get("net_profit")?.value ?? null} pieces={pieces} setPieces={setPieces} perPiece={perPiece} setPerPiece={setPerPiece} missingCostDays={ov.advertising?.missing_days ?? []} />
             </div>}
           </div>
           <AdvertisingSource data={ov.advertising} currency={ov.shop.currency} />

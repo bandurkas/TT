@@ -187,6 +187,7 @@ def import_report(session, shop_id, path, kind, timezone, observed_at):
 
 
 MANUAL_SCOPE = "manual_entry"
+WINDSOR_SCOPE = "windsor_gmv_max"   # Windsor.ai TikTok connector; see docs/windsor-ingest.md
 
 # Ads Manager reports the SELECTED DATE RANGE, so a range's totals are trivially entered as one day.
 # Both checks below compare only against facts already in the database, and are overridable, never silent.
@@ -273,8 +274,9 @@ def _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, pr
 
 
 
-def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue, observed_at, timezone,
-                         final=False, note="", entered_by="dashboard", confirm=False):
+def record_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue, observed_at, timezone,
+                  final=False, note="", entered_by="dashboard", confirm=False,
+                  scope=MANUAL_SCOPE, label="manual-entry"):
     """Operator-entered daily Cost (from the Ads Manager / GMV Max overview screen) until the Ads API
     is approved. Same audit trail as XLSX imports: a SourceReport (kind=ads, scope manual_entry) with a
     content hash, and a ShopAdDay row that only a NEWER observation may replace. `final=False` keeps the
@@ -282,7 +284,11 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
 
     `sku_orders` / `gross_revenue` of None mean "leave whatever the day already has": the operator
     updates Cost several times a day and must not blank the other figures by omitting them. Blanking
-    stays possible, but only by entering 0 explicitly."""
+    stays possible, but only by entering 0 explicitly.
+
+    `scope` selects the provenance. The operator sanity guard runs for MANUAL_SCOPE only: it exists to
+    catch a human typing a period's totals into one day, and a platform-sourced figure must be free to
+    correct a bad manual entry downward."""
     if observed_at.tzinfo is None or observed_at > datetime.now(UTC) + timedelta(minutes=5):
         raise ValueError("Observed-at must be timezone-aware and not in the future")
     shop = session.get(Shop, shop_id)
@@ -313,7 +319,7 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
     payload = {"days": [{"date": str(day), "cost": str(cost), "sku_orders": sku_orders,
                          "gross_revenue": str(gross_revenue), "row": 1}],
                "cost": str(cost), "sku_orders": sku_orders, "reported_gross_revenue": str(gross_revenue),
-               "revenue_rounding_difference": "0", "scope": MANUAL_SCOPE, "metric": "Cost",
+               "revenue_rounding_difference": "0", "scope": scope, "metric": "Cost",
                "taxes_and_credits": "not_reconciled", "final": bool(final), "note": (note or "")[:500],
                "entered_by": entered_by, "observed_at": observed_at.isoformat(timespec="seconds"),
                **({"confirmed_override": True} if confirm else {}),
@@ -328,10 +334,10 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
         return {"report_id": prior.id, "unchanged": True}
     if pair and pair[1].observed_at >= observed_at:
         raise ValueError("A newer or equal observation for this day already exists; enter a later one")
-    if not confirm:
+    if not confirm and scope == MANUAL_SCOPE:
         _check_manual_day(session, shop_id, day, cost, sku_orders, gross_revenue, prior_day)
     report = SourceReport(shop_id=shop_id, kind="ads", sha256=digest,
-                          filename=f"manual-entry {day} @ {observed_at.astimezone(ZoneInfo(timezone)):%H:%M} {timezone}",
+                          filename=f"{label} {day} @ {observed_at.astimezone(ZoneInfo(timezone)):%H:%M} {timezone}",
                           currency=shop.currency, timezone=timezone, period_start=day, period_end=day,
                           observed_at=observed_at, imported_at=datetime.now(UTC), data=payload)
     session.add(report)
@@ -340,11 +346,15 @@ def record_manual_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue,
     d.report_id, d.currency = report.id, shop.currency
     d.cost, d.sku_orders, d.gross_revenue = cost, sku_orders, gross_revenue
     d.partial = (day >= observed_day) or not final
-    d.manual = True
+    d.manual = scope == MANUAL_SCOPE
     session.add(d)
     session.commit()
     return {"report_id": report.id, "unchanged": False, "sha256": digest, "period": [str(day), str(day)],
             "rows": 1, "partial": d.partial}
+
+
+# The dashboard's operator path; identical behaviour, kept under its own name for call sites and tests.
+record_manual_ad_day = record_ad_day
 
 
 def ad_days(session, shop_id):
@@ -388,11 +398,12 @@ def advertising_summary(session, shop_id, start, end, timezone):
                         "note": ((reports.get(r.report_id).data or {}).get("note") or None)
                         if r.report_id in reports else None}
                        for r in sorted(days, key=lambda r: r.metric_date) if start <= r.metric_date <= end]
-    manual = sum(1 for d in result["days"] if d["source"] == MANUAL_SCOPE)
-    result["manual_days"] = manual
-    result["source"] = ("Campaign overview · Cost" if not manual else
-                        "Manual entry from Ads Manager · Cost (until Ads API)" if manual == len(result["days"])
-                        else "Campaign overview + manual entry · Cost")
+    names = {MANUAL_SCOPE: "manual entry", WINDSOR_SCOPE: "Windsor.ai GMV Max", "shop_overview": "Campaign overview"}
+    scopes = [d["source"] for d in result["days"]]
+    result["manual_days"] = sum(1 for s_ in scopes if s_ == MANUAL_SCOPE)
+    result["windsor_days"] = sum(1 for s_ in scopes if s_ == WINDSOR_SCOPE)
+    present = sorted({names.get(s_, s_) for s_ in scopes}) or ["Campaign overview"]
+    result["source"] = " + ".join(present) + " · Cost"
     return result
 
 
