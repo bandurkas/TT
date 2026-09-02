@@ -48,10 +48,10 @@ No migration: `ad_accounts`, `campaigns` and `ad_metrics` already exist with the
   `gmv_max_ads_spend` costs **its own day and nothing else**: that day is dropped whole — writing the
   sum of the campaigns that *did* report would understate it — and listed in `skipped_null_days`. It becomes an
   `errors` entry — the thing `/health` reads — **unless a settled Cost is already on file for that
-  day**. A **closed** day still marked `partial` holds a mid-day figure — the manual form defaults
-  `final` to false — so it is understated, not a fallback, and silence would leave it sitting under a
-  green job. A partial figure for the day still running is simply correct and is not reported.
-  Reasoning: with
+  day**. Only a day that has **ended** can be missing anything: nothing on file, or a figure
+  still marked `partial` — a mid-day reading, since the manual form defaults `final` to false — means
+  the day is understated and would otherwise sit under a green job. Nothing is owed for the day still
+  running, with or without a row. Reasoning: with
   nothing to fall back on the day is genuinely missing, whereas a day that already has a Cost simply
   gained no new information, and holding the job red across the whole backfill window for that would
   mask the next real failure. `/health` renders only the first line, so errors are ordered by severity: per-day

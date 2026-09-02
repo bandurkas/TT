@@ -129,12 +129,12 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     for d in unusable:
         log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
         row = _stored(session, shop.id, d)
-        if row is None or (row.partial and d < today):
-            # Nothing on file, or a *closed* day still marked partial. The latter holds a mid-day
-            # figure — the manual form defaults `final` to false — so it is understated, not a
-            # fallback, and silence would leave it under a green job. The `d < today` guard is the
-            # function's own: window() happens to ask only for days that have ended, but ingest
-            # accepts an open day, and a partial figure for a day still running is simply correct.
+        if d < today and (row is None or row.partial):
+            # Only a day that has ended can be missing anything. Nothing on file, or a figure still
+            # marked partial — a mid-day reading, since the manual form defaults `final` to false —
+            # means the day is understated and would otherwise sit there under a green job. Nothing
+            # is owed for the day still running, whether or not it has a row yet: window() asks only
+            # for closed days, but ingest accepts an open one and is tested doing so.
             null_errors.append(f"{d}: null {SPEND} and no settled Cost on file for that day")
     rejections: list[str] = []
     for day, per_campaign in sorted(by_day.items()):

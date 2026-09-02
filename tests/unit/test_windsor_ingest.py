@@ -488,6 +488,11 @@ def test_a_partial_figure_for_the_day_still_running_is_not_an_error(monkeypatch)
     # 09:00 WIB on 1 Sep: the day is still running
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 2, 0, tzinfo=UTC))
     assert out["skipped_null_days"] == ["2026-09-01"] and "errors" not in out
+    # and nothing is owed for the running day when it has no row at all yet either
+    monkeypatch.setattr(W, "_stored", lambda *a: None)
+    fresh = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 2, 0, tzinfo=UTC))
+    assert "errors" not in fresh
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("450000"), partial=True, manual=True))
     # the same row once the day has closed is understated and must be reported
     closed = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 2, 2, 0, tzinfo=UTC))
     assert closed["errors"] == ["2026-09-01: null gmv_max_ads_spend and no settled Cost on file for that day"]
