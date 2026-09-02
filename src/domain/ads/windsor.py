@@ -97,6 +97,13 @@ def _metric(session: Any, campaign_id: int, day: date, spend: Decimal, currency:
     session.flush()
 
 
+def _is_understated(session: Any, shop_id: int, day: date) -> bool:
+    """Nothing on file, or a figure still marked partial — a mid-day reading, since the manual form
+    defaults `final` to false. Only asked about days that have ended."""
+    row = _stored(session, shop_id, day)
+    return row is None or bool(row.partial)
+
+
 def _stored(session: Any, shop_id: int, day: date) -> ShopAdDay | None:
     return session.scalar(select(ShopAdDay).where(ShopAdDay.shop_id == shop_id,
                                                   ShopAdDay.metric_date == day))
@@ -128,8 +135,7 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     null_errors = []
     for d in unusable:
         log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
-        row = _stored(session, shop.id, d)
-        if d < today and (row is None or row.partial):
+        if d < today and _is_understated(session, shop.id, d):
             # Only a day that has ended can be missing anything. Nothing on file, or a figure still
             # marked partial — a mid-day reading, since the manual form defaults `final` to false —
             # means the day is understated and would otherwise sit there under a green job. Nothing
