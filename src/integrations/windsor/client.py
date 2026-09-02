@@ -37,7 +37,9 @@ class WindsorError(RuntimeError):
 
 
 class WindsorClient:
-    def __init__(self, api_key: str, timeout: int = 60, opener: Any = None):
+    # Measured from VPS3 on 2026-09-02: a cold query took 19s for one day; a warm one 0.6s for seven.
+    # 60s lost the very first production run to a cold cache, so the budget is generous on purpose.
+    def __init__(self, api_key: str, timeout: int = 180, opener: Any = None):
         if not api_key:
             raise WindsorError("Windsor API key is not configured")
         self.api_key, self.timeout = api_key, timeout
