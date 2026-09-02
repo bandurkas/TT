@@ -44,8 +44,13 @@ No migration: `ad_accounts`, `campaigns` and `ad_metrics` already exist with the
 - **An absent date is never written as zero.** Only dates the response actually contains are touched.
   A day Windsor does not mention keeps whatever it had — including "no data at all", which the
   dashboard already renders as `—` rather than as profit.
-- **A null is not a zero.** The connector answers `null` for any field it cannot fill, so the client
-  rejects a row whose `gmv_max_ads_spend` is null rather than let it be read as spend of 0.
+- **A null is not a zero.** The connector answers `null` for any field it cannot fill. A null
+  `gmv_max_ads_spend` costs **its own day and nothing else**: that day is dropped whole — writing the
+  sum of the campaigns that *did* report would understate it — and listed in `skipped_null_days` *and*
+  in `errors`, so `/health` shows it instead of a stale figure sitting there under a green job. Only
+  `date` and `campaign_id` are fatal to the request, because a row cannot be grouped without them.
+  Blankness is emptiness, not just `None`: an empty-string `account_id` would pass an `is None` test
+  and then silently skip the whole campaign branch.
 - **An empty or malformed response writes nothing** and fails the job loudly into
   `integration_sync_state` (`job:ads_windsor`), so `/health` shows it. Every row must carry every
   requested key; a response whose rows lack `gmv_max_ads_spend` is treated as a contract change, not
@@ -53,6 +58,10 @@ No migration: `ad_accounts`, `campaigns` and `ad_metrics` already exist with the
 - **Only a newer observation replaces a day** — the same rule the XLSX and manual paths use. A Windsor
   row supersedes an earlier manual entry for a closed day; it can never overwrite something observed
   later.
+- **One bad day never truncates the window.** A day whose write is rejected is collected into
+  `errors` (which `/health` reads through `_collect_errors`) and the remaining days are still
+  ingested; only "a newer observation already exists" is swallowed, since that is the normal result
+  of a re-run.
 - **The operator guard does not run on this path.** `_check_manual_day` exists to catch a human typing
   a period's totals into one day; Windsor is the platform's own figure and must be allowed to correct
   a bad manual entry *downward*. Instead, a material disagreement with the stored value is logged and
@@ -69,9 +78,12 @@ No migration: `ad_accounts`, `campaigns` and `ad_metrics` already exist with the
 that has ended in the shop's timezone** and starts `WINDSOR_BACKFILL_DAYS` earlier (default 7) so late
 restatements are picked up. Yesterday, not `min(shop_today, windsor_today)`: the connector's clock
 trails ours and rejects a later date outright, and the open day belongs to the manual form anyway.
-A day whose stored Cost and finality already match is skipped, so a quiet hour writes nothing —
-`observed_at` is inside the content hash, so writing an unchanged day would insert a report and force
-a full profit recompute every tick. Recorded in `integration_sync_state` as `job:ads_windsor`, stale after 3h.
+A day whose stored Cost and finality already match is not rewritten — `observed_at` is inside the
+content hash, so writing an unchanged day would insert a report and force a full profit recompute
+every tick. Its **per-campaign split is still refreshed**, because a campaign-mix restatement keeps
+the same total while moving the split, and a day first entered by hand has no campaigns at all until
+this runs. Conversely, when a day's Cost is *rejected*, its campaign rows are not written either:
+`ad_metrics` must never outlive the Cost it splits. Recorded in `integration_sync_state` as `job:ads_windsor`, stale after 3h.
 
 `WINDSOR_API_KEY` lives only in `/root/TT/.env`. **With no key the job is skipped, not failed** — dev
 and CI never reach the network.

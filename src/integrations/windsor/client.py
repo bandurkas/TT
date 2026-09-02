@@ -18,11 +18,18 @@ BASE = "https://connectors.windsor.ai/tiktok"
 FIELDS = ("date", "account_id", "account_name", "campaign_id", "campaign",
           "gmv_max_ads_spend", "gmv_max_ads_billed_cost")
 REQUIRED = ("date", "account_id", "campaign_id", "gmv_max_ads_spend")
-# Presence is not enough: the connector answers `null` for anything it cannot fill. These three are
-# constant for a working advertiser, so a null in them is a contract change and stops the request.
-# A null `gmv_max_ads_spend` is handled per day by the ingest: it must cost that day, not the window.
-NOT_NULL = ("date", "account_id", "campaign_id")
+# Presence is not enough: the connector answers `null` for anything it cannot fill. Only the two
+# fields a row cannot be grouped without stop the request; everything else is handled per day, so a
+# single unusable row can never cost the whole window.
+NOT_NULL = ("date", "campaign_id")
 SPEND = "gmv_max_ads_spend"
+ACCOUNT = "account_id"
+
+
+def blank(v: Any) -> bool:
+    """None, or a string the connector filled with nothing. `_ad_account` tests truthiness, so an
+    empty string would otherwise pass validation and silently skip the whole hierarchy branch."""
+    return v is None or (isinstance(v, str) and not v.strip())
 
 
 class WindsorError(RuntimeError):
@@ -71,10 +78,10 @@ class WindsorClient:
             if missing:
                 # A renamed or dropped field would otherwise read as "no spend".
                 raise WindsorError(f"Windsor rows are missing {missing}; refusing to treat as data")
-            empty = [k for k in NOT_NULL if r.get(k) is None]
+            empty = [k for k in NOT_NULL if blank(r.get(k))]
             if empty:
-                raise WindsorError(f"Windsor row {r.get('date')} has null {empty}; "
-                                   "these are constant per advertiser, so a null is a contract change")
+                raise WindsorError(f"Windsor row {r.get('date')} has empty {empty}; "
+                                   "a row cannot be grouped without them")
         meta = {"url": self.redact(url), "fields": list(FIELDS),
                 "date_from": str(start), "date_to": str(end), "rows": len(rows)}
         return rows, meta

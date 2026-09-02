@@ -17,7 +17,7 @@ from sqlalchemy import select
 from src.db.models import AdAccount, AdMetric, Campaign, RawApiResponse
 from src.db.models_reports import ShopAdDay
 from src.domain.reports import WINDSOR_SCOPE, number, record_ad_day
-from src.integrations.windsor.client import SPEND
+from src.integrations.windsor.client import ACCOUNT, SPEND, blank
 
 log = logging.getLogger("tt.windsor")
 ZERO = Decimal(0)
@@ -55,7 +55,7 @@ def window(shop_tz: str, backfill_days: int, now: datetime | None = None) -> tup
 
 
 def _ad_account(session: Any, shop: Any, rows: list[dict[str, Any]]) -> AdAccount | None:
-    ext = next((str(r["account_id"]) for r in rows if r.get("account_id")), None)
+    ext = next((str(r[ACCOUNT]).strip() for r in rows if not blank(r.get(ACCOUNT))), None)
     if not ext:
         return None
     acc = session.scalar(select(AdAccount).where(AdAccount.external_advertiser_id == ext))
@@ -113,58 +113,65 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     tz = shop.timezone
     today = fetched_at.astimezone(ZoneInfo(tz)).date()
     by_day, unusable = _by_day_campaign(rows)
-    for day in unusable:
-        log.warning("windsor: %s has a null %s; the whole day is left untouched", day, SPEND)
     acc = _ad_account(session, shop, rows)
     written = unchanged = 0
     disagreements: list[dict[str, Any]] = []
-    errors: list[str] = []
+    # A day we could not read, and an account we could not identify, both leave data silently stale.
+    # They belong in `errors`, which /health reads — `skipped_null_days` alone is invisible.
+    errors = [f"{d}: null {SPEND}, day left untouched" for d in unusable]
+    if acc is None:
+        errors.append(f"no usable {ACCOUNT} in the response; campaigns and ad_metrics not written")
+    for d in unusable:
+        log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
     campaigns: set[str] = set()
     for day, per_campaign in sorted(by_day.items()):
         total = sum((c["spend"] for c in per_campaign.values()), ZERO)
         final = day < today
         expected_partial = (day >= today) or not final
-        # Hierarchy and per-campaign metrics are written even when the day's total has not moved:
-        # a campaign-mix restatement keeps the same sum, and a day first entered by hand has no
-        # campaigns at all until this runs.
+        before = _stored(session, shop.id, day)
+        settled = (before is not None and number(before.cost or 0) == total
+                   and before.partial == expected_partial and not before.manual)
+        if settled:
+            # Nothing moved and the day is already ours. Writing would insert a fresh SourceReport
+            # every hour (observed_at is inside the content hash) and force a full profit recompute.
+            unchanged += 1
+        else:
+            if before is not None:
+                was = number(before.cost or 0)
+                base = max(was, total)
+                if was != total and base > ZERO and abs(total - was) / base >= DISAGREEMENT_RATIO:
+                    disagreements.append({"date": str(day), "stored": str(was), "windsor": str(total)})
+                    log.warning("windsor: %s restates Cost %s -> %s", day, was, total)
+            try:
+                res = record_ad_day(session, shop.id, day, total, None, None, fetched_at, tz,
+                                    final=final,
+                                    note=f"Windsor.ai GMV Max, {len(per_campaign)} campaign(s)",
+                                    entered_by="windsor", scope=WINDSOR_SCOPE, label="windsor-gmv-max")
+            except ValueError as e:
+                session.rollback()
+                if "newer or equal observation" in str(e):
+                    unchanged += 1
+                    log.info("windsor: %s already has a newer observation; left alone", day)
+                else:
+                    # Fail the job, but keep going: one bad day must not truncate the window hourly.
+                    errors.append(f"{day}: {e}")
+                    log.error("windsor: %s rejected: %s", day, e)
+                # The day's Cost did not land, so per-campaign spend must not either — otherwise
+                # ad_metrics would permanently disagree with it and be re-committed every hour.
+                continue
+            if res.get("unchanged"):
+                unchanged += 1
+            else:
+                written += 1
+        # Written or settled, the day's Cost is now what we believe: record how it splits. A day
+        # first entered by hand has no campaigns at all until this runs, and a campaign-mix
+        # restatement keeps the same total while moving the split.
         if acc is not None:
             for c in per_campaign.values():
                 camp = _campaign(session, acc, c["campaign_id"], c["campaign"])
                 campaigns.add(camp.external_campaign_id)
                 _metric(session, camp.id, day, c["spend"], shop.currency, fetched_at, final)
             session.commit()
-        before = _stored(session, shop.id, day)
-        if (before is not None and number(before.cost or 0) == total
-                and before.partial == expected_partial and not before.manual):
-            # Nothing moved and the day is already ours. Writing would insert a fresh SourceReport
-            # every hour (observed_at is inside the content hash) and force a full profit recompute.
-            unchanged += 1
-            continue
-        if before is not None:
-            was = number(before.cost or 0)
-            base = max(was, total)
-            if was != total and base > ZERO and abs(total - was) / base >= DISAGREEMENT_RATIO:
-                disagreements.append({"date": str(day), "stored": str(was), "windsor": str(total)})
-                log.warning("windsor: %s restates Cost %s -> %s", day, was, total)
-        try:
-            res = record_ad_day(session, shop.id, day, total, None, None, fetched_at, tz,
-                                final=final, note=f"Windsor.ai GMV Max, {len(per_campaign)} campaign(s)",
-                                entered_by="windsor", scope=WINDSOR_SCOPE, label="windsor-gmv-max")
-        except ValueError as e:
-            session.rollback()
-            if "newer or equal observation" in str(e):
-                unchanged += 1
-                log.info("windsor: %s already has a newer observation; left alone", day)
-            else:
-                # Fail the job, but do not lose the remaining days: one bad day must not truncate
-                # the window every hour. `errors` is what /health reads.
-                errors.append(f"{day}: {e}")
-                log.error("windsor: %s rejected: %s", day, e)
-            continue
-        if res.get("unchanged"):
-            unchanged += 1
-        else:
-            written += 1
     out = {"days": len(by_day), "written": written, "unchanged": unchanged,
            "campaigns": len(campaigns), "disagreements": disagreements,
            "skipped_null_days": [str(d) for d in unusable]}

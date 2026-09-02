@@ -44,9 +44,9 @@ def test_client_refuses_everything_that_could_be_mistaken_for_zero_spend():
     with pytest.raises(WindsorError, match="missing"):   # renamed/dropped field = contract change
         client({"data": [{"date": "2026-08-01", "campaign_id": "1"}]}).fetch_gmv_max(
             date(2026, 8, 1), date(2026, 8, 1))
-    # a null in a field that is constant per advertiser is a contract change and stops the request
-    with pytest.raises(WindsorError, match=r"null \['account_id'\]"):
-        client({"data": [{"date": "2026-08-01", "account_id": None, "campaign_id": "1",
+    # only the two fields a row cannot be grouped without are fatal
+    with pytest.raises(WindsorError, match=r"empty \['campaign_id'\]"):
+        client({"data": [{"date": "2026-08-01", "account_id": "1", "campaign_id": "  ",
                           "gmv_max_ads_spend": 1}]}).fetch_gmv_max(date(2026, 8, 1), date(2026, 8, 1))
     # a null spend does NOT stop the request: it must cost its own day only, never the window
     rows2, _ = client({"data": [{"date": "2026-08-01", "account_id": "1", "campaign_id": "1",
@@ -74,6 +74,13 @@ def test_window_ends_yesterday_in_shop_time():
 
 
 # --- ingest ------------------------------------------------------------------------------------
+def _stub_hierarchy(monkeypatch):
+    """Silence the ad_accounts/campaigns/ad_metrics branch for tests that are about the Cost path."""
+    monkeypatch.setattr(W, "_ad_account", lambda *a: NS(id=1))
+    monkeypatch.setattr(W, "_campaign", lambda s, acc, cid, name: NS(id=1, external_campaign_id=cid))
+    monkeypatch.setattr(W, "_metric", lambda *a: None)
+
+
 def _session():
     s = MagicMock()
     s.scalar.side_effect = None
@@ -122,7 +129,7 @@ def test_ingest_reports_a_material_disagreement_instead_of_hiding_it(monkeypatch
     rows = [{"date": "2026-08-31", "account_id": "76583", "campaign_id": "1",
              "gmv_max_ads_spend": 339256}]
     monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: {"unchanged": False})
-    monkeypatch.setattr(W, "_ad_account", lambda *a: None)
+    _stub_hierarchy(monkeypatch)
     monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("73989"), partial=False, manual=False))
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert out["disagreements"] == [{"date": "2026-08-31", "stored": "73989", "windsor": "339256"}]
@@ -141,7 +148,7 @@ def test_ingest_keeps_the_open_day_partial_and_skips_a_newer_observation(monkeyp
         return {"unchanged": False}
 
     monkeypatch.setattr(W, "record_ad_day", rec)
-    monkeypatch.setattr(W, "_ad_account", lambda *a: None)
+    _stub_hierarchy(monkeypatch)
     monkeypatch.setattr(W, "_stored", lambda *a: None)
     rows = [{"date": "2026-08-31", "account_id": "1", "campaign_id": "1", "gmv_max_ads_spend": 1},
             {"date": "2026-09-01", "account_id": "1", "campaign_id": "1", "gmv_max_ads_spend": 2}]
@@ -203,11 +210,12 @@ def test_ingest_skips_a_day_that_has_not_moved_so_the_hourly_run_is_a_no_op(monk
     SourceReport every hour and trigger a full profit recompute for nothing."""
     rows = [{"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 339256}]
     wrote = []
-    monkeypatch.setattr(W, "_ad_account", lambda *a: None)
+    _stub_hierarchy(monkeypatch)
     monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: wrote.append(1) or {})
     monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=False, manual=False))
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
-    assert wrote == [] and out == {"days": 1, "written": 0, "unchanged": 1, "campaigns": 0,
+    # the day's Cost is left alone, but its per-campaign split is still recorded
+    assert wrote == [] and out == {"days": 1, "written": 0, "unchanged": 1, "campaigns": 1,
                                    "disagreements": [], "skipped_null_days": []}
     # same figure, wrong finality -> still written
     monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=True, manual=False))
@@ -223,7 +231,7 @@ def test_ingest_lets_a_real_validation_failure_fail_the_job(monkeypatch):
     """Only "a newer observation exists" is benign; anything else must not be reported as skipped
     while /health stays green."""
     rows = [{"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 1}]
-    monkeypatch.setattr(W, "_ad_account", lambda *a: None)
+    _stub_hierarchy(monkeypatch)
     monkeypatch.setattr(W, "_stored", lambda *a: None)
 
     rows = rows + [{"date": "2026-09-01", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 2}]
@@ -274,7 +282,7 @@ def test_a_null_spend_costs_its_own_day_and_never_the_window(monkeypatch):
             {"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 300000},
             {"date": "2026-08-31", "account_id": "1", "campaign_id": "c2", "gmv_max_ads_spend": None}]
     days = []
-    monkeypatch.setattr(W, "_ad_account", lambda *a: None)
+    _stub_hierarchy(monkeypatch)
     monkeypatch.setattr(W, "_stored", lambda *a: None)
     monkeypatch.setattr(W, "record_ad_day",
                         lambda s, sid, day, cost, *a, **k: days.append((day, str(cost))) or {})
@@ -355,3 +363,50 @@ def test_advertising_summary_returns_null_for_figures_the_source_never_reported(
     assert d["sku_orders"] is None and d["gross_revenue"] is None   # stored 0, never measured
     assert d["source"] == R.WINDSOR_SCOPE and out["windsor_days"] == 1
     assert out["source"] == "Windsor.ai GMV Max · Cost"
+
+
+def test_an_unusable_account_id_is_reported_but_never_costs_the_days_cost(monkeypatch):
+    """account_id feeds only the hierarchy. An empty one must not abort the window — but it must not
+    pass unnoticed either, which is how the campaign branch went silently missing before."""
+    from src.integrations.windsor.client import blank
+    assert blank(None) and blank("") and blank("   ") and not blank("76583")
+
+    rows = [{"date": "2026-08-31", "account_id": "  ", "campaign_id": "c1", "gmv_max_ads_spend": 5}]
+    wrote = []
+    monkeypatch.setattr(W, "_stored", lambda *a: None)
+    monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: wrote.append(1) or {})
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert wrote == [1] and out["campaigns"] == 0           # the day's Cost still lands
+    assert out["errors"] == ["no usable account_id in the response; campaigns and ad_metrics not written"]
+
+
+def test_a_day_skipped_for_a_null_spend_reaches_health_as_an_error(monkeypatch):
+    """Otherwise a day keeps a stale Cost with the job reporting success and nothing to look at."""
+    rows = [{"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": None}]
+    _stub_hierarchy(monkeypatch)
+    monkeypatch.setattr(W, "_stored", lambda *a: None)
+    monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: {})
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert out["skipped_null_days"] == ["2026-08-31"]
+    assert out["errors"] == ["2026-08-31: null gmv_max_ads_spend, day left untouched"]
+
+    from apps.worker.scheduler import _collect_errors
+    surfaced = _collect_errors(out)                          # this is what marks the job failed
+    assert surfaced and "null gmv_max_ads_spend" in surfaced[0]
+
+
+def test_per_campaign_spend_is_not_written_when_the_days_cost_was_rejected(monkeypatch):
+    """ad_metrics must never outlive the Cost it splits, or the two disagree permanently and the
+    disagreement is re-committed every hour."""
+    rows = [{"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 5}]
+    metrics = []
+    monkeypatch.setattr(W, "_ad_account", lambda *a: NS(id=1))
+    monkeypatch.setattr(W, "_campaign", lambda s, acc, cid, name: NS(id=1, external_campaign_id=cid))
+    monkeypatch.setattr(W, "_metric", lambda s, cid, d, spend, *a: metrics.append(str(spend)))
+    monkeypatch.setattr(W, "_stored", lambda *a: None)
+
+    def reject(*a, **k):
+        raise ValueError("Cost, SKU orders and gross revenue must be non-negative")
+    monkeypatch.setattr(W, "record_ad_day", reject)
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert metrics == [] and out["campaigns"] == 0 and out["errors"]
