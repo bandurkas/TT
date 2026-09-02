@@ -17,6 +17,7 @@ from sqlalchemy import select
 from src.db.models import AdAccount, AdMetric, Campaign, RawApiResponse
 from src.db.models_reports import ShopAdDay
 from src.domain.reports import WINDSOR_SCOPE, number, record_ad_day
+from src.integrations.windsor.client import SPEND
 
 log = logging.getLogger("tt.windsor")
 ZERO = Decimal(0)
@@ -25,17 +26,24 @@ RESOURCE = "gmv_max_daily"
 DISAGREEMENT_RATIO = Decimal("0.05")
 
 
-def _by_day_campaign(rows: list[dict[str, Any]]) -> dict[date, dict[str, dict[str, Any]]]:
+def _by_day_campaign(rows: list[dict[str, Any]]) -> tuple[dict[date, dict[str, dict[str, Any]]], list[date]]:
     """(day, campaign) -> summed spend. The connector may split a campaign-day across rows; summing
     keeps ad_metrics and the day's Cost derived from the same arithmetic."""
     out: dict[date, dict[str, dict[str, Any]]] = defaultdict(dict)
+    unusable: set[date] = set()
     for r in rows:
         day = date.fromisoformat(str(r["date"]))
+        if r.get(SPEND) is None:
+            # A null is not a measured zero; summing the day's other campaigns would understate it.
+            unusable.add(day)
+            continue
         cid = str(r["campaign_id"])
         acc = out[day].setdefault(cid, {"campaign_id": cid, "campaign": r.get("campaign"), "spend": ZERO})
-        acc["spend"] += number(r["gmv_max_ads_spend"])
+        acc["spend"] += number(r[SPEND])
         acc["campaign"] = acc["campaign"] or r.get("campaign")
-    return out
+    for day in unusable:
+        out.pop(day, None)      # the whole day goes, so a partial sum is never written as its Cost
+    return out, sorted(unusable)
 
 
 def window(shop_tz: str, backfill_days: int, now: datetime | None = None) -> tuple[date, date]:
@@ -100,52 +108,66 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     session.commit()
     if not rows:
         return {"days": 0, "written": 0, "unchanged": 0, "campaigns": 0, "disagreements": [],
-                "note": "no rows"}
+                "skipped_null_days": [], "note": "no rows"}
 
     tz = shop.timezone
     today = fetched_at.astimezone(ZoneInfo(tz)).date()
-    by_day = _by_day_campaign(rows)
+    by_day, unusable = _by_day_campaign(rows)
+    for day in unusable:
+        log.warning("windsor: %s has a null %s; the whole day is left untouched", day, SPEND)
     acc = _ad_account(session, shop, rows)
     written = unchanged = 0
     disagreements: list[dict[str, Any]] = []
+    errors: list[str] = []
     campaigns: set[str] = set()
     for day, per_campaign in sorted(by_day.items()):
         total = sum((c["spend"] for c in per_campaign.values()), ZERO)
         final = day < today
         expected_partial = (day >= today) or not final
-        before = _stored(session, shop.id, day)
-        if before is not None and number(before.cost or 0) == total and before.partial == expected_partial:
-            # Nothing moved. Writing anyway would insert a fresh SourceReport every hour (observed_at
-            # is inside the content hash) and trigger a full profit recompute for no reason.
-            unchanged += 1
-            continue
+        # Hierarchy and per-campaign metrics are written even when the day's total has not moved:
+        # a campaign-mix restatement keeps the same sum, and a day first entered by hand has no
+        # campaigns at all until this runs.
         if acc is not None:
             for c in per_campaign.values():
                 camp = _campaign(session, acc, c["campaign_id"], c["campaign"])
                 campaigns.add(camp.external_campaign_id)
                 _metric(session, camp.id, day, c["spend"], shop.currency, fetched_at, final)
             session.commit()
+        before = _stored(session, shop.id, day)
+        if (before is not None and number(before.cost or 0) == total
+                and before.partial == expected_partial and not before.manual):
+            # Nothing moved and the day is already ours. Writing would insert a fresh SourceReport
+            # every hour (observed_at is inside the content hash) and force a full profit recompute.
+            unchanged += 1
+            continue
         if before is not None:
             was = number(before.cost or 0)
             base = max(was, total)
             if was != total and base > ZERO and abs(total - was) / base >= DISAGREEMENT_RATIO:
-                d = {"date": str(day), "stored": str(was), "windsor": str(total)}
-                disagreements.append(d)
+                disagreements.append({"date": str(day), "stored": str(was), "windsor": str(total)})
                 log.warning("windsor: %s restates Cost %s -> %s", day, was, total)
         try:
             res = record_ad_day(session, shop.id, day, total, None, None, fetched_at, tz,
                                 final=final, note=f"Windsor.ai GMV Max, {len(per_campaign)} campaign(s)",
                                 entered_by="windsor", scope=WINDSOR_SCOPE, label="windsor-gmv-max")
         except ValueError as e:
-            if "newer or equal observation" not in str(e):
-                raise      # a real validation failure must fail the job, not read as "skipped"
             session.rollback()
-            unchanged += 1
-            log.info("windsor: %s already has a newer observation; left alone", day)
+            if "newer or equal observation" in str(e):
+                unchanged += 1
+                log.info("windsor: %s already has a newer observation; left alone", day)
+            else:
+                # Fail the job, but do not lose the remaining days: one bad day must not truncate
+                # the window every hour. `errors` is what /health reads.
+                errors.append(f"{day}: {e}")
+                log.error("windsor: %s rejected: %s", day, e)
             continue
         if res.get("unchanged"):
             unchanged += 1
         else:
             written += 1
-    return {"days": len(by_day), "written": written, "unchanged": unchanged,
-            "campaigns": len(campaigns), "disagreements": disagreements}
+    out = {"days": len(by_day), "written": written, "unchanged": unchanged,
+           "campaigns": len(campaigns), "disagreements": disagreements,
+           "skipped_null_days": [str(d) for d in unusable]}
+    if errors:
+        out["errors"] = errors
+    return out

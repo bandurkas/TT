@@ -18,9 +18,11 @@ BASE = "https://connectors.windsor.ai/tiktok"
 FIELDS = ("date", "account_id", "account_name", "campaign_id", "campaign",
           "gmv_max_ads_spend", "gmv_max_ads_billed_cost")
 REQUIRED = ("date", "account_id", "campaign_id", "gmv_max_ads_spend")
-# Presence is not enough: this connector answers `null` for anything it cannot fill, and a null
-# spend read as 0 would overwrite a correct figure with a measurement that was never taken.
-NOT_NULL = ("date", "campaign_id", "gmv_max_ads_spend")
+# Presence is not enough: the connector answers `null` for anything it cannot fill. These three are
+# constant for a working advertiser, so a null in them is a contract change and stops the request.
+# A null `gmv_max_ads_spend` is handled per day by the ingest: it must cost that day, not the window.
+NOT_NULL = ("date", "account_id", "campaign_id")
+SPEND = "gmv_max_ads_spend"
 
 
 class WindsorError(RuntimeError):
@@ -72,7 +74,7 @@ class WindsorClient:
             empty = [k for k in NOT_NULL if r.get(k) is None]
             if empty:
                 raise WindsorError(f"Windsor row {r.get('date')} has null {empty}; "
-                                   "a null is not a measured zero and is not ingested")
+                                   "these are constant per advertiser, so a null is a contract change")
         meta = {"url": self.redact(url), "fields": list(FIELDS),
                 "date_from": str(start), "date_to": str(end), "rows": len(rows)}
         return rows, meta

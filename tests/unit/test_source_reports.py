@@ -134,7 +134,7 @@ def test_record_manual_ad_day_validation_and_payload(monkeypatch):
     out2 = R.record_manual_ad_day(session, 1, date(2026, 8, 30), 1, 0, 0, now, "Asia/Jakarta", final=True)
     assert out2["partial"] is False
     # older-or-equal observation is rejected
-    session.execute.return_value.first.return_value = (NS(), NS(observed_at=now))
+    session.execute.return_value.first.return_value = (NS(), NS(observed_at=now, data={}))
     with pytest.raises(ValueError):
         R.record_manual_ad_day(session, 1, date(2026, 8, 30), 2, 0, 0, now, "Asia/Jakarta", final=True)
 
@@ -157,7 +157,7 @@ def test_manual_ad_day_guards_against_period_totals_and_thinner_records():
         s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
         s.scalar.side_effect = [None, actual]  # digest lookup, then analytics_shop_daily
         s.scalars.return_value.all.return_value = list(recent)  # recent daily Cost history
-        s.execute.return_value.first.return_value = ((prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC)))
+        s.execute.return_value.first.return_value = ((prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC), data={}))
                                                      if prior is not None else None)
         return s
 
@@ -249,7 +249,7 @@ def test_manual_ad_day_omitted_figures_keep_the_day_instead_of_blanking_it():
         s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
         s.scalar.side_effect = [None, NS(units=10, gmv=R.number("825000"))]
         s.scalars.return_value.all.return_value = []
-        s.execute.return_value.first.return_value = (prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC)))
+        s.execute.return_value.first.return_value = (prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC), data={}))
         return s
 
     prior = NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904"))
@@ -291,7 +291,7 @@ def test_manual_ad_day_records_which_figures_were_carried_over():
         s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
         s.scalar.side_effect = [None, None]
         s.scalars.return_value.all.return_value = []
-        s.execute.return_value.first.return_value = (prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC)))
+        s.execute.return_value.first.return_value = (prior, NS(observed_at=datetime(2026, 9, 1, 14, 0, tzinfo=UTC), data={}))
         return s
 
     prior = NS(cost=R.number("450000"), sku_orders=10, gross_revenue=R.number("810904"))

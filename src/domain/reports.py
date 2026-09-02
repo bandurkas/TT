@@ -303,12 +303,17 @@ def record_ad_day(session, shop_id, day, cost, sku_orders, gross_revenue, observ
                            .join(SourceReport, SourceReport.id == ShopAdDay.report_id)
                            .where(ShopAdDay.shop_id == shop_id, ShopAdDay.metric_date == day)).first()
     prior_day = pair[0] if pair else None
+    # A field carried forward from a record that never observed it is still unobserved: Windsor
+    # restates days inside its backfill window, and the flag must not decay into a measured 0.
+    was_unknown = set(((pair[1].data or {}) if pair else {}).get("figures_unknown") or ())
     carried, unknown = [], []
+    for field, given in (("sku_orders", sku_orders), ("gross_revenue", gross_revenue)):
+        if given is not None:
+            continue
+        (unknown if prior_day is None or field in was_unknown else carried).append(field)
     if sku_orders is None:
-        (carried if prior_day is not None else unknown).append("sku_orders")
         sku_orders = int(prior_day.sku_orders or 0) if prior_day is not None else 0
     if gross_revenue is None:
-        (carried if prior_day is not None else unknown).append("gross_revenue")
         gross_revenue = number(prior_day.gross_revenue or 0) if prior_day is not None else ZERO
     cost, gross_revenue = number(cost), number(gross_revenue)
     sku_orders = int(sku_orders)

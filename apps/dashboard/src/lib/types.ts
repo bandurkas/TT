@@ -325,7 +325,8 @@ export interface VPHistory { products: VPHistProduct[]; videos: VPHistVideo[]; n
 
 // GET /api/advertising (also embedded as overview.advertising) — src/domain/reports.advertising_summary
 export interface AdDay {
-  date: string; cost: Dec; partial: boolean; sku_orders: number; gross_revenue: Dec;
+  // sku_orders / gross_revenue are null when the source never reported them (Windsor does not).
+  date: string; cost: Dec; partial: boolean; sku_orders: number | null; gross_revenue: Dec | null;
   source: "shop_overview" | "manual_entry" | "windsor_gmv_max" | string; observed_at: string | null; note: string | null;
 }
 // sku_orders / gross_revenue: null = leave the day's existing figure alone (0 blanks it).

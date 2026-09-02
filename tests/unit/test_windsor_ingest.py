@@ -44,10 +44,14 @@ def test_client_refuses_everything_that_could_be_mistaken_for_zero_spend():
     with pytest.raises(WindsorError, match="missing"):   # renamed/dropped field = contract change
         client({"data": [{"date": "2026-08-01", "campaign_id": "1"}]}).fetch_gmv_max(
             date(2026, 8, 1), date(2026, 8, 1))
-    # the connector answers null for anything it cannot fill; a null spend is NOT a measured zero
-    with pytest.raises(WindsorError, match=r"null \['gmv_max_ads_spend'\]"):
-        client({"data": [{"date": "2026-08-01", "account_id": "1", "campaign_id": "1",
-                          "gmv_max_ads_spend": None}]}).fetch_gmv_max(date(2026, 8, 1), date(2026, 8, 1))
+    # a null in a field that is constant per advertiser is a contract change and stops the request
+    with pytest.raises(WindsorError, match=r"null \['account_id'\]"):
+        client({"data": [{"date": "2026-08-01", "account_id": None, "campaign_id": "1",
+                          "gmv_max_ads_spend": 1}]}).fetch_gmv_max(date(2026, 8, 1), date(2026, 8, 1))
+    # a null spend does NOT stop the request: it must cost its own day only, never the window
+    rows2, _ = client({"data": [{"date": "2026-08-01", "account_id": "1", "campaign_id": "1",
+                                 "gmv_max_ads_spend": None}]}).fetch_gmv_max(date(2026, 8, 1), date(2026, 8, 1))
+    assert rows2[0]["gmv_max_ads_spend"] is None
     with pytest.raises(WindsorError, match="Empty range"):
         client({"data": []}).fetch_gmv_max(date(2026, 8, 2), date(2026, 8, 1))
 
@@ -109,7 +113,7 @@ def test_ingest_stores_raw_and_writes_nothing_when_there_are_no_rows():
     s = _session()
     out = W.ingest(s, SHOP, [], {"rows": 0}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert out == {"days": 0, "written": 0, "unchanged": 0, "campaigns": 0,
-                   "disagreements": [], "note": "no rows"}
+                   "disagreements": [], "skipped_null_days": [], "note": "no rows"}
     raw = s.add.call_args_list[0].args[0]          # raw payload is kept even when empty (SPEC 2.2)
     assert raw.integration == "windsor" and raw.resource == W.RESOURCE and raw.payload == {"data": []}
 
@@ -119,11 +123,11 @@ def test_ingest_reports_a_material_disagreement_instead_of_hiding_it(monkeypatch
              "gmv_max_ads_spend": 339256}]
     monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: {"unchanged": False})
     monkeypatch.setattr(W, "_ad_account", lambda *a: None)
-    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("73989"), partial=False))
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("73989"), partial=False, manual=False))
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert out["disagreements"] == [{"date": "2026-08-31", "stored": "73989", "windsor": "339256"}]
 
-    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339250"), partial=False))  # tiny drift
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339250"), partial=False, manual=False))  # tiny drift
     assert W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))["disagreements"] == []
 
 
@@ -201,13 +205,18 @@ def test_ingest_skips_a_day_that_has_not_moved_so_the_hourly_run_is_a_no_op(monk
     wrote = []
     monkeypatch.setattr(W, "_ad_account", lambda *a: None)
     monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: wrote.append(1) or {})
-    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=False))
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=False, manual=False))
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert wrote == [] and out == {"days": 1, "written": 0, "unchanged": 1, "campaigns": 0,
-                                   "disagreements": []}
-    # the same figure but a different finality still has to be written
-    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=True))
-    assert W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))["written"] == 0 or wrote
+                                   "disagreements": [], "skipped_null_days": []}
+    # same figure, wrong finality -> still written
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=True, manual=False))
+    assert W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))["written"] == 1
+    assert wrote == [1]
+    # same figure, but the day is still flagged manual -> claim it, so it stops being operator-owned
+    wrote.clear()
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=False, manual=True))
+    assert W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))["written"] == 1
 
 
 def test_ingest_lets_a_real_validation_failure_fail_the_job(monkeypatch):
@@ -217,11 +226,21 @@ def test_ingest_lets_a_real_validation_failure_fail_the_job(monkeypatch):
     monkeypatch.setattr(W, "_ad_account", lambda *a: None)
     monkeypatch.setattr(W, "_stored", lambda *a: None)
 
-    def boom(*a, **k):
-        raise ValueError("Explicit report timezone must match the shop timezone")
+    rows = rows + [{"date": "2026-09-01", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 2}]
+    seen = []
+
+    def boom(session, shop_id, day, *a, **k):
+        seen.append(day)
+        if day == date(2026, 8, 31):
+            raise ValueError("Cost, SKU orders and gross revenue must be non-negative")
+        return {}
     monkeypatch.setattr(W, "record_ad_day", boom)
-    with pytest.raises(ValueError, match="timezone"):
-        W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    # the bad day fails the job, the good day is still ingested: one bad day must not truncate the
+    # window every hour and leave everything after it permanently unwritten
+    assert seen == [date(2026, 8, 31), date(2026, 9, 1)]
+    assert out["errors"] == ["2026-08-31: Cost, SKU orders and gross revenue must be non-negative"]
+    assert out["written"] == 1
 
 
 def test_redact_removes_the_key_wherever_it_sits():
@@ -246,3 +265,93 @@ def test_platform_source_never_claims_it_measured_zero_orders():
     data = s.add.call_args_list[0].args[0].data
     assert data["figures_unknown"] == ["sku_orders", "gross_revenue"] and "carried_over" not in data
     assert data["sku_orders"] == 0        # stored as 0 (column is NOT NULL) but flagged as unobserved
+
+
+def test_a_null_spend_costs_its_own_day_and_never_the_window(monkeypatch):
+    """One campaign-day with a null spend must not throw away the other good days, and its own day
+    must not be written from a partial sum of the campaigns that did report."""
+    rows = [{"date": "2026-08-30", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 309660},
+            {"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 300000},
+            {"date": "2026-08-31", "account_id": "1", "campaign_id": "c2", "gmv_max_ads_spend": None}]
+    days = []
+    monkeypatch.setattr(W, "_ad_account", lambda *a: None)
+    monkeypatch.setattr(W, "_stored", lambda *a: None)
+    monkeypatch.setattr(W, "record_ad_day",
+                        lambda s, sid, day, cost, *a, **k: days.append((day, str(cost))) or {})
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert days == [(date(2026, 8, 30), "309660")]   # 31 Aug dropped whole, not written as 300000
+    assert out["skipped_null_days"] == ["2026-08-31"] and out["days"] == 1
+
+
+def test_hierarchy_is_written_even_when_the_days_total_has_not_moved(monkeypatch):
+    """A campaign-mix restatement keeps the same sum, and a day first entered by hand has no
+    campaigns at all — so ad_metrics must not sit behind the unchanged-day fast path."""
+    rows = [{"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 200000},
+            {"date": "2026-08-31", "account_id": "1", "campaign_id": "c2", "gmv_max_ads_spend": 139256}]
+    metrics, wrote = [], []
+    monkeypatch.setattr(W, "_ad_account", lambda *a: NS(id=7))
+    monkeypatch.setattr(W, "_campaign", lambda s, acc, cid, name: NS(id=1, external_campaign_id=cid))
+    monkeypatch.setattr(W, "_metric", lambda s, cid, d, spend, cur, at, fin: metrics.append(str(spend)))
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=False, manual=False))
+    monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: wrote.append(1) or {})
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert sorted(metrics) == ["139256", "200000"]   # per-campaign detail recorded
+    assert wrote == [] and out["unchanged"] == 1     # the day's Cost itself is left alone
+    assert out["campaigns"] == 2
+
+
+def test_unknown_figures_stay_unknown_when_windsor_restates_the_same_day():
+    """Windsor restates days inside its backfill window; "never observed" must not decay into a
+    measured 0 just because a previous Windsor row is now the prior record."""
+    from src.domain import reports as R
+    s = MagicMock()
+    s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+    s.scalar.side_effect = [None, None]
+    s.scalars.return_value.all.return_value = []
+    prior = NS(observed_at=datetime(2026, 9, 1, 10, 0, tzinfo=UTC),
+               data={"figures_unknown": ["sku_orders", "gross_revenue"]})
+    s.execute.return_value.first.return_value = (NS(sku_orders=0, gross_revenue=R.number("0")), prior)
+    R.record_ad_day(s, 1, date(2026, 8, 31), "340000", None, None,
+                    datetime(2026, 9, 1, 15, 30, tzinfo=UTC), "Asia/Jakarta", final=True,
+                    scope=R.WINDSOR_SCOPE, label="windsor-gmv-max")
+    data = s.add.call_args_list[0].args[0].data
+    assert data["figures_unknown"] == ["sku_orders", "gross_revenue"] and "carried_over" not in data
+
+
+def test_figures_a_human_actually_entered_are_carried_not_marked_unknown():
+    from src.domain import reports as R
+    s = MagicMock()
+    s.get.return_value = NS(timezone="Asia/Jakarta", currency="IDR")
+    s.scalar.side_effect = [None, None]
+    s.scalars.return_value.all.return_value = []
+    prior = NS(observed_at=datetime(2026, 9, 1, 10, 0, tzinfo=UTC), data={"scope": "manual_entry"})
+    s.execute.return_value.first.return_value = (NS(sku_orders=10, gross_revenue=R.number("810904")),
+                                                 prior)
+    R.record_ad_day(s, 1, date(2026, 8, 31), "340000", None, None,
+                    datetime(2026, 9, 1, 15, 30, tzinfo=UTC), "Asia/Jakarta", final=True,
+                    scope=R.WINDSOR_SCOPE, label="windsor-gmv-max")
+    data = s.add.call_args_list[0].args[0].data
+    assert data["carried_over"] == ["sku_orders", "gross_revenue"] and "figures_unknown" not in data
+    assert data["sku_orders"] == 10
+
+
+def test_advertising_summary_returns_null_for_figures_the_source_never_reported():
+    from unittest.mock import patch
+
+    from src.domain import reports as R
+    day = NS(metric_date=date(2026, 8, 31), cost=R.number("339256"), partial=False,
+             sku_orders=0, gross_revenue=R.number("0"), report_id=5, currency="IDR")
+    rep = NS(id=5, filename="windsor-gmv-max", sha256="x", observed_at=datetime(2026, 9, 1, tzinfo=UTC),
+             timezone="Asia/Jakarta", period_start=day.metric_date, period_end=day.metric_date,
+             data={"scope": R.WINDSOR_SCOPE, "figures_unknown": ["sku_orders", "gross_revenue"],
+                   "note": "Windsor.ai GMV Max, 2 campaign(s)"})
+    s = MagicMock()
+    s.scalars.return_value = [rep]
+    with patch.object(R, "ad_days", lambda *a: [day]), \
+         patch("src.domain.dashboard.loaders.ad_deductions", lambda *a: []):
+        out = R.advertising_summary(s, 1, date(2026, 8, 31), date(2026, 8, 31), "Asia/Jakarta")
+    d = out["days"][0]
+    assert d["cost"] == R.number("339256")
+    assert d["sku_orders"] is None and d["gross_revenue"] is None   # stored 0, never measured
+    assert d["source"] == R.WINDSOR_SCOPE and out["windsor_days"] == 1
+    assert out["source"] == "Windsor.ai GMV Max · Cost"
