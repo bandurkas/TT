@@ -129,12 +129,12 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     for d in unusable:
         log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
         row = _stored(session, shop.id, d)
-        if row is None or row.partial:
-            # `window()` only ever asks for days that have already ended, so every day here is a
-            # closed one. A closed day still marked partial holds a mid-day figure — the manual form
-            # defaults `final` to false — and is therefore understated, not a fallback. Left silent
-            # it would sit there under a green job, which is how 2026-08-31 stayed at 73,989 instead
-            # of 339,256.
+        if row is None or (row.partial and d < today):
+            # Nothing on file, or a *closed* day still marked partial. The latter holds a mid-day
+            # figure — the manual form defaults `final` to false — so it is understated, not a
+            # fallback, and silence would leave it under a green job. The `d < today` guard is the
+            # function's own: window() happens to ask only for days that have ended, but ingest
+            # accepts an open day, and a partial figure for a day still running is simply correct.
             null_errors.append(f"{d}: null {SPEND} and no settled Cost on file for that day")
     rejections: list[str] = []
     for day, per_campaign in sorted(by_day.items()):

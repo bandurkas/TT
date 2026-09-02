@@ -399,8 +399,7 @@ def test_a_null_day_is_an_error_unless_a_settled_cost_is_on_file_for_it(monkeypa
     quiet = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert quiet["skipped_null_days"] == ["2026-08-31"] and "errors" not in quiet
 
-    # window() only asks for days that have ended, so a row still marked partial holds a mid-day
-    # figure for a closed day — understated, not a fallback. This is how 31 Aug stayed at 73,989.
+    # a closed day still marked partial holds a mid-day figure — understated, not a fallback
     monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("73989"), partial=True, manual=True))
     stale = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert stale["errors"] == ["2026-08-31: null gmv_max_ads_spend and no settled Cost on file for that day"]
@@ -477,3 +476,18 @@ def test_per_campaign_spend_is_not_written_when_the_days_cost_was_rejected(monke
     monkeypatch.setattr(W, "record_ad_day", reject)
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert metrics == [] and out["campaigns"] == 0 and out["errors"]
+
+
+def test_a_partial_figure_for_the_day_still_running_is_not_an_error(monkeypatch):
+    """window() asks only for days that have ended, but ingest accepts an open day, and a partial
+    Cost for a day still in progress is simply correct — not something to fail the job over."""
+    rows = [{"date": "2026-09-01", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": None}]
+    _stub_hierarchy(monkeypatch)
+    monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: {})
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("450000"), partial=True, manual=True))
+    # 09:00 WIB on 1 Sep: the day is still running
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 2, 0, tzinfo=UTC))
+    assert out["skipped_null_days"] == ["2026-09-01"] and "errors" not in out
+    # the same row once the day has closed is understated and must be reported
+    closed = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 2, 2, 0, tzinfo=UTC))
+    assert closed["errors"] == ["2026-09-01: null gmv_max_ads_spend and no settled Cost on file for that day"]
