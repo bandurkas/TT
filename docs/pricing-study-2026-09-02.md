@@ -120,3 +120,66 @@ order carries — not by turning the GMV Max budget up. In order of leverage:
    winner doubles reachable demand at the *low* end of the CPO curve instead of climbing the high end.
 
 None of this is a forecast of 100/day. It is what must be true for it to be profitable when it comes.
+
+## Follow-up 2 (2026-09-02 afternoon): purchase price ≈ 4,000/pair; what ad budget; did the 80k price help?
+
+**Price cut to 80,000 — not visible in the data yet.** Net revenue per unit (after platform
+deductions, before fees): 27–31 Aug 72.9–78.3k; 1–2 Sep 73.7–78.3k; price points unchanged (75k/80k).
+1 Sep's 8 orders came on the highest budget ever (450k); 28 Aug also had 8 on 323k with no price
+change; 2 Sep had 3 by 14:00. Two factors moved at once and n = 8 — no conclusion either way.
+The settled `revenue_base` will show the cut once orders placed at the new price flow through.
+
+**COGS with 4,000/pair:** the selling unit is the 5-pair set → **20,000** (not 12,000; that is a
+3-pair set, a different product). Contribution at August revenue: 52,476/unit → break-even CPO
+57,193; at the late-August revenue actually being realised (~76k/unit): 46,804 → break-even CPO 51,011.
+
+**Budget under the measured curve** (orders/day = 0.0226 · budget^0.44, two points, one week each —
+a guardrail, not a forecast):
+
+```
+кривая по двум точкам: заказов/день = 0.02259 · бюджет^0.44   (130,771→3.86; 344,919→5.89)
+
+выручка/ед: 82,453 = средняя августа; 76,000 = фактическая 27.08–02.09 (медианы 72.9–78.3k)
+
+=== выручка/ед 82,453 | 5×4000 = 20,000 → вклад/ед 52,476, безубыточный CPO 57,193
+  оптимум прибыли: бюджет ≈    75,919/день → 3.0 зак/день, CPO 24,953, прибыль ≈   +98,091/день
+  потолок (прибыль=0): бюджет ≈   330,654/день → 5.8 зак/день, CPO 57,193
+  бюджет/день:   100,000   130,000   150,000   200,000   250,000   300,000   345,000   450,000
+  заказов/день:      3.4       3.8       4.1       4.6       5.1       5.5       5.9       6.6
+  прибыль/день:  +96,235   +90,034   +84,209   +65,530   +42,680   +16,913    -8,162   -71,761
+
+=== выручка/ед 82,453 | 3×4000 = 12,000 → вклад/ед 60,476, безубыточный CPO 65,912
+  оптимум прибыли: бюджет ≈    97,648/день → 3.4 зак/день, CPO 28,757, прибыль ≈  +126,167/день
+  потолок (прибыль=0): бюджет ≈   425,294/день → 6.5 зак/день, CPO 65,912
+  бюджет/день:   100,000   130,000   150,000   200,000   250,000   300,000   345,000   450,000
+  заказов/день:      3.4       3.8       4.1       4.6       5.1       5.5       5.9       6.6
+  прибыль/день: +126,151  +123,578  +119,914  +106,010   +87,300   +65,226   +43,189   -14,098
+
+=== выручка/ед 76,000 | 5×4000 = 20,000 → вклад/ед 46,804, безубыточный CPO 51,011
+  оптимум прибыли: бюджет ≈    61,976/день → 2.8 зак/день, CPO 22,256, прибыль ≈   +80,076/день
+  потолок (прибыль=0): бюджет ≈   269,926/день → 5.3 зак/день, CPO 51,011
+  бюджет/день:   100,000   130,000   150,000   200,000   250,000   300,000   345,000   450,000
+  заказов/день:      3.4       3.8       4.1       4.6       5.1       5.5       5.9       6.6
+  прибыль/день:  +75,024   +66,250   +58,893   +36,828   +11,044   -17,343   -44,571  -112,645
+
+=== выручка/ед 76,000 | 3×4000 = 12,000 → вклад/ед 54,804, безубыточный CPO 59,730
+  оптимум прибыли: бюджет ≈    81,995/день → 3.1 зак/день, CPO 26,060, прибыль ≈  +105,942/день
+  потолок (прибыль=0): бюджет ≈   357,119/день → 6.0 зак/день, CPO 59,730
+  бюджет/день:   100,000   130,000   150,000   200,000   250,000   300,000   345,000   450,000
+  заказов/день:      3.4       3.8       4.1       4.6       5.1       5.5       5.9       6.6
+  прибыль/день: +104,940   +99,794   +94,598   +77,308   +55,664   +30,971    +6,780   -54,982
+```
+
+Reading it: profit per day peaks at a small budget (60–100k/day, ~3 orders) and reaches zero at
+270–330k/day for the 5-pair set at 20,000 COGS. Between 130k and 200k/day the curve is nearly flat
+(+66k…+37k/day at 76k revenue) — that band buys ~0.8 extra orders/day for ~70k, roughly at cost.
+Above ~250k/day every order is bought at a loss on this curve.
+
+**Recommendation for the coming week (5-pair set, 20,000 COGS):**
+- Hold **150–200k/day**: near the profit plateau, still growing volume, and enough spend to read a
+  CPO signal daily. Do not run 300k+ until the curve is shown to have moved.
+- **Guard:** trailing-3-day CPO must stay ≤ 51k (76k revenue) / ≤ 57k (82k revenue). Above it, step
+  the budget down 50k; below 35k for three days, step up 50k.
+- The curve moves only if conversion moves: the price test and a 2-set bundle are what to measure
+  this week, budget held constant so the effect is attributable. If the 80k price lifts orders per
+  budget, the whole table shifts right and the plateau widens — that is the lever toward 100/day.
