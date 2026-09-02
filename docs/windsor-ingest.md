@@ -46,8 +46,12 @@ No migration: `ad_accounts`, `campaigns` and `ad_metrics` already exist with the
   dashboard already renders as `—` rather than as profit.
 - **A null is not a zero.** The connector answers `null` for any field it cannot fill. A null
   `gmv_max_ads_spend` costs **its own day and nothing else**: that day is dropped whole — writing the
-  sum of the campaigns that *did* report would understate it — and listed in `skipped_null_days` *and*
-  in `errors`, so `/health` shows it instead of a stale figure sitting there under a green job. Only
+  sum of the campaigns that *did* report would understate it — and listed in `skipped_null_days`. It becomes an
+  `errors` entry — the thing `/health` reads — **only when no Cost is on file for that day**: with
+  nothing to fall back on the day is genuinely missing, whereas a day that already has a Cost simply
+  gained no new information, and holding the job red across the whole backfill window for that would
+  mask the next real failure. Rejections are reported before null days, because `/health` renders
+  only the first line. Only
   `date` and `campaign_id` are fatal to the request, because a row cannot be grouped without them.
   Blankness is emptiness, not just `None`: an empty-string `account_id` would pass an `is None` test
   and then silently skip the whole campaign branch.

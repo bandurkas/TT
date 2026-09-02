@@ -65,7 +65,10 @@ def _ad_account(session: Any, shop: Any, rows: list[dict[str, Any]]) -> AdAccoun
     acc.name = next((r.get("account_name") for r in rows if r.get("account_name")), acc.name)
     # Windsor reports neither currency nor timezone; the shop's own are asserted (docs §3).
     acc.currency, acc.timezone = shop.currency, shop.timezone
-    session.flush()
+    # Committed, not merely flushed: the first day's rollback would otherwise discard the new row
+    # while `acc.id` survives on the expunged object, and every campaign after it would insert
+    # against a foreign key that no longer exists.
+    session.commit()
     return acc
 
 
@@ -116,13 +119,7 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     acc = _ad_account(session, shop, rows)
     written = unchanged = 0
     disagreements: list[dict[str, Any]] = []
-    # A day we could not read, and an account we could not identify, both leave data silently stale.
-    # They belong in `errors`, which /health reads — `skipped_null_days` alone is invisible.
-    errors = [f"{d}: null {SPEND}, day left untouched" for d in unusable]
-    if acc is None:
-        errors.append(f"no usable {ACCOUNT} in the response; campaigns and ad_metrics not written")
-    for d in unusable:
-        log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
+    errors: list[str] = []          # filled in day order below; /health renders only the first
     campaigns: set[str] = set()
     for day, per_campaign in sorted(by_day.items()):
         total = sum((c["spend"] for c in per_campaign.values()), ZERO)
@@ -172,6 +169,16 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
                 campaigns.add(camp.external_campaign_id)
                 _metric(session, camp.id, day, c["spend"], shop.currency, fetched_at, final)
             session.commit()
+    # Reported after the rejections, so /health's first line is the most severe thing that happened.
+    if acc is None:
+        errors.append(f"no usable {ACCOUNT} in the response; campaigns and ad_metrics not written")
+    for d in unusable:
+        log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
+        if _stored(session, shop.id, d) is None:
+            # Nothing to fall back on, so the day is genuinely missing and has to be visible. When a
+            # Cost is already on file, a null is merely "no new information" and must not hold the
+            # job red for the whole backfill window and mask a later, real failure.
+            errors.append(f"{d}: null {SPEND} and no Cost on file for that day")
     out = {"days": len(by_day), "written": written, "unchanged": unchanged,
            "campaigns": len(campaigns), "disagreements": disagreements,
            "skipped_null_days": [str(d) for d in unusable]}

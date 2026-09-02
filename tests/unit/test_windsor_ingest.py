@@ -380,19 +380,51 @@ def test_an_unusable_account_id_is_reported_but_never_costs_the_days_cost(monkey
     assert out["errors"] == ["no usable account_id in the response; campaigns and ad_metrics not written"]
 
 
-def test_a_day_skipped_for_a_null_spend_reaches_health_as_an_error(monkeypatch):
-    """Otherwise a day keeps a stale Cost with the job reporting success and nothing to look at."""
+def test_a_null_day_is_an_error_only_when_no_cost_is_on_file_for_it(monkeypatch):
+    """A day with nothing to fall back on is genuinely missing and must reach /health. A day that
+    already has a Cost gained no new information — holding the job red for the whole backfill window
+    would mask the next real failure behind a benign one."""
     rows = [{"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": None}]
     _stub_hierarchy(monkeypatch)
-    monkeypatch.setattr(W, "_stored", lambda *a: None)
     monkeypatch.setattr(W, "record_ad_day", lambda *a, **k: {})
+
+    monkeypatch.setattr(W, "_stored", lambda *a: None)
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert out["skipped_null_days"] == ["2026-08-31"]
-    assert out["errors"] == ["2026-08-31: null gmv_max_ads_spend, day left untouched"]
-
+    assert out["errors"] == ["2026-08-31: null gmv_max_ads_spend and no Cost on file for that day"]
     from apps.worker.scheduler import _collect_errors
-    surfaced = _collect_errors(out)                          # this is what marks the job failed
-    assert surfaced and "null gmv_max_ads_spend" in surfaced[0]
+    assert "null gmv_max_ads_spend" in _collect_errors(out)[0]   # this is what marks the job failed
+
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("339256"), partial=False, manual=False))
+    quiet = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert quiet["skipped_null_days"] == ["2026-08-31"] and "errors" not in quiet
+
+
+def test_a_real_rejection_is_reported_before_a_benign_null_day(monkeypatch):
+    """/health renders only errors[0], so the most severe thing that happened has to be first."""
+    rows = [{"date": "2026-08-30", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": None},
+            {"date": "2026-08-31", "account_id": "1", "campaign_id": "c1", "gmv_max_ads_spend": 5}]
+    _stub_hierarchy(monkeypatch)
+    monkeypatch.setattr(W, "_stored", lambda *a: None)
+
+    def reject(*a, **k):
+        raise ValueError("Cost, SKU orders and gross revenue must be non-negative")
+    monkeypatch.setattr(W, "record_ad_day", reject)
+    out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert out["errors"][0].startswith("2026-08-31: Cost, SKU orders")
+    assert "null gmv_max_ads_spend" in out["errors"][1]
+
+
+def test_the_ad_account_is_durable_before_any_day_can_roll_back(monkeypatch):
+    """A rollback in the first day would otherwise discard the freshly created AdAccount while its
+    id survives on the expunged object, and every campaign after it would hit a dead foreign key."""
+    from unittest.mock import call
+
+    s = _session()
+    s.scalar.return_value = None                       # no AdAccount on file yet
+    acc = W._ad_account(s, SHOP, [{"account_id": "76583", "account_name": "Lomira.product"}])
+    assert acc is not None
+    assert s.commit.called and s.commit.call_args_list[-1] == call()
 
 
 def test_per_campaign_spend_is_not_written_when_the_days_cost_was_rejected(monkeypatch):
