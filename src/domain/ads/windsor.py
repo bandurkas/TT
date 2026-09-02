@@ -119,8 +119,22 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     acc = _ad_account(session, shop, rows)
     written = unchanged = 0
     disagreements: list[dict[str, Any]] = []
-    errors: list[str] = []          # filled in day order below; /health renders only the first
     campaigns: set[str] = set()
+    # Assembled before the loop so a crash inside it cannot lose them. Null days are excluded from
+    # `by_day`, so nothing the loop does can change their stored state.
+    account_errors = ([] if acc is not None
+                      else [f"no usable {ACCOUNT} in the response; campaigns and ad_metrics not written"])
+    null_errors = []
+    for d in unusable:
+        log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
+        row = _stored(session, shop.id, d)
+        if row is None or row.partial:
+            # No settled Cost to fall back on, so the day is genuinely missing and must be visible.
+            # A day already closed at a known figure gained no new information from a null, and
+            # holding the job red across the backfill window for that would mask the next real
+            # failure.
+            null_errors.append(f"{d}: null {SPEND} and no settled Cost on file for that day")
+    rejections: list[str] = []
     for day, per_campaign in sorted(by_day.items()):
         total = sum((c["spend"] for c in per_campaign.values()), ZERO)
         final = day < today
@@ -151,7 +165,7 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
                     log.info("windsor: %s already has a newer observation; left alone", day)
                 else:
                     # Fail the job, but keep going: one bad day must not truncate the window hourly.
-                    errors.append(f"{day}: {e}")
+                    rejections.append(f"{day}: {e}")
                     log.error("windsor: %s rejected: %s", day, e)
                 # The day's Cost did not land, so per-campaign spend must not either — otherwise
                 # ad_metrics would permanently disagree with it and be re-committed every hour.
@@ -169,16 +183,9 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
                 campaigns.add(camp.external_campaign_id)
                 _metric(session, camp.id, day, c["spend"], shop.currency, fetched_at, final)
             session.commit()
-    # Reported after the rejections, so /health's first line is the most severe thing that happened.
-    if acc is None:
-        errors.append(f"no usable {ACCOUNT} in the response; campaigns and ad_metrics not written")
-    for d in unusable:
-        log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
-        if _stored(session, shop.id, d) is None:
-            # Nothing to fall back on, so the day is genuinely missing and has to be visible. When a
-            # Cost is already on file, a null is merely "no new information" and must not hold the
-            # job red for the whole backfill window and mask a later, real failure.
-            errors.append(f"{d}: null {SPEND} and no Cost on file for that day")
+    # /health renders only the first entry, so order by blast radius: an unusable account cost the
+    # whole window its campaign detail, a rejection cost one day, a null day cost one day's refresh.
+    errors = account_errors + rejections + null_errors
     out = {"days": len(by_day), "written": written, "unchanged": unchanged,
            "campaigns": len(campaigns), "disagreements": disagreements,
            "skipped_null_days": [str(d) for d in unusable]}
