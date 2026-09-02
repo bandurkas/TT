@@ -87,3 +87,36 @@ Monthly at August-like volume, net profit:
 4. Enter real purchase lots. Every number above moves with the first invoice.
 
 Ad regime × 5×3,000 is the combination with measured support: ≈ +3.4M/month at low-regime volume.
+
+## Follow-up: the operator's actual goal is 100 orders/day, profitable
+
+What the data says about that target (measured unless marked):
+
+- **Demand is almost entirely paid.** GMV Max share of GMV averages 75.6 % by day; affiliate is
+  77k of 6.2M in August. Of GMV, 86 % arrives through the product card and 14 % through video; video
+  funnel in August: 59,826 views → 3,847 clicks (6.4 %) → 8 orders (**0.21 %** click→order).
+- **Paid demand has strongly diminishing returns.** Between the two measured regimes, orders scale
+  with budget at elasticity **0.44** (1.0 would be linear). Extrapolating that curve to 100 orders/day
+  gives an absurd budget — the point is not the number but the shape: buying 100/day from the same
+  single campaign on the same product card is not a budget question, it is a different machine.
+- **Best measured CPO is 33.9k** (130k/day). Break-even CPO: 50.5k at today's COGS, 62k at 15k COGS,
+  65k at 12k COGS. So at any COGS in the grid, 100 profitable orders/day needs the *marginal* order
+  to cost ≤ ~62–65k — while the marginal order already costs ~105k at 6/day.
+- At 100 orders/day the permitted ad budget is **5.1–6.9M/day** depending on COGS, and the daily
+  profit ranges from +1.7M (today's COGS, CPO 34k) to −0.8M (today's COGS, CPO 59k).
+
+Conclusion: 100/day profitably is reachable only by changing where demand comes from and what each
+order carries — not by turning the GMV Max budget up. In order of leverage:
+
+1. **Contribution per order up**: ≤ 3,000/pair purchasing (keeps the 5-pair winner), and a bigger
+   basket — 89 of 99 orders are a single set; a 2-set bundle at a small discount raises revenue per
+   order without raising CPO. Both measurable within a week.
+2. **Cheaper demand**: organic/affiliate video, creator seeding, live — the only sources whose CPO is
+   not on the 0.44 curve. Today they are ~24 % of GMV. Requires content volume; the Ads app's
+   creative-level data is what will tell which videos to feed.
+3. **Scale paid in steps with a hard guard**: +50k/day at a time, hold ≥ 3 days, continue only while
+   trailing-3-day CPO ≤ break-even for the COGS in force. The dashboard already shows daily CPO.
+4. **More products / campaigns**: one campaign, one product card carries ~90 % of everything; a second
+   winner doubles reachable demand at the *low* end of the CPO curve instead of climbing the high end.
+
+None of this is a forecast of 100/day. It is what must be true for it to be profitable when it comes.
