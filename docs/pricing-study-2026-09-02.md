@@ -183,3 +183,35 @@ Above ~250k/day every order is bought at a loss on this curve.
 - The curve moves only if conversion moves: the price test and a 2-set bundle are what to measure
   this week, budget held constant so the effect is attributable. If the 80k price lifts orders per
   budget, the whole table shifts right and the plateau widens — that is the lever toward 100/day.
+
+## Follow-up 3: the budget is two campaigns, not one
+
+Per-campaign daily spend (Windsor, `ad_metrics`) next to total orders. Orders per campaign are
+**not available** — Windsor returns null for GMV Max orders, so CPO is only measurable on the total.
+
+| date | majority black | moms & girls | total | orders | CPO |
+|---|---|---|---|---|---|
+| 17–23 Aug | 130,000/day | — | 130,000 | 27 in 7 days | 33.9k |
+| 24 Aug | **303,833** | — | 303,833 | 3 | 101k |
+| 25–27 Aug | 342–350k | — | ~345k | 6/6/5 | 57–70k |
+| 28 Aug | 300,000 | 22,802 | 322,802 | 11 | 29k |
+| 29–31 Aug | 232–300k | 39–77k | 310–344k | 5/3/6 | 57–103k |
+| 1 Sep | 387,504 | 62,496 | 450,000 | 8 | 56k |
+
+- The break in CPO is **24 Aug, when "majority black" alone went 130k → 300k**. "moms & girls" did
+  not exist yet; it started 28 Aug at 23–77k/day and has spent 245,590 in total against 3.77M for
+  "majority black". The whole high-regime finding is about the main campaign's budget.
+- With blended orders, the second campaign cannot be judged on its own. Its one useful signal is
+  28 Aug: the day it started was the best day of the high regime (11 orders, CPO 29k) — but one day,
+  and the main campaign's spend was unchanged, so it may be coincidence.
+
+**Recommendation restated per campaign:**
+- **majority black: back to 130–150k/day** — the regime in which it was measured profitable at the
+  current COGS, and the level from which the 24 Aug step broke CPO. This is the whole adjustment.
+- **moms & girls: hold at its ~100k cap**, do not raise; it is the experiment. Combined total lands at
+  230–250k/day — above the 150–200k band from follow-up 2, which is acceptable only because the
+  second campaign is the test being run; if trailing-3-day total CPO exceeds 51k, it is the one to
+  cut first, since the main campaign's 130k level has a measured record and it does not.
+- To judge "moms & girls" properly, either the Ads app (attributed orders per campaign) or an A/B
+  by days: run it on alternate days for two weeks with the main campaign fixed, and compare orders
+  on its on-days vs off-days. Blended attribution cannot do better than that.
