@@ -120,20 +120,21 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     written = unchanged = 0
     disagreements: list[dict[str, Any]] = []
     campaigns: set[str] = set()
-    # Assembled before the loop so a crash inside it cannot lose them. Null days are excluded from
-    # `by_day`, so nothing the loop does can change their stored state.
+    # Computed before the loop: null days are excluded from `by_day`, so nothing the loop does can
+    # change their stored state, and this way they are ready whatever the loop turns into.
     account_errors = ([] if acc is not None
                       else [f"no usable {ACCOUNT} in the response; campaigns and ad_metrics not written"])
     null_errors = []
     for d in unusable:
         log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
-        row = _stored(session, shop.id, d)
-        if row is None or row.partial:
-            # No settled Cost to fall back on, so the day is genuinely missing and must be visible.
-            # A day already closed at a known figure gained no new information from a null, and
-            # holding the job red across the backfill window for that would mask the next real
-            # failure.
-            null_errors.append(f"{d}: null {SPEND} and no settled Cost on file for that day")
+        if _stored(session, shop.id, d) is None:
+            # Nothing at all on file, so the day is invisible and has to be reported. A Cost that is
+            # merely still `partial` does count as a fallback: it is a real transcribed figure, and
+            # the dashboard already flags it through the advertising status. Treating it as missing
+            # would make an ordinary manual entry a permanent /health failure — Windsor never
+            # reports the open day, so such a day could never become settled — and that benign
+            # message would then mask the next real rejection.
+            null_errors.append(f"{d}: null {SPEND} and no Cost on file for that day")
     rejections: list[str] = []
     for day, per_campaign in sorted(by_day.items()):
         total = sum((c["spend"] for c in per_campaign.values()), ZERO)

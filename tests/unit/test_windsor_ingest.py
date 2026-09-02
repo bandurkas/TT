@@ -380,7 +380,7 @@ def test_an_unusable_account_id_is_reported_but_never_costs_the_days_cost(monkey
     assert out["errors"] == ["no usable account_id in the response; campaigns and ad_metrics not written"]
 
 
-def test_a_null_day_is_an_error_unless_a_settled_cost_is_on_file_for_it(monkeypatch):
+def test_a_null_day_is_an_error_only_when_nothing_is_on_file_for_it(monkeypatch):
     """A day with nothing to fall back on is genuinely missing and must reach /health. A day that
     already has a Cost gained no new information — holding the job red for the whole backfill window
     would mask the next real failure behind a benign one."""
@@ -391,7 +391,7 @@ def test_a_null_day_is_an_error_unless_a_settled_cost_is_on_file_for_it(monkeypa
     monkeypatch.setattr(W, "_stored", lambda *a: None)
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert out["skipped_null_days"] == ["2026-08-31"]
-    assert out["errors"] == ["2026-08-31: null gmv_max_ads_spend and no settled Cost on file for that day"]
+    assert out["errors"] == ["2026-08-31: null gmv_max_ads_spend and no Cost on file for that day"]
     from apps.worker.scheduler import _collect_errors
     assert "null gmv_max_ads_spend" in _collect_errors(out)[0]   # this is what marks the job failed
 
@@ -399,10 +399,11 @@ def test_a_null_day_is_an_error_unless_a_settled_cost_is_on_file_for_it(monkeypa
     quiet = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert quiet["skipped_null_days"] == ["2026-08-31"] and "errors" not in quiet
 
-    # a day still open is not a fallback: an unfinished figure must not silence a missing one
-    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("100000"), partial=True, manual=False))
-    still = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
-    assert still["errors"] == ["2026-08-31: null gmv_max_ads_spend and no settled Cost on file for that day"]
+    # a still-open manual entry IS a fallback: the dashboard flags it as partial already, and
+    # Windsor never reports the open day, so calling it missing would fail the job forever
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("100000"), partial=True, manual=True))
+    open_day = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert "errors" not in open_day
 
 
 def test_a_real_rejection_is_reported_before_a_benign_null_day(monkeypatch):
