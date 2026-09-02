@@ -380,7 +380,7 @@ def test_an_unusable_account_id_is_reported_but_never_costs_the_days_cost(monkey
     assert out["errors"] == ["no usable account_id in the response; campaigns and ad_metrics not written"]
 
 
-def test_a_null_day_is_an_error_only_when_nothing_is_on_file_for_it(monkeypatch):
+def test_a_null_day_is_an_error_unless_a_settled_cost_is_on_file_for_it(monkeypatch):
     """A day with nothing to fall back on is genuinely missing and must reach /health. A day that
     already has a Cost gained no new information — holding the job red for the whole backfill window
     would mask the next real failure behind a benign one."""
@@ -391,7 +391,7 @@ def test_a_null_day_is_an_error_only_when_nothing_is_on_file_for_it(monkeypatch)
     monkeypatch.setattr(W, "_stored", lambda *a: None)
     out = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert out["skipped_null_days"] == ["2026-08-31"]
-    assert out["errors"] == ["2026-08-31: null gmv_max_ads_spend and no Cost on file for that day"]
+    assert out["errors"] == ["2026-08-31: null gmv_max_ads_spend and no settled Cost on file for that day"]
     from apps.worker.scheduler import _collect_errors
     assert "null gmv_max_ads_spend" in _collect_errors(out)[0]   # this is what marks the job failed
 
@@ -399,11 +399,11 @@ def test_a_null_day_is_an_error_only_when_nothing_is_on_file_for_it(monkeypatch)
     quiet = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
     assert quiet["skipped_null_days"] == ["2026-08-31"] and "errors" not in quiet
 
-    # a still-open manual entry IS a fallback: the dashboard flags it as partial already, and
-    # Windsor never reports the open day, so calling it missing would fail the job forever
-    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("100000"), partial=True, manual=True))
-    open_day = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
-    assert "errors" not in open_day
+    # window() only asks for days that have ended, so a row still marked partial holds a mid-day
+    # figure for a closed day — understated, not a fallback. This is how 31 Aug stayed at 73,989.
+    monkeypatch.setattr(W, "_stored", lambda *a: NS(cost=W.number("73989"), partial=True, manual=True))
+    stale = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))
+    assert stale["errors"] == ["2026-08-31: null gmv_max_ads_spend and no settled Cost on file for that day"]
 
 
 def test_a_real_rejection_is_reported_before_a_benign_null_day(monkeypatch):
@@ -421,9 +421,9 @@ def test_a_real_rejection_is_reported_before_a_benign_null_day(monkeypatch):
     assert "null gmv_max_ads_spend" in out["errors"][1]
 
 
-def test_errors_are_ordered_by_blast_radius(monkeypatch):
-    """/health shows one line. An unusable account cost the whole window its campaign detail; a
-    rejection cost one day; a null day cost one day's refresh."""
+def test_errors_are_ordered_by_severity(monkeypatch):
+    """/health shows one line. A rejection means a day's Cost never landed; an unusable account only
+    costs campaign attribution; a null day costs one day's refresh."""
     rows = [{"date": "2026-08-30", "account_id": "  ", "campaign_id": "c1", "gmv_max_ads_spend": None},
             {"date": "2026-08-31", "account_id": "  ", "campaign_id": "c1", "gmv_max_ads_spend": 5}]
     monkeypatch.setattr(W, "_stored", lambda *a: None)
@@ -432,8 +432,8 @@ def test_errors_are_ordered_by_blast_radius(monkeypatch):
         raise ValueError("Explicit report timezone must match the shop timezone")
     monkeypatch.setattr(W, "record_ad_day", reject)
     errs = W.ingest(_session(), SHOP, rows, {}, now=datetime(2026, 9, 1, 19, 0, tzinfo=UTC))["errors"]
-    assert errs[0].startswith("no usable account_id")
-    assert errs[1].startswith("2026-08-31: Explicit report timezone")
+    assert errs[0].startswith("2026-08-31: Explicit report timezone")
+    assert errs[1].startswith("no usable account_id")
     assert errs[2].startswith("2026-08-30: null")
 
 

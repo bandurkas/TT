@@ -120,21 +120,22 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     written = unchanged = 0
     disagreements: list[dict[str, Any]] = []
     campaigns: set[str] = set()
-    # Computed before the loop: null days are excluded from `by_day`, so nothing the loop does can
-    # change their stored state, and this way they are ready whatever the loop turns into.
+    # Computed before the loop because null days are excluded from `by_day`, so nothing the loop
+    # does can change their stored state. This is not crash-proofing: an exception other than
+    # ValueError propagates out of ingest and `_run_job` reports it instead of any of this.
     account_errors = ([] if acc is not None
                       else [f"no usable {ACCOUNT} in the response; campaigns and ad_metrics not written"])
     null_errors = []
     for d in unusable:
         log.warning("windsor: %s has a null %s; the whole day is left untouched", d, SPEND)
-        if _stored(session, shop.id, d) is None:
-            # Nothing at all on file, so the day is invisible and has to be reported. A Cost that is
-            # merely still `partial` does count as a fallback: it is a real transcribed figure, and
-            # the dashboard already flags it through the advertising status. Treating it as missing
-            # would make an ordinary manual entry a permanent /health failure — Windsor never
-            # reports the open day, so such a day could never become settled — and that benign
-            # message would then mask the next real rejection.
-            null_errors.append(f"{d}: null {SPEND} and no Cost on file for that day")
+        row = _stored(session, shop.id, d)
+        if row is None or row.partial:
+            # `window()` only ever asks for days that have already ended, so every day here is a
+            # closed one. A closed day still marked partial holds a mid-day figure — the manual form
+            # defaults `final` to false — and is therefore understated, not a fallback. Left silent
+            # it would sit there under a green job, which is how 2026-08-31 stayed at 73,989 instead
+            # of 339,256.
+            null_errors.append(f"{d}: null {SPEND} and no settled Cost on file for that day")
     rejections: list[str] = []
     for day, per_campaign in sorted(by_day.items()):
         total = sum((c["spend"] for c in per_campaign.values()), ZERO)
@@ -184,9 +185,9 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
                 campaigns.add(camp.external_campaign_id)
                 _metric(session, camp.id, day, c["spend"], shop.currency, fetched_at, final)
             session.commit()
-    # /health renders only the first entry, so order by blast radius: an unusable account cost the
-    # whole window its campaign detail, a rejection cost one day, a null day cost one day's refresh.
-    errors = account_errors + rejections + null_errors
+    # /health renders only the first entry. A rejection means a day's Cost never landed, which
+    # outranks losing campaign attribution for the window — the account error costs no day its Cost.
+    errors = rejections + account_errors + null_errors
     out = {"days": len(by_day), "written": written, "unchanged": unchanged,
            "campaigns": len(campaigns), "disagreements": disagreements,
            "skipped_null_days": [str(d) for d in unusable]}
