@@ -265,3 +265,45 @@ spent 300k except one. Give LIVE three more days before reading it.
 `attributed_gmv`, `reported_roas` per campaign and per product (SPEC §5.14), which makes §6.4 A
 "platform reported" attribution available instead of BLENDED, and puts campaign ROI vs break-even
 on the dashboard daily.
+
+## Follow-up 5 (2026-09-03): "will a higher ROI get us to 100/day?", shop traffic, price 65,000
+
+**Traffic.** Not measurable for GMV Max through Windsor: `impressions`, `clicks`, and every
+`onsite_*` field (product page views, add-to-cart, checkout) come back 0 for GMV Max campaigns on
+every day 17 Aug – 2 Sep. Shop-level visitors are not in the Shop API either (product-card
+impressions/clicks NOT AVAILABLE). The only traffic we hold is **video** (14 % of GMV):
+
+| regime | video views/day | product clicks/day | CTR | video-attributed orders/day |
+|---|---|---|---|---|
+| 130k (17–23 Aug) | 619 | 12 | 1.96 % | 0.4 |
+| 300k+ (24 Aug – 1 Sep) | 5,840 | 565 | 9.68 % | 0.5 |
+
+Video traffic rose ~9× with the budget; video orders did not move. 30 Aug alone: **48,126 views,
+5,226 product clicks, 0 video orders, 3 shop orders in total** — a click-to-order rate under 0.06 %.
+Traffic is not what is missing; conversion after the click is. For shop visitors, read Seller
+Center → Analytics and the GMV Max dashboard in Ads Manager directly; we cannot pull them.
+
+**Does raising ROI get to 100/day?** No — ROI is a ratio, 100/day is volume. ROI above break-even is
+the *condition* under which budget can be scaled without losing money; it does not create demand by
+itself. The measured curve says scaling the main campaign 130k → 300k dropped ROI below break-even.
+So the order is: (1) raise ROI at the current scale — product exclusions (≈ 40k/day on zero-order
+products), offer/price, creatives; (2) then step the budget up while ROI holds ≥ threshold; (3) add
+demand sources that are not on the same curve (second/third campaign, LIVE, organic/affiliate). At
+CPO 50–65k, 100 orders/day is 5–6.5M/day of spend; nothing measured yet shows ROI holding there.
+
+**Price 65,000** (lowest allowed). Net revenue/unit ≈ price × 0.96 (80k lists as 76–78k in the
+order base). Contribution and thresholds:
+
+| list price | net/unit | contribution @25,515 | @20,000 | break-even CPO @20,000 | break-even ROI @20,000 |
+|---|---|---|---|---|---|
+| 80,000 | 76,800 | 41,992 | 47,507 | 51,783 | 1.62 |
+| 72,000 | 69,120 | 35,241 | 40,756 | 44,425 | 1.70 |
+| **65,000** | 62,400 | 29,335 | 34,850 | **37,986** | **1.79** |
+
+The cut costs **12,658 per unit** at either COGS. At today's CPO (~50k) it makes every order less
+profitable unless conversion rises **≥ 34 %** on the same budget (CPO ≤ 37.4k). Note the direction:
+a lower price *raises* the ROI threshold (1.62 → 1.79), because each order carries less margin.
+Nothing in the data yet shows the 80k cut lifting orders per budget (n = 8, confounded with the 450k
+day). 65k is therefore a bet on elasticity ≥ 34 % with no measurement behind it — run it as a
+bounded test (one campaign or one listing, budget fixed, 5–7 days, judge by orders-per-budget), not
+as the shop's new price.
