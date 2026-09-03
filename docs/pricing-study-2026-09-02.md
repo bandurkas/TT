@@ -215,3 +215,53 @@ Per-campaign daily spend (Windsor, `ad_metrics`) next to total orders. Orders pe
 - To judge "moms & girls" properly, either the Ads app (attributed orders per campaign) or an A/B
   by days: run it on alternate days for two weeks with the main campaign fixed, and compare orders
   on its on-days vs off-days. Blended attribution cannot do better than that.
+
+## Follow-up 4 (2026-09-03): campaign analysis, last 3 days — and a correction
+
+**Correction.** Windsor *does* report GMV Max orders, gross revenue, ROI, cost per order, the
+configured budget, and a per-product breakdown inside each campaign. The 2026-09-02 probe used the
+wrong field names (`gmv_max_ads_orders`…), and the connector answers an unknown field with nothing,
+not an error. The real fields, from `get_fields`: `gmv_max_cost`, `gmv_max_net_cost`,
+`gmv_max_orders`, `gmv_max_gross_revenue`, `gmv_max_roi`, `gmv_max_cost_per_order`,
+`gmv_max_target_roi_budget`, `gmv_max_max_delivery_budget`, `gmv_max_product_id`,
+`gmv_max_live_room_id`. `video_id` is still null for GMV Max. Raw tables:
+`docs/campaign-analysis-2026-09-03.txt`.
+
+Note on attribution: orders/revenue here are TikTok's, "paid and organic attributed to the
+campaign"; they track the shop's own order count closely (28 Aug: 10 vs 11; 1 Sep: 10 vs 8;
+2 Sep: 6 vs 6). ROI is gross revenue ÷ cost, before fees and COGS. **Break-even ROI for the shop**
+at ~78k revenue/unit: 1.81 at today's COGS, 1.61 at 4,000/pair, 1.38 at 12,000.
+
+| 31 Aug – 2 Sep | budget | spend | orders | revenue | ROI | CPO |
+|---|---|---|---|---|---|---|
+| majority black | 300k | 918,687 | 17 | 1,342,143 | **1.46** | 54,040 |
+| moms and girls | 100k | 144,524 | 4 | 308,568 | **2.14** | 36,131 |
+| LIVE GMV Max (started 2 Sep) | 200k | 38,261 | 1 | 34,022 | 0.89 | 38,261 |
+| total | | 1,101,472 | 22 | 1,684,733 | 1.53 | 50,067 |
+
+Previous 3 days (28–30 Aug): majority black ROI 1.71 / CPO 52k; moms and girls ROI 1.09 / CPO 72k.
+
+- **majority black is under break-even five days out of six** (ROI 2.59 → 1.42 → 0.97 → 1.55 →
+  1.70 → 0.95). Only 28 Aug cleared 1.81. The campaign is capped at 300k and spends it whether or
+  not the day converts — 30 Aug and 2 Sep bought 2–3 orders for 230k.
+- **Inside majority black, 90 % of spend goes to the black 5-pair hit (ROI 1.71, 32 orders); the
+  other seven products took 149,761 over six days for one order.** Five of them have zero orders:
+  ~25k/day, 9 % of the campaign, buying nothing.
+- **moms and girls is above break-even over the last 3 days (2.14)** but on a 3-day sample with
+  4 orders; over 6 days it is 1.62 — right at the 4,000/pair break-even. Inside it, grey 5-pair
+  carries it (ROI 2.02, 4 orders), the kids' 10-pair had one order at ROI 2.99, and **the
+  black/white mix took 30 % of the campaign (87,546) for zero orders**.
+- **LIVE**: one room on 2 Sep, 38k spent, one order, ROI 0.89. First day; nothing to conclude. The
+  product breakdown only sees 6.9k of the 38k — the rest is attributed to the live room, not to a
+  product — so judge LIVE by `gmv_max_live_room_id`, not by product.
+
+**Actions this suggests (operator's call):** exclude the five zero-order products from majority
+black and the black/white mix from moms and girls (≈ 40k/day currently buying nothing, ~12 % of
+spend); keep moms and girls at 100k as the one campaign clearing break-even; bring majority black's
+cap down toward the 130–150k regime from follow-up 3 — its ROI has been below 1.81 on every day it
+spent 300k except one. Give LIVE three more days before reading it.
+
+**Next engineering step:** extend `ads_windsor` to ingest these fields → `ad_metrics.attributed_orders`,
+`attributed_gmv`, `reported_roas` per campaign and per product (SPEC §5.14), which makes §6.4 A
+"platform reported" attribution available instead of BLENDED, and puts campaign ROI vs break-even
+on the dashboard daily.
