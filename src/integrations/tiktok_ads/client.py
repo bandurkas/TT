@@ -174,12 +174,26 @@ class TikTokAdsClient:
 
     def get_gmv_max_report(self, advertiser_id: str, store_ids: list[str], dimensions: list[str],
                            metrics: list[str], start: str, end: str, page: int = 1,
-                           page_size: int = 100, filtering: Mapping[str, Any] | None = None
-                           ) -> dict[str, Any]:
-        # GET /gmv_max/report/get/ per SDK ReportingApi.md; doc portal page
-        # gmv-max-ads-reports/v1.3 also describes report/integrated/get with report_type=TT_SHOP.
-        # Metrics/dimensions names  # UNVERIFIED
+                           page_size: int = 100, filtering: Mapping[str, Any] | None = None,
+                           enable_total_metrics: bool | None = None) -> dict[str, Any]:
+        """GET /gmv_max/report/get/. Names verified live 2026-09-09, see
+        docs/ads-api-live-probe-2026-09-09.md — the API answers a wrong name with a bare
+        "ERROR Message.", so they cannot be guessed.
+
+        metrics: cost, net_cost, orders, gross_revenue, roi. `spend`/`impressions`/`clicks` do not
+        exist here. dimensions: campaign_id; stat_time_day (only alongside a main dimension);
+        item_group_id (needs filtering.campaign_ids); item_id = video (needs campaign_ids and
+        item_group_ids). store_ids is required."""
         return self.request("/gmv_max/report/get/", {
             "advertiser_id": advertiser_id, "store_ids": store_ids, "dimensions": dimensions,
             "metrics": metrics, "start_date": start, "end_date": end, "filtering": filtering,
+            "enable_total_metrics": enable_total_metrics,
             "page": page, "page_size": page_size}, "gmv_max_report")
+
+    def iter_gmv_max_report(self, *args: Any, **kwargs: Any) -> Iterator[dict[str, Any]]:
+        for page in range(1, self.max_pages + 1):
+            data = self.get_gmv_max_report(*args, page=page, **kwargs)
+            yield from data.get("list") or []
+            if page >= int((data.get("page_info") or {}).get("total_page") or 1):
+                return
+        raise AdsApiError("max_pages", f"exceeded {self.max_pages} gmv_max report pages")

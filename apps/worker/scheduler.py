@@ -32,11 +32,14 @@ SLOTS: dict[str, dict[str, Any]] = {
     "withdrawals": {"hour": "*/6", "minute": 20},
     "daily_metrics": {"hour": 3, "minute": 0},
     "ads_windsor": {"minute": 25},
+    # Every 15 minutes: this source reports the day in progress, and the dashboard shows it as a
+    # reading with a timestamp. Windsor stays on its hourly slot as an independent cross-check.
+    "ads_tiktok": {"minute": "*/15"},
 }
 # /health: a job older than this (or stuck "running") is stale
 STALE_AFTER = {"finance_cycle": timedelta(hours=3), "order_statements": timedelta(hours=13),
                "withdrawals": timedelta(hours=13), "daily_metrics": timedelta(hours=27),
-               "ads_windsor": timedelta(hours=3)}
+               "ads_windsor": timedelta(hours=3), "ads_tiktok": timedelta(minutes=90)}
 
 
 def _compute_profit(session: Any, shop: Any) -> dict[str, Any]:
@@ -57,11 +60,53 @@ def ads_windsor(session: Any, build_context: Callable[[Any], Any]) -> dict[str, 
 
     if not settings.windsor_api_key:
         return {"skipped": "WINDSOR_API_KEY not configured"}
+    if _tiktok_ads_ready():
+        # Both sources write the same ShopAdDay rows. Left running, they would restate each other
+        # every hour, each insert a SourceReport and force a profit recompute. The Ads API is the
+        # authoritative one, so Windsor stands down while it is live.
+        return {"skipped": "superseded by the TikTok Ads API"}
     ctx = build_context(session)
     shop = ctx.shop
     start, end = W.window(shop.timezone or "Asia/Jakarta", settings.windsor_backfill_days)
     rows, meta = WindsorClient(settings.windsor_api_key).fetch_gmv_max(start, end)
     out = W.ingest(session, shop, rows, meta)
+    if out.get("written"):
+        out.update(_compute_profit(session, shop))
+    return out
+
+
+def _tiktok_ads_ready() -> bool:
+    """Configured *and* authorised: an app id alone writes nothing."""
+    from src.integrations.tiktok_shop.auth import TokenStore
+    if not settings.tiktok_ads_app_id:
+        return False
+    tok = TokenStore(f"{settings.token_store_dir}/tiktok_ads_tokens.json").load()
+    return bool(tok and tok.get("access_token") and tok.get("advertiser_ids"))
+
+
+def ads_tiktok(session: Any, build_context: Callable[[Any], Any]) -> dict[str, Any]:
+    """Every 15 min: GMV Max Cost per campaign from TikTok's own Ads API, including the open day.
+    Skipped, not failed, until the app is configured and an advertiser has been authorised."""
+    from src.domain.ads import tiktok as T
+    from src.integrations.tiktok_ads import gmv_max
+    from src.integrations.tiktok_ads.client import TikTokAdsClient
+    from src.integrations.tiktok_shop.auth import TokenStore
+
+    if not settings.tiktok_ads_app_id:
+        return {"skipped": "TIKTOK_ADS_APP_ID not configured"}
+    tok = TokenStore(f"{settings.token_store_dir}/tiktok_ads_tokens.json").load()
+    if not tok or not tok.get("access_token"):
+        return {"skipped": "advertiser not authorised yet"}
+    advertisers = [str(a) for a in (tok.get("advertiser_ids") or [])]
+    if not advertisers:
+        return {"skipped": "token carries no advertiser_ids"}
+
+    ctx = build_context(session)
+    shop = ctx.shop
+    start, end = T.window(shop.timezone or "Asia/Jakarta", settings.tiktok_ads_backfill_days)
+    client = TikTokAdsClient(tok["access_token"])
+    rows, meta = gmv_max.fetch(client, advertisers, start, end)
+    out = T.ingest(session, shop, rows, meta)
     if out.get("written"):
         out.update(_compute_profit(session, shop))
     return out
@@ -100,6 +145,7 @@ def daily_metrics(session: Any, build_context: Callable[[Any], Any]) -> dict[str
 JOBS: dict[str, Callable[[Any, Callable[[Any], Any]], dict[str, Any]]] = {
     "finance_cycle": finance_cycle, "order_statements": order_statements,
     "withdrawals": withdrawals, "daily_metrics": daily_metrics, "ads_windsor": ads_windsor,
+    "ads_tiktok": ads_tiktok,
 }
 
 

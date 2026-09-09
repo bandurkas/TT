@@ -19,7 +19,11 @@ class Settings(BaseSettings):
     tiktok_ads_app_id: str = ""
     tiktok_ads_secret: str = ""
 
-    # Windsor.ai TikTok connector (interim GMV Max Cost until the Ads app is approved).
+    # Days of GMV Max Cost re-read on every run, ending today. Short: the API restates recent days
+    # and the open one changes all day, but older days are settled and re-reading them is waste.
+    tiktok_ads_backfill_days: int = 3
+
+    # Windsor.ai TikTok connector — superseded by the Ads API above, kept as an independent check.
     # Empty key = the ingest job is skipped, so dev and CI never reach the network.
     windsor_api_key: str = ""
     windsor_backfill_days: int = 7

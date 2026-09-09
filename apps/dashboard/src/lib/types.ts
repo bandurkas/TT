@@ -330,8 +330,6 @@ export interface AdDay {
   source: "shop_overview" | "manual_entry" | "windsor_gmv_max" | string; observed_at: string | null; note: string | null;
 }
 // sku_orders / gross_revenue: null = leave the day's existing figure alone (0 blanks it).
-export interface ManualAdIn { date: string; cost: string; sku_orders: number | null; gross_revenue: string | null; final: boolean; note?: string | null; confirm?: boolean }
-export interface ManualAdOut { report_id: number; partial?: boolean; unchanged?: boolean; recomputed?: { orders: number; inserted: number }; day: AdDay | null }
 
 // GET /api/costs — src/domain/costs.cost_overview
 export interface CostLot {

@@ -5,7 +5,6 @@ import type { Card, Overview } from "@/lib/types";
 import { kpiChange } from "@/lib/kpi";
 import { orderMoney } from "@/lib/orders";
 import { ErrorNote, Pill, Skeleton, Sparkline, ZoneHeader, statusTone } from "./ui";
-import AdCost from "./AdCost";
 import Costs from "./Costs";
 import AdvertisingSource from "./AdvertisingSource";
 import WhatIf, { whatIfNet } from "./WhatIf";
@@ -85,7 +84,7 @@ function Note({ c, ov }: { c: Card; ov: Overview }) {
     case "orders": return <span>{int(c.meta?.refunded ?? ov.totals.refunded_orders, lang)} {t("refunded")}</span>;
     case "ad_spend": {
       const share = c.meta?.ad_share ?? null;
-      return <>{share !== null && <span>{pct(share, lang)} {t("of net revenue")}</span>}<Pill tone="warn">{lang === "ru" ? (c.value === null ? "Отчёт неполный" : c.provisional ? "Неполный день" : "Источник: выгрузка") : (c.value === null ? "Missing report" : c.provisional ? "Partial day" : "Export source")}</Pill></>;
+      return <>{share !== null && <span>{pct(share, lang)} {t("of net revenue")}</span>}<Pill tone={c.value === null ? "warn" : c.provisional ? "warn" : "gray"}>{lang === "ru" ? (c.value === null ? "Расход не получен" : c.provisional ? "День не закрыт" : "Ads API") : (c.value === null ? "Cost not received" : c.provisional ? "Day still open" : "Ads API")}</Pill></>;
     }
     case "net_margin": {
       const floor = c.meta?.floor ?? null;
@@ -106,8 +105,8 @@ const COMP = ["margin", "ad_efficiency", "conversion", "refunds", "data_quality"
 const COMP_LABEL: Record<string, string> = { margin: "Margin", ad_efficiency: "Ad efficiency", conversion: "Conversion", refunds: "Refunds", data_quality: "Data quality" };
 const barColor = (v: number) => (v < 40 ? "var(--bad)" : v < 60 ? "var(--warn)" : v >= 75 ? "var(--good)" : "var(--accent)");
 
-interface HealthProps { ov: Overview | null; loading: boolean; error: string | null; reload: () => void; query: string; tick: number; onAdApplied: () => void; onCostApplied: () => void }
-export default function Health({ ov, loading, error, reload, query, tick, onAdApplied, onCostApplied }: HealthProps) {
+interface HealthProps { ov: Overview | null; loading: boolean; error: string | null; reload: () => void; query: string; tick: number; onCostApplied: () => void }
+export default function Health({ ov, loading, error, reload, query, tick, onCostApplied }: HealthProps) {
   const lang = useLang(), t = useT();
   const byKey = new Map((ov?.cards ?? []).map((c) => [c.key, c]));
   const health = ov?.health;
@@ -124,11 +123,13 @@ export default function Health({ ov, loading, error, reload, query, tick, onAdAp
   const wiBase = num(byKey.get("net_seller_revenue")?.value);
   const wiMargin = wiNet !== null && wiBase ? wiNet / wiBase : null;
   const wiFor = (k: string) => (k === "net_profit" ? wiNet : k === "net_margin" ? wiMargin : null);
-  const [adOpen, setAdOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const adv = ov?.advertising;
   const lastDay = adv?.days?.length ? adv.days[adv.days.length - 1] : null;
   const gap = adv?.status === "missing" ? "bad" : adv?.status === "partial" ? "warn" : null;
+  // The open day is a reading taken at a moment, not a settled figure. Saying when it was taken is
+  // the whole difference between "we spent this" and "we had spent this by 20:49".
+  const asOf = lastDay?.observed_at && adv?.partial_days?.includes(lastDay.date) ? lastDay.observed_at : null;
   const expense = (value: string | null | undefined) =>
     value == null ? "—" : money(value.startsWith("-") ? value.slice(1) : `-${value}`);
   return (
@@ -137,25 +138,22 @@ export default function Health({ ov, loading, error, reload, query, tick, onAdAp
       {error && <ErrorNote error={error} onRetry={reload} />}
       {loading && !ov ? <Skeleton h={140} /> : ov && (
         <>
-          {gap && !adOpen && (
+          {gap && (
             <div className={`banner ${gap}`} role="status">
-              <b>{gap === "bad" ? t("Advertising Cost for this period has not been entered") : t("A day in this period is still open")}</b>
-              <span>{gap === "bad" ? t("Profit is overstated until it is.") : t("Cost and profit will still change.")}</span>
+              <b>{gap === "bad" ? t("Ad cost for this period has not arrived") : t("A day in this period is still open")}</b>
+              <span>{gap === "bad" ? t("Profit is overstated until it does. The Ads API is read every 15 minutes.") : t("Cost and profit will still change.")}</span>
               {!!adv?.missing_days?.length && <span className="mono tiny">{adv.missing_days.slice(0, 5).join(", ")}{adv.missing_days.length > 5 ? "…" : ""}</span>}
-              <span className="sp" style={{ flex: 1 }} />
-              <button className="btn sm" onClick={() => setAdOpen(true)}>{t("Enter Cost")}</button>
             </div>
           )}
           <div>
-            <div className={`ctrl ${adOpen ? "on" : ""}`}>
+            <div className="ctrl">
               <span className="lab">{lang === "ru" ? "Реклама" : "Advertising"}</span>
               <b>{idr(adv?.cost, lang)}</b>
               <span>· {adv?.source ?? "—"}</span>
-              {lastDay?.observed_at && <span className="tiny">· {t("last")}: {dateTime(lastDay.observed_at, lang, ov.shop.timezone)}</span>}
-              <span className="sp" />
-              <button className="btn sm" aria-expanded={adOpen} onClick={() => setAdOpen(!adOpen)}>{adOpen ? t("Done") : t("Change")}</button>
+              {asOf
+                ? <span className="tiny">· {t("as of")} {dateTime(asOf, lang, ov.shop.timezone)}</span>
+                : lastDay?.observed_at && <span className="tiny">· {t("last")}: {dateTime(lastDay.observed_at, lang, ov.shop.timezone)}</span>}
             </div>
-            {adOpen && <div className="ctrl-body"><AdCost adv={ov.advertising} onApplied={onAdApplied} timezone={ov.shop.timezone} /></div>}
           </div>
           <div>
             <div className={`ctrl ${costOpen ? "on" : ""}`}>

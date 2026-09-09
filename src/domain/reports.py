@@ -188,6 +188,7 @@ def import_report(session, shop_id, path, kind, timezone, observed_at):
 
 MANUAL_SCOPE = "manual_entry"
 WINDSOR_SCOPE = "windsor_gmv_max"   # Windsor.ai TikTok connector; see docs/windsor-ingest.md
+TIKTOK_SCOPE = "tiktok_ads_gmv_max" # TikTok's own Ads API; supersedes Windsor, reports the open day
 
 # Ads Manager reports the SELECTED DATE RANGE, so a range's totals are trivially entered as one day.
 # Both checks below compare only against facts already in the database, and are overridable, never silent.
@@ -408,10 +409,12 @@ def advertising_summary(session, shop_id, start, end, timezone):
 
     result["days"] = [_day(r) for r in sorted(days, key=lambda r: r.metric_date)
                       if start <= r.metric_date <= end]
-    names = {MANUAL_SCOPE: "manual entry", WINDSOR_SCOPE: "Windsor.ai GMV Max", "shop_overview": "Campaign overview"}
+    names = {MANUAL_SCOPE: "manual entry", WINDSOR_SCOPE: "Windsor.ai GMV Max",
+             TIKTOK_SCOPE: "TikTok Ads API", "shop_overview": "Campaign overview"}
     scopes = [d["source"] for d in result["days"]]
     result["manual_days"] = sum(1 for s_ in scopes if s_ == MANUAL_SCOPE)
     result["windsor_days"] = sum(1 for s_ in scopes if s_ == WINDSOR_SCOPE)
+    result["tiktok_days"] = sum(1 for s_ in scopes if s_ == TIKTOK_SCOPE)
     present = sorted({names.get(s_, s_) for s_ in scopes}) or ["Campaign overview"]
     result["source"] = " + ".join(present) + " · Cost"
     return result
