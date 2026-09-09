@@ -226,3 +226,20 @@ def test_ads_tiktok_job_skips_until_authorised(monkeypatch):
     monkeypatch.setattr(S.settings, "tiktok_ads_app_id", "")
     assert S.ads_tiktok(MagicMock(), lambda s: NS(shop=SHOP)) == {
         "skipped": "TIKTOK_ADS_APP_ID not configured"}
+
+
+# --- campaigns tab -------------------------------------------------------------------------------
+def test_campaign_spend_leaves_cpo_and_roi_undefined_without_orders():
+    """A zero would read as "free"; the absence of orders is not a cost per order of nothing."""
+    from src.domain.dashboard import loaders as L
+
+    session = MagicMock()
+    session.execute.return_value.all.return_value = [
+        ("1872852148459778", "majority black", Decimal("1281169"), 35, Decimal("2292746"), NOW, True),
+        ("1875228349709633", "LIVE GMV Max", Decimal("228549"), 0, Decimal("0"), NOW, False),
+    ]
+    rows = L.campaign_spend(session, 1, date(2026, 9, 2), date(2026, 9, 9))
+    assert [r["name"] for r in rows] == ["majority black", "LIVE GMV Max"]   # sorted by spend
+    assert rows[0]["cost_per_order"] == Decimal("36605") and rows[0]["reported_roi"] == Decimal("1.79")
+    assert rows[1]["cost_per_order"] is None and rows[1]["reported_roi"] == Decimal("0")
+    assert rows[1]["final"] is False

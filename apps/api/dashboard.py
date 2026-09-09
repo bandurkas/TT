@@ -125,7 +125,7 @@ def _overview(c: Ctx) -> dict[str, Any]:
             "totals": {k: (None if (k == "ad_cost" and not cur.ad_cost_known) or (k == "net_profit" and not cur.profit_known) else getattr(cur, k)) for k in C.DAILY_FIELDS} | {"refunded_orders": cur.refunded_orders},
             "notes": ["Ad spend = reported daily Cost; GMV Pay is a separate payment. Order attribution is same-day BLENDED (LOW).",
                       "Provisional orders: fees estimated from trailing settled ratio; not final.",
-                      "Reported ROAS / per-campaign cost: NOT AVAILABLE until the TikTok Ads app is approved."]}
+                      "Per-campaign Cost comes from the TikTok Ads API (Campaigns tab). Reported ROAS is not yet aggregated to the period. Per-video ad spend does not exist: GMV Max leaves 96% of orders unattributed."]}
 
 
 @router.get("/dashboard/overview")
@@ -185,7 +185,7 @@ def _videos(c: Ctx) -> list[dict[str, Any]]:
 def videos(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     return _n({**c.meta(), "cards": _videos(c),
                "clicks_note": "derived: views × click_through_rate", 
-               "ad_spend_note": C.NOT_AVAILABLE + ": per-video ad cost needs Ads API"})
+               "ad_spend_note": C.NOT_AVAILABLE + ": GMV Max does not attribute spend per video"})
 
 
 @router.get("/analytics/video-products")
@@ -232,8 +232,12 @@ def video_products(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
 def campaigns(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     ded = L.ad_deductions(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
     ad = c.advertising(c.period)
-    return _n({**c.meta(), "available": False, "reason": "Shop overview export has no campaign IDs",
-               "advertising": ad, "shop_level_ad_cost": ad["cost"], "deductions": ded, "rows": []})
+    rows = L.campaign_spend(c.session, c.shop.id, c.period.start, c.period.end)
+    return _n({**c.meta(), "available": bool(rows),
+               "reason": "" if rows else "No campaign rows for this period",
+               "advertising": ad, "shop_level_ad_cost": ad["cost"], "deductions": ded, "rows": rows,
+               "attribution_note": "orders/revenue are TikTok's own attribution for the campaign, "
+                                   "not the shop's booked figures (SPEC §7)"})
 
 
 @router.get("/analytics/creators")

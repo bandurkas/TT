@@ -237,7 +237,8 @@ def business_health(cur: Totals, prev: Totals, daily_rows: Sequence[Any], period
             meta={"ad_share": ratio(cur.ad_cost, cur.net_seller_revenue) if cur.ad_cost_known and cur.net_seller_revenue > 0 else None}),
         kpi("net_margin", m, pm, [], kind="pct", status=_status(m, "up", floor_margin),
             note=f"floor {floor_margin}", provisional=prov, meta={"floor": floor_margin}),
-        kpi("reported_roas", None, None, [], kind="ratio", status=NEUTRAL, note=NOT_AVAILABLE + ": Ads API"),
+        kpi("reported_roas", None, None, [], kind="ratio", status=NEUTRAL,
+            note=NOT_AVAILABLE + ": per-campaign ROI is on the Campaigns tab; not yet aggregated to the period"),
         kpi("blended_roas", cur.blended_roas, prev.blended_roas, [], kind="ratio",
             status=_status(cur.blended_roas, "up", cur.break_even_roas) if cur.break_even_roas else NEUTRAL,
             note=f"break-even {cur.break_even_roas}" if cur.break_even_roas else "net revenue / ad spend",
@@ -440,7 +441,9 @@ def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[in
                     "gpm": (a["gmv"] / a["views"] * 1000).quantize(Decimal(1)) if a["views"] else None,
                     "clicks_note": (f"measured product clicks on {a['clicks_measured_days']} days, derived "
                                     f"(views × CTR) on {a['clicks_derived_days']} days"),
-                    "ad_spend": None, "net_profit": None, "ad_spend_note": NOT_AVAILABLE + ": Ads API",
+                    "ad_spend": None, "net_profit": None,
+                    "ad_spend_note": NOT_AVAILABLE + ": GMV Max does not attribute spend per video "
+                                     "(96% of orders land in the unattributed bucket, measured 2026-09-09)",
                     "classification": res.classification.value, "confidence": res.confidence.value,
                     "reasons": list(res.reasons)})
     order = {Classification.WINNER: 0, Classification.PROMISING: 1, Classification.WATCH: 2,

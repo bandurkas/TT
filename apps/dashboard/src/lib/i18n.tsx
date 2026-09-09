@@ -129,6 +129,7 @@ export const RU: Record<string, string> = {
   "Ad cost for this period has not arrived": "Расход на рекламу за период не получен",
   "Profit is overstated until it does. The Ads API is read every 15 minutes.": "Пока не получен, прибыль завышена. Ads API опрашивается каждые 15 минут.",
   "as of": "на",
+  "Per campaign only": "только по кампаниям",
   "Profit is overstated until it is.": "Пока его нет, прибыль завышена.",
   "A day in this period is still open": "День в периоде ещё не закрыт",
   "Cost and profit will still change.": "Расход и прибыль ещё изменятся.",

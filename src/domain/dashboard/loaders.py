@@ -190,3 +190,39 @@ def video_product_metrics(session: Any, shop_id: int, start: date, end: date) ->
     return list(session.scalars(select(VideoProductMetric).join(Video, Video.id == VideoProductMetric.video_id)
                                 .where(Video.shop_id == shop_id, VideoProductMetric.metric_date >= start,
                                        VideoProductMetric.metric_date <= end)))
+
+
+def campaign_spend(session: Any, shop_id: int, start: date, end: date) -> list[dict[str, Any]]:
+    """Per-campaign GMV Max Cost from the Ads API (SPEC §5.14 ad_metrics).
+
+    `orders` / `revenue` here are TikTok's own attribution, not the shop's (SPEC §7): they answer
+    "what did the platform credit this campaign with", never "what did the shop actually book".
+    They are returned alongside Cost precisely so the two are not confused for one another.
+    """
+    from src.db.models import AdAccount, AdMetric, Campaign
+
+    rows = session.execute(
+        select(Campaign.external_campaign_id, Campaign.name,
+               func.sum(AdMetric.spend), func.sum(AdMetric.attributed_orders),
+               func.sum(AdMetric.attributed_gmv), func.max(AdMetric.fetched_at),
+               func.bool_and(AdMetric.is_final))
+        .join(AdMetric, (AdMetric.entity_type == "campaign") & (AdMetric.entity_id == Campaign.id))
+        .join(AdAccount, AdAccount.id == Campaign.ad_account_id)
+        .where(AdAccount.shop_id == shop_id, AdMetric.metric_date >= start,
+               AdMetric.metric_date <= end, AdMetric.metric_hour.is_(None))
+        .group_by(Campaign.external_campaign_id, Campaign.name)).all()
+
+    out = []
+    for ext_id, name, spend, orders, gmv, fetched, final in rows:
+        spend = Decimal(str(spend or 0))
+        orders = int(orders or 0)
+        gmv = Decimal(str(gmv or 0))
+        out.append({"campaign_id": ext_id, "name": name or ext_id, "spend": spend,
+                    "attributed_orders": orders, "attributed_revenue": gmv,
+                    # Cost per order and ROI as the platform reports them; both are undefined
+                    # without orders, and a zero would read as "free", so they stay null.
+                    "cost_per_order": (spend / orders).quantize(Decimal(1)) if orders else None,
+                    "reported_roi": (gmv / spend).quantize(Decimal("0.01")) if spend else None,
+                    "final": bool(final), "fetched_at": fetched})
+    out.sort(key=lambda r: -r["spend"])
+    return out

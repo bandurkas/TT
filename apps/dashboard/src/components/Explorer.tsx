@@ -1,6 +1,6 @@
 "use client";
 import { useLang, useT } from "@/lib/i18n";
-import { dayMon, idr, int, num, pct, shortId } from "@/lib/format";
+import { dayMon, idr, int, num, pct, ratio, shortId } from "@/lib/format";
 import type { Campaigns, Creators, ProductStatus, Products, VideoClass, Videos } from "@/lib/types";
 import type { Loaded } from "@/lib/api";
 import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
@@ -88,7 +88,7 @@ export default function Explorer({ tab, setTab, apiDown, products, videos, campa
                         <span className="k">{t("Orders")}</span><span className={`v ${v.orders === 0 ? "dn" : ""}`}>{int(v.orders, lang)}</span>
                         <span className="k">{t("GMV")}</span><span className="v">{idr(v.gmv, lang)}</span>
                         <span className="k">GPM</span><span className="v">{idr(v.gpm, lang)}</span>
-                        <span className="k">{t("Ad spend")}</span><span className="v muted" title={v.ad_spend_note}>{t("NOT AVAILABLE — Ads API pending")}</span>
+                        <span className="k">{t("Ad spend")}</span><span className="v muted" title={v.ad_spend_note}>{lang === "ru" ? "нет разбивки по видео" : "no per-video split"}</span>
                         <span className="k">{t("Age")}</span><span className="v">{v.age_days} {t("d")}</span>
                         <span className="rs">{t("Confidence")} {t(v.confidence)} · {v.reasons.join("; ")}{lang === "ru" && " · EN"}</span>
                       </div>
@@ -100,12 +100,24 @@ export default function Explorer({ tab, setTab, apiDown, products, videos, campa
             )}
             {cur === "campaigns" && campaigns.data && (
               <div className="scroll" id="panel-campaigns" role="tabpanel" aria-labelledby="tab-campaigns"><table className="tbl">
-                <thead><tr><th>{t("Campaign")}</th><th>{t("Status")}</th><th className="r">{t("Spend")}</th><th className="r">{t("Orders")}</th><th className="r">{t("GMV")}</th><th className="r">{t("Reported ROAS")}</th><th className="r">{t("Adjusted ROAS")}</th><th className="r">{t("Net profit")}</th><th>{t("AI status")}</th></tr></thead>
+                <thead><tr><th>{t("Campaign")}</th><th className="r">{t("Spend")}</th><th className="r">{lang === "ru" ? "Заказы TikTok" : "TikTok orders"}</th><th className="r">{lang === "ru" ? "Выручка TikTok" : "TikTok revenue"}</th><th className="r">{lang === "ru" ? "Цена заказа" : "Cost per order"}</th><th className="r">ROI</th><th>{t("Status")}</th></tr></thead>
                 <tbody>
-                  <tr><td colSpan={9} className="empty">
+                  {campaigns.data.rows.map((r) => (
+                    <tr key={r.campaign_id}>
+                      <td>{r.name}<br /><span className="tiny mono">{r.campaign_id}</span></td>
+                      <td className="r">{idr(r.spend, lang)}</td>
+                      <td className={`r ${r.attributed_orders === 0 ? "dn" : ""}`}>{int(r.attributed_orders, lang)}</td>
+                      <td className="r">{idr(r.attributed_revenue, lang)}</td>
+                      <td className="r">{r.cost_per_order === null ? "—" : idr(r.cost_per_order, lang)}</td>
+                      <td className="r">{r.reported_roi === null ? "—" : ratio(r.reported_roi, lang)}</td>
+                      <td>{r.final ? <Pill tone="gray">{lang === "ru" ? "закрыт" : "settled"}</Pill> : <Pill tone="warn">{lang === "ru" ? "день идёт" : "day open"}</Pill>}</td>
+                    </tr>
+                  ))}
+                  {!campaigns.data.rows.length && <tr><td colSpan={7} className="empty">{campaigns.data.reason}</td></tr>}
+                  <tr><td colSpan={7} className="empty">
                     <AdvertisingSource data={campaigns.data.advertising} currency={campaigns.data.shop.currency} />
-                    <b>{lang === "ru" ? "В выгрузке нет разбивки по кампаниям — доступен общий дневной Cost." : "The export contains daily shop Cost, without a campaign breakdown."}</b>
-                    <p>{lang === "ru" ? "Платежи GMV Pay ниже — не дополнительные расходы. Даты платежей могут отличаться от дат показов." : "GMV Pay payments below are not additional expenses. Payment dates may differ from delivery dates."}</p>
+                    <b>{lang === "ru" ? "Заказы и выручка — атрибуция самого TikTok, а не бухгалтерия магазина." : "Orders and revenue are TikTok's own attribution, not the shop's booked figures."}</b>
+                    <p>{lang === "ru" ? "Сравнивать их с прибылью напрямую нельзя: платформа засчитывает заказ кампании по своим правилам. Расход (Cost) — точный. Платежи GMV Pay ниже — движение денег, а не дополнительный расход." : "They are not comparable with booked profit: the platform credits a campaign by its own rules. Cost is exact. GMV Pay payments below are cash movement, not a second expense."}</p>
                     {campaigns.data.deductions.length > 0 && <div className="small" style={{ marginTop: 8 }}>{campaigns.data.deductions.map((d, i) => <span key={i} style={{ marginRight: 12 }}>◆ {dayMon(d.date, lang)} {idr(d.amount, lang)}</span>)}</div>}
                   </td></tr>
                 </tbody>

@@ -181,12 +181,20 @@ export interface Deduction {
   [k: string]: unknown;
 }
 
+export interface CampaignRow {
+  campaign_id: string; name: string; spend: Dec; attributed_orders: number;
+  attributed_revenue: Dec; cost_per_order: Dec | null; reported_roi: Dec | null;
+  final: boolean; fetched_at: string | null;
+}
+
 export interface Campaigns extends Meta {
   available: boolean;
   reason: string;
   shop_level_ad_cost: Dec | null;
   deductions: Deduction[];
-  rows: unknown[];
+  rows: CampaignRow[];
+  attribution_note?: string;
+  advertising?: Advertising;
 }
 
 export interface CreatorRow {

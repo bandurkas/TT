@@ -23,9 +23,9 @@ const EXPLAIN: Record<string, string> = {
   gmv: "Total order value before fees and costs. GMV is sales volume, not profit.",
   net_seller_revenue: "Revenue after platform fees, refunds and adjustments. Product costs and advertising have not yet been deducted.",
   orders: "Orders included in the profit calculation, excluding cancelled orders. Refunds are shown separately.",
-  ad_spend: "Shop-level GMV Max deductions from payouts. Allocation to orders is estimated (BLENDED, LOW confidence); spend by campaign requires the Ads API.",
+  ad_spend: "GMV Max Cost from TikTok's Ads API, read every 15 minutes. Allocation to individual orders is estimated (BLENDED, LOW confidence); the per-campaign breakdown is on the Campaigns tab.",
   net_margin: "Net profit divided by net seller revenue. The threshold describes the current level; the arrow separately shows the change from the comparison period.",
-  reported_roas: "TikTok-reported return on ad spend is unavailable until Ads data is connected. Missing data is not zero.",
+  reported_roas: "TikTok's own return on ad spend. Available per campaign on the Campaigns tab; not yet aggregated to the selected period. Missing data is not zero.",
   blended_roas: "Net seller revenue divided by shop ad spend. This includes all shop revenue, so it is not proof that advertising generated every sale. Break-even is the ratio needed to cover recorded costs.",
   aov: "GMV divided by the number of orders. A larger average order does not necessarily mean more profit.",
   cvr: "Video-attributed orders divided by estimated video clicks (views × CTR). This does not measure conversion for all shop traffic.",
@@ -64,7 +64,7 @@ function KpiCard({ c, ov, whatIf }: { c: Card; ov: Overview; whatIf?: number | n
         {change.points ? `${pct(change.raw, lang, { sign: true }).replace("%", "")} ${t("pp")}` : pct(change.raw, lang, { sign: true })} {t("vs previous")}
       </div>}
       {!na && c.prev !== null && wi === null && <div className="kpi-previous">{t("Previously")}: {fmt(c.prev)}</div>}
-      {wi === null && <div className="d">{na ? <Pill tone="gray">{t("Ads data not connected")}</Pill> : <Note c={c} ov={ov} />}</div>}
+      {wi === null && <div className="d">{na ? <Pill tone="gray">{t("Per campaign only")}</Pill> : <Note c={c} ov={ov} />}</div>}
       {wi === null && c.sparkline.length > 1 && <Sparkline values={c.sparkline} tone={tone === "bad" ? "bad" : tone === "good" ? "good" : "accent"} />}
       {explanation && <details className="kpi-help">
         <summary aria-label={`${t("How to read this")}: ${t(LABEL[c.key] ?? c.key)}`}>{t("How to read this")}</summary>
