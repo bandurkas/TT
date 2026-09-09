@@ -217,6 +217,8 @@ def campaign_spend(session: Any, shop_id: int, start: date, end: date) -> list[d
         spend = Decimal(str(spend or 0))
         orders = int(orders or 0)
         gmv = Decimal(str(gmv or 0))
+        if not spend and not orders:
+            continue   # a campaign that did nothing in this period is noise, not a zero worth showing
         out.append({"campaign_id": ext_id, "name": name or ext_id, "spend": spend,
                     "attributed_orders": orders, "attributed_revenue": gmv,
                     # Cost per order and ROI as the platform reports them; both are undefined

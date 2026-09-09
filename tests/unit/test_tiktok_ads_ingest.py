@@ -243,3 +243,14 @@ def test_campaign_spend_leaves_cpo_and_roi_undefined_without_orders():
     assert rows[0]["cost_per_order"] == Decimal("36605") and rows[0]["reported_roi"] == Decimal("1.79")
     assert rows[1]["cost_per_order"] is None and rows[1]["reported_roi"] == Decimal("0")
     assert rows[1]["final"] is False
+
+
+def test_campaign_spend_hides_a_campaign_that_did_nothing_in_the_period():
+    from src.domain.dashboard import loaders as L
+
+    session = MagicMock()
+    session.execute.return_value.all.return_value = [
+        ("A", "ran", Decimal("100"), 1, Decimal("300"), NOW, True),
+        ("B", "idle", Decimal("0"), 0, Decimal("0"), NOW, True),
+    ]
+    assert [r["campaign_id"] for r in L.campaign_spend(session, 1, date(2026, 9, 2), date(2026, 9, 9))] == ["A"]
