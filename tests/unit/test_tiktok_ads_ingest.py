@@ -273,3 +273,21 @@ def test_spend_without_orders_is_called_out_not_scored():
     from src.domain.dashboard.loaders import _verdict
     assert _verdict(Decimal(0), Decimal("13368"), 0) == {"headroom": None, "verdict": "no_orders"}
     assert _verdict(Decimal(0), Decimal(0), 0)["verdict"] == "no_data"
+
+
+def test_every_bridge_product_carries_a_verdict_even_with_no_sales():
+    """The no-sales branch builds its row separately and used to omit the fields the UI reads."""
+    from src.domain.dashboard import loaders as L
+
+    session = MagicMock()
+    session.execute.return_value.all.side_effect = [
+        [(7, Decimal("13368"))],          # spend by product
+        [],                                # product daily rows: none sold
+        [],                                # videos
+        [],                                # video-product links
+    ]
+    session.get.return_value = NS(external_product_id="X", title="Wanita Putih")
+    out = L.creative_bridge(session, 1, date(2026, 9, 2), date(2026, 9, 9))
+    row = out["products"][0]
+    assert row["verdict"] == "no_orders" and row["headroom"] is None
+    assert row["profit"] == Decimal("-13368")

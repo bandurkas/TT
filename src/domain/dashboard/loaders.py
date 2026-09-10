@@ -302,7 +302,8 @@ def creative_bridge(session: Any, shop_id: int, start: date, end: date) -> dict[
             prod[pid] = {"product_id": pid, "external_product_id": getattr(p, "external_product_id", None),
                          "title": getattr(p, "title", str(pid)), "orders": 0, "units": 0,
                          "revenue": ZERO_D, "cogs": ZERO_D, "contribution": ZERO_D,
-                         "ad_cost": spend, "profit": -spend, "break_even_cpo": None, "cpo": None}
+                         "ad_cost": spend, "profit": -spend, "break_even_cpo": None, "cpo": None,
+                         **_verdict(ZERO_D, spend, 0)}
 
     vids = {}
     for vid, ext_v, caption, views, clicks, orders, gmv in session.execute(
