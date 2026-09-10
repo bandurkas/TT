@@ -1,10 +1,11 @@
 "use client";
 import { useLang, useT } from "@/lib/i18n";
 import { dayMon, idr, int, num, pct, ratio, shortId } from "@/lib/format";
-import type { Campaigns, Creators, ProductStatus, Products, VideoClass, Videos } from "@/lib/types";
+import type { Campaigns, CreativeBridge, Creators, ProductStatus, Products, VideoClass, Videos } from "@/lib/types";
 import type { Loaded } from "@/lib/api";
 import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
 import AdvertisingSource from "./AdvertisingSource";
+import Bridge from "./Bridge";
 
 export const PSTATUS: Record<ProductStatus | "NO_SALES", { label: string; tone: "good" | "bad" | "warn" | "info" | "gray" }> = {
   SCALE: { label: "Scale", tone: "good" }, HEALTHY: { label: "Healthy", tone: "good" }, WATCH: { label: "Watch", tone: "info" },
@@ -31,14 +32,15 @@ const neg = (v: string | null, lang: "en" | "ru") => v === null ? "—" : idr(-(
 
 interface Props {
   tab: string; setTab: (t: string) => void; apiDown?: boolean;
-  products: Loaded<Products>; videos: Loaded<Videos>; campaigns: Loaded<Campaigns>; creators: Loaded<Creators>;
+  products: Loaded<Products>; videos: Loaded<Videos>; campaigns: Loaded<Campaigns>;
+  bridge: Loaded<CreativeBridge>; creators: Loaded<Creators>;
 }
 
-export default function Explorer({ tab, setTab, apiDown, products, videos, campaigns, creators }: Props) {
+export default function Explorer({ tab, setTab, apiDown, products, videos, campaigns, bridge, creators }: Props) {
   const lang = useLang(), t = useT();
-  const TABS = [["products", "Products"], ["videos", "Videos"], ["campaigns", "Campaigns"], ["creators", "Creators"]] as const;
+  const TABS = [["products", "Products"], ["videos", "Videos"], ["campaigns", "Campaigns"], ["bridge", "Video → product → cost"], ["creators", "Creators"]] as const;
   const cur = TABS.some(([k]) => k === tab) ? tab : "products";
-  const L = cur === "products" ? products : cur === "videos" ? videos : cur === "campaigns" ? campaigns : creators;
+  const L = cur === "products" ? products : cur === "videos" ? videos : cur === "campaigns" ? campaigns : cur === "bridge" ? bridge : creators;
   return (
     <section className="zone">
       <ZoneHeader id="z4" eyebrow={t("4 · Performance explorer")} title={t("Campaigns · Products · Videos · Creators")} hint={t("Sorted by net profit")} />
@@ -123,6 +125,7 @@ export default function Explorer({ tab, setTab, apiDown, products, videos, campa
                 </tbody>
               </table></div>
             )}
+            {cur === "bridge" && bridge.data && <Bridge data={bridge.data} />}
             {cur === "creators" && creators.data && (
               <div className="scroll" id="panel-creators" role="tabpanel" aria-labelledby="tab-creators"><table className="tbl">
                 <thead><tr><th>{t("Creator")}</th><th className="r">{t("Orders")}</th><th className="r">{t("GMV")}</th><th className="r">{t("Affiliate commission")}</th><th className="r">{t("Profit after commission")}</th></tr></thead>

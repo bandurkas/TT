@@ -234,6 +234,25 @@ def campaign_spend(session: Any, shop_id: int, start: date, end: date) -> list[d
     return out
 
 
+def _verdict(contribution: Decimal, spend: Decimal, orders: int) -> dict[str, Any]:
+    """How much room a product has before its next order stops paying.
+
+    headroom = break-even CPO / actual CPO. Above 1 the product can absorb more spend per order and
+    still earn; below 1 every additional order is bought at a loss. It is deliberately a ratio: a
+    single shop-wide CPO target cannot serve a 19,000 single pair and a 75,000 five-pack at once.
+    """
+    if spend and not orders:
+        return {"headroom": None, "verdict": "no_orders"}
+    if not orders or not spend:
+        return {"headroom": None, "verdict": "no_data"}
+    be, cpo = contribution / orders, spend / orders
+    if cpo <= 0:
+        return {"headroom": None, "verdict": "no_data"}
+    h = (be / cpo).quantize(Decimal("0.01"))
+    return {"headroom": h, "verdict": "scale" if h >= Decimal("1.2")
+            else "hold" if h >= Decimal("0.9") else "cut"}
+
+
 def creative_bridge(session: Any, shop_id: int, start: date, end: date) -> dict[str, Any]:
     """Video -> product -> measured ad Cost. The only honest chain from a creative to money.
 
@@ -273,7 +292,8 @@ def creative_bridge(session: Any, shop_id: int, start: date, end: date) -> dict[
                      # product (a 19,000 single pair against a 75,000 five-pack), which is exactly
                      # why one shop-wide CPO target misleads.
                      "break_even_cpo": (contrib / orders).quantize(Decimal(1)) if orders else None,
-                     "cpo": (spend / orders).quantize(Decimal(1)) if orders else None}
+                     "cpo": (spend / orders).quantize(Decimal(1)) if orders else None,
+                     **_verdict(contrib, spend, orders)}
     # Ad money on products with no sales in the window is still money; it is listed, not spread.
     for pid, amount in spend_rows.items():
         if pid not in prod:

@@ -354,3 +354,22 @@ export interface Costs extends Meta { default_cogs_per_unit: Dec | null; lots: C
 export interface LotIn { scope: "all" | "product" | "sku"; product_id?: number | null; sku_id?: number | null; received_on: string; unit_cost: string; quantity?: number | null; note?: string | null }
 export interface LotPatch { received_on?: string; unit_cost?: string; quantity?: number; note?: string | null; active?: boolean }
 export interface CostWriteOut { lot_id?: number; default_cogs_per_unit?: Dec | null; versions: number; skus_with_lots: number; recomputed: { orders: number; inserted: number } }
+
+export interface BridgeProduct {
+  product_id: number; external_product_id: string | null; title: string | null;
+  orders: number; units: number; revenue: Dec; cogs: Dec; contribution: Dec;
+  ad_cost: Dec; profit: Dec; break_even_cpo: Dec | null; cpo: Dec | null;
+  headroom: Dec | null; verdict: string;
+}
+
+export interface BridgeVideo {
+  video_id: number; external_video_id: string | null; caption: string | null;
+  views: number; clicks: number; orders: number; gmv: Dec; gpm: Dec | null; products: number[];
+}
+
+export interface CreativeBridge extends Meta {
+  products: BridgeProduct[];
+  videos: BridgeVideo[];
+  measured_ad_cost: Dec; total_ad_cost: Dec; unattributed_ad_cost: Dec;
+  notes: string[];
+}

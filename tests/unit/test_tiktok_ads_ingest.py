@@ -254,3 +254,22 @@ def test_campaign_spend_hides_a_campaign_that_did_nothing_in_the_period():
         ("B", "idle", Decimal("0"), 0, Decimal("0"), NOW, True),
     ]
     assert [r["campaign_id"] for r in L.campaign_spend(session, 1, date(2026, 9, 2), date(2026, 9, 9))] == ["A"]
+
+
+# --- product headroom ----------------------------------------------------------------------------
+def test_headroom_is_a_ratio_because_one_cpo_target_cannot_serve_both_products():
+    """A 19,000 single pair and a 75,000 five-pack have different break-even CPOs by construction."""
+    from src.domain.dashboard.loaders import _verdict
+
+    # kids: contribution 136,077 over 2 orders vs 50,514 spent -> room to pay much more per order
+    assert _verdict(Decimal("136077"), Decimal("50514"), 2)["verdict"] == "scale"
+    # flagship: 1,122,245 contribution against 1,263,330 spent -> every extra order is bought at a loss
+    assert _verdict(Decimal("1122245"), Decimal("1263330"), 34)["verdict"] == "cut"
+    assert _verdict(Decimal("1122245"), Decimal("1263330"), 34)["headroom"] == Decimal("0.89")
+
+
+def test_spend_without_orders_is_called_out_not_scored():
+    """No orders is not a headroom of zero; it is a product the money bought nothing from."""
+    from src.domain.dashboard.loaders import _verdict
+    assert _verdict(Decimal(0), Decimal("13368"), 0) == {"headroom": None, "verdict": "no_orders"}
+    assert _verdict(Decimal(0), Decimal(0), 0)["verdict"] == "no_data"

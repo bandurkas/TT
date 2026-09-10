@@ -3,7 +3,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { LangContext, type Lang, t as tr } from "@/lib/i18n";
 import { qs, useApi } from "@/lib/api";
 import { usePeriod } from "@/lib/period";
-import type { Campaigns, Creators, Finding, Funnel as FunnelT, Insights, Overview, Products, TaskIn, Tasks, Trends, VideoProducts as VPT, Videos } from "@/lib/types";
+import type { Campaigns, CreativeBridge, Creators, Finding, Funnel as FunnelT, Insights, Overview, Products, TaskIn, Tasks, Trends, VideoProducts as VPT, Videos } from "@/lib/types";
 import { Header, Rail } from "@/components/Shell";
 import Health from "@/components/Health";
 import Orders from "@/components/Orders";
@@ -30,6 +30,7 @@ function Dashboard() {
   const prods = useApi<Products>(`/api/analytics/products${q}`, tick);
   const vids = useApi<Videos>(`/api/analytics/videos${q}`, tick);
   const camps = useApi<Campaigns>(`/api/analytics/campaigns${q}`, tick);
+  const bridge = useApi<CreativeBridge>(`/api/analytics/creative-bridge${q}`, tick);
   const crs = useApi<Creators>(`/api/analytics/creators${q}`, tick);
   const vp = useApi<VPT>(`/api/analytics/video-products${q}`, tick);
   const fn = useApi<FunnelT>(`/api/dashboard/funnel${q}`, tick);
@@ -54,7 +55,7 @@ function Dashboard() {
             <Orders key={q} query={q} shopId={state.shopId} tick={tick} />
             <Diagnosis ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
             <Trend tr={trd.data} ov={ov.data} loading={trd.loading} error={apiDown ? null : trd.error} reload={trd.reload} />
-            <Explorer tab={state.tab} setTab={(tab) => update({ tab })} apiDown={apiDown} products={prods} videos={vids} campaigns={camps} creators={crs} />
+            <Explorer tab={state.tab} setTab={(tab) => update({ tab })} apiDown={apiDown} products={prods} videos={vids} campaigns={camps} bridge={bridge} creators={crs} />
             <VideoProducts vp={vp.data} loading={vp.loading} error={apiDown ? null : vp.error} reload={vp.reload} />
             <Funnel fn={fn.data} loading={fn.loading} error={apiDown ? null : fn.error} reload={fn.reload} />
             <Opps ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} />
