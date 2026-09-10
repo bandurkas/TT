@@ -107,6 +107,9 @@ def ads_tiktok(session: Any, build_context: Callable[[Any], Any]) -> dict[str, A
     client = TikTokAdsClient(tok["access_token"])
     rows, meta = gmv_max.fetch(client, advertisers, start, end)
     out = T.ingest(session, shop, rows, meta)
+    # Per-product Cost: replaces the blended allocation, which was wrong by up to 3x per product.
+    prod_rows, attributed = gmv_max.fetch_products(client, advertisers, start, end)
+    out["by_product"] = T.ingest_products(session, shop, prod_rows, attributed)
     if out.get("written"):
         out.update(_compute_profit(session, shop))
     return out

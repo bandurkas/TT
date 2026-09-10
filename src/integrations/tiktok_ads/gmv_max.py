@@ -90,3 +90,44 @@ def fetch(client: TikTokAdsClient, advertiser_ids: list[str], start: date, end: 
     meta = {"source": "tiktok_ads", "endpoint": "/gmv_max/report/get/", "advertisers": seen,
             "start": str(start), "end": str(end), "dimensions": DIMENSIONS, "metrics": METRICS}
     return rows, meta
+
+
+def campaigns(client: TikTokAdsClient, advertiser_id: str, store_ids: list[str]) -> list[str]:
+    return [str(c["campaign_id"]) for c in client.paginate("/gmv_max/campaign/get/", {
+        "advertiser_id": advertiser_id,
+        "filtering": {"store_ids": store_ids,
+                      "gmv_max_promotion_types": ["PRODUCT_GMV_MAX", "LIVE_GMV_MAX"]}},
+        "gmv_max_campaigns", page_size=50) if c.get("campaign_id")]
+
+
+def fetch_products(client: TikTokAdsClient, advertiser_ids: list[str], start: date, end: date
+                   ) -> tuple[list[dict[str, Any]], Decimal]:
+    """Per-product spend. `item_group_id` **is** the shop's `external_product_id` (verified
+    2026-09-09), which is what turns campaign Cost into product P&L.
+
+    Returns the rows and the spend that no product accounts for. That remainder is real money and
+    is handed back rather than spread: the blended allocation it replaces was wrong by up to 3x per
+    product, and silently smearing the unattributed part would rebuild the same error.
+    """
+    rows: list[dict[str, Any]] = []
+    attributed = Decimal(0)
+    for adv in advertiser_ids:
+        store_ids = stores(client, adv)
+        if not store_ids:
+            continue
+        for cid in campaigns(client, adv, store_ids):
+            report = list(client.iter_gmv_max_report(
+                adv, store_ids, ["item_group_id", "stat_time_day"], METRICS,
+                str(start), str(end), page_size=200, filtering={"campaign_ids": [cid]}))
+            for r in report:
+                d, m = r.get("dimensions") or {}, r.get("metrics") or {}
+                gid = d.get("item_group_id")
+                if not gid or gid == "-1" or d.get("stat_time_day") is None or m.get("cost") is None:
+                    continue
+                cost = Decimal(str(m["cost"]))
+                attributed += cost
+                rows.append({"date": _day(d["stat_time_day"]), "advertiser_id": str(adv),
+                             "campaign_id": cid, "external_product_id": str(gid), "cost": cost,
+                             "ad_orders": int(float(m.get("orders") or 0)),
+                             "ad_revenue": Decimal(str(m.get("gross_revenue") or 0))})
+    return rows, attributed

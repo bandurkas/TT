@@ -72,13 +72,13 @@ def _campaign(session: Any, acc: AdAccount, ext_id: str, name: str | None) -> Ca
 
 
 def _metric(session: Any, campaign_id: int, day: date, row: dict[str, Any], currency: str,
-            fetched_at: datetime, final: bool) -> None:
-    m = session.scalar(select(AdMetric).where(AdMetric.entity_type == "campaign",
+            fetched_at: datetime, final: bool, entity: str = "campaign") -> None:
+    m = session.scalar(select(AdMetric).where(AdMetric.entity_type == entity,
                                               AdMetric.entity_id == campaign_id,
                                               AdMetric.metric_date == day,
                                               AdMetric.metric_hour.is_(None)))
     if m is None:
-        m = AdMetric(entity_type="campaign", entity_id=campaign_id, metric_date=day, metric_hour=None)
+        m = AdMetric(entity_type=entity, entity_id=campaign_id, metric_date=day, metric_hour=None)
         session.add(m)
     m.spend, m.currency, m.fetched_at, m.is_final = row["cost"], currency, fetched_at, final
     # Platform attribution, kept apart from the shop's own orders. impressions/clicks are not part
@@ -155,3 +155,39 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     return {"days": len(days), "written": written, "unchanged": unchanged,
             "campaigns": len(campaigns), "disagreements": disagreements,
             "rejections": rejections, "as_of": fetched_at.isoformat()}
+
+
+def ingest_products(session: Any, shop: Any, rows: list[dict[str, Any]], attributed: Decimal,
+                    now: datetime | None = None) -> dict[str, Any]:
+    """Per-product Cost into ad_metrics(entity_type="product"). Replaces the blended allocation,
+    which was measured wrong by up to 3x per product on 2026-09-09.
+
+    Spend on a product the shop does not know is counted, never invented: no Product row is created
+    from an ad report, and the total is reported so the money is not lost from view.
+    """
+    from src.db.models import Product
+
+    fetched_at = now or datetime.now(UTC)
+    tz = shop.timezone
+    today = fetched_at.astimezone(ZoneInfo(tz)).date()
+    ids = {str(p.external_product_id): p.id for p in
+           session.scalars(select(Product).where(Product.shop_id == shop.id))}
+
+    per: dict[tuple[int, date], dict[str, Any]] = {}
+    unknown: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    for r in rows:
+        pid = ids.get(r["external_product_id"])
+        if pid is None:
+            unknown[r["external_product_id"]] += r["cost"]
+            continue
+        acc = per.setdefault((pid, r["date"]), {"cost": ZERO, "ad_orders": 0, "ad_revenue": ZERO})
+        acc["cost"] += r["cost"]
+        acc["ad_orders"] += int(r.get("ad_orders") or 0)
+        acc["ad_revenue"] += r.get("ad_revenue") or ZERO
+
+    for (pid, day), v in per.items():
+        _metric(session, pid, day, v, shop.currency, fetched_at, day < today, entity="product")
+    session.commit()
+    return {"products": len({p for p, _ in per}), "rows": len(per),
+            "attributed_cost": str(attributed),
+            "unknown_products": {k: str(v) for k, v in unknown.items()}}

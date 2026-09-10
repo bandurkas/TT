@@ -1,4 +1,6 @@
 """DB loaders for the dashboard (read-only, pre-aggregated tables; SPEC §55)."""
+
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -9,6 +11,8 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
+
+ZERO_D = Decimal(0)
 
 from src.db.models import (
     IntegrationSyncState,
@@ -228,3 +232,79 @@ def campaign_spend(session: Any, shop_id: int, start: date, end: date) -> list[d
                     "final": bool(final), "fetched_at": fetched})
     out.sort(key=lambda r: -r["spend"])
     return out
+
+
+def creative_bridge(session: Any, shop_id: int, start: date, end: date) -> dict[str, Any]:
+    """Video -> product -> measured ad Cost. The only honest chain from a creative to money.
+
+    GMV Max does not attribute spend to a video (96% of orders land in its unattributed bucket,
+    measured 2026-09-09), so per-video ROI does not exist and is not invented here. What does exist:
+    a video promotes products, and each product's advertising is measured exactly. A creative is
+    therefore judged on how well it converts attention (organic GPM/CTR) and on whether the product
+    it carries earns its ad money.
+    """
+    from src.db.models import AdMetric, Product, Video, VideoMetric, VideoProduct
+    from src.db.models_profit import ProductDaily
+
+    spend_rows = dict(session.execute(
+        select(AdMetric.entity_id, func.sum(AdMetric.spend))
+        .where(AdMetric.entity_type == "product", AdMetric.metric_date >= start,
+               AdMetric.metric_date <= end, AdMetric.metric_hour.is_(None))
+        .group_by(AdMetric.entity_id)).all())
+
+    prod = {}
+    for pid, ext, title, orders, units, rev, cogs, contrib in session.execute(
+            select(Product.id, Product.external_product_id, Product.title,
+                   func.sum(ProductDaily.orders), func.sum(ProductDaily.units),
+                   func.sum(ProductDaily.net_seller_revenue), func.sum(ProductDaily.cogs),
+                   func.sum(ProductDaily.contribution))
+            .join(ProductDaily, ProductDaily.product_id == Product.id)
+            .where(Product.shop_id == shop_id, ProductDaily.metric_date >= start,
+                   ProductDaily.metric_date <= end)
+            .group_by(Product.id, Product.external_product_id, Product.title)).all():
+        contrib = Decimal(str(contrib or 0))
+        spend = Decimal(str(spend_rows.get(pid, 0)))
+        orders = int(orders or 0)
+        prod[pid] = {"product_id": pid, "external_product_id": ext, "title": title,
+                     "orders": orders, "units": int(units or 0),
+                     "revenue": Decimal(str(rev or 0)), "cogs": Decimal(str(cogs or 0)),
+                     "contribution": contrib, "ad_cost": spend, "profit": contrib - spend,
+                     # What one more order may cost before it stops paying. Varies enormously by
+                     # product (a 19,000 single pair against a 75,000 five-pack), which is exactly
+                     # why one shop-wide CPO target misleads.
+                     "break_even_cpo": (contrib / orders).quantize(Decimal(1)) if orders else None,
+                     "cpo": (spend / orders).quantize(Decimal(1)) if orders else None}
+    # Ad money on products with no sales in the window is still money; it is listed, not spread.
+    for pid, amount in spend_rows.items():
+        if pid not in prod:
+            p = session.get(Product, pid)
+            spend = Decimal(str(amount))
+            prod[pid] = {"product_id": pid, "external_product_id": getattr(p, "external_product_id", None),
+                         "title": getattr(p, "title", str(pid)), "orders": 0, "units": 0,
+                         "revenue": ZERO_D, "cogs": ZERO_D, "contribution": ZERO_D,
+                         "ad_cost": spend, "profit": -spend, "break_even_cpo": None, "cpo": None}
+
+    vids = {}
+    for vid, ext_v, caption, views, clicks, orders, gmv in session.execute(
+            select(Video.id, Video.external_video_id, Video.caption,
+                   func.sum(VideoMetric.views), func.sum(VideoMetric.product_clicks),
+                   func.sum(VideoMetric.orders), func.sum(VideoMetric.gmv))
+            .join(VideoMetric, VideoMetric.video_id == Video.id)
+            .where(VideoMetric.metric_date >= start, VideoMetric.metric_date <= end)
+            .group_by(Video.id, Video.external_video_id, Video.caption)).all():
+        views, gmv = int(views or 0), Decimal(str(gmv or 0))
+        vids[vid] = {"video_id": vid, "external_video_id": ext_v, "caption": caption,
+                     "views": views, "clicks": int(clicks or 0), "orders": int(orders or 0),
+                     "gmv": gmv,
+                     # GMV per 1000 views: how well the creative turns attention into money,
+                     # independent of who paid for the attention.
+                     "gpm": (gmv / views * 1000).quantize(Decimal(1)) if views else None,
+                     "products": []}
+
+    for vid, pid in session.execute(
+            select(VideoProduct.video_id, VideoProduct.product_id)).all():
+        if vid in vids and pid in prod:
+            vids[vid]["products"].append(pid)
+
+    return {"products": sorted(prod.values(), key=lambda r: -r["ad_cost"]),
+            "videos": sorted(vids.values(), key=lambda r: -(r["gpm"] or 0))}

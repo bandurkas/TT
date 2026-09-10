@@ -240,6 +240,24 @@ def campaigns(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
                                    "not the shop's booked figures (SPEC §7)"})
 
 
+@router.get("/analytics/creative-bridge")
+def creative_bridge(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
+    """Video -> product -> measured ad Cost. Per-video ROI does not exist (GMV Max leaves 96% of
+    orders unattributed); this is the chain that does."""
+    data = L.creative_bridge(c.session, c.shop.id, c.period.start, c.period.end)
+    ad = c.advertising(c.period)
+    measured = sum((p["ad_cost"] for p in data["products"]), Decimal(0))
+    total = ad["known_cost"] or Decimal(0)
+    return _n({**c.meta(), **data,
+               "measured_ad_cost": measured, "total_ad_cost": total,
+               "unattributed_ad_cost": total - measured,
+               "notes": ["Product Cost is measured per product, not allocated. The remainder is "
+                         "spend GMV Max did not attribute to any product; it is shown, not spread.",
+                         "Per-video ad spend does not exist: GMV Max leaves 96% of orders in an "
+                         "unattributed bucket. A video is judged on organic GPM and on the ad "
+                         "economics of the products it carries."]})
+
+
 @router.get("/analytics/creators")
 def creators(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     rows = c.profits(c.period)[0]
