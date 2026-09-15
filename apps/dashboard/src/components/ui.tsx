@@ -1,7 +1,19 @@
 "use client";
+import { useEffect } from "react";
 import { useT } from "@/lib/i18n";
 import type { Dec, Status } from "@/lib/types";
 import { num } from "@/lib/format";
+
+// Opens a <dialog> ref on mount and locks body scroll for as long as it's up; shared so every
+// modal in the app opens/closes the same way instead of re-implementing this per component.
+export function useDialogAutoOpen(ref: React.RefObject<HTMLDialogElement | null>) {
+  useEffect(() => {
+    const el = ref.current, prior = document.body.style.overflow;
+    if (el && !el.open) el.showModal();
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prior; };
+  }, [ref]);
+}
 
 export const Pill = ({ tone, children }: { tone: "good" | "bad" | "warn" | "info" | "gray"; children: React.ReactNode }) => (
   <span className={`pill p-${tone}`}>{children}</span>

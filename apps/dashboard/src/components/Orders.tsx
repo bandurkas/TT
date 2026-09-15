@@ -1,10 +1,10 @@
 "use client";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { useApi } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { dateTime, pct } from "@/lib/format";
 import { orderMoney, orderText, type OrderDetail, type OrderPage, type OrderRow, type OrderState } from "@/lib/orders";
-import { ErrorNote, Skeleton, ZoneHeader } from "./ui";
+import { ErrorNote, Skeleton, useDialogAutoOpen, ZoneHeader } from "./ui";
 import AdvertisingSource from "./AdvertisingSource";
 
 function Evidence({ value }: { value: string }) {
@@ -93,12 +93,7 @@ function JournalPage({ path, tick, setOffset, open }: { path: string; tick: numb
 function OrderDialog({ id, shopId, close }: { id: number; shopId?: string; close: () => void }) {
   const lang = useLang(), t = (key: string) => orderText(lang, key);
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const el = ref.current, prior = document.body.style.overflow;
-    if (el && !el.open) el.showModal();
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prior; };
-  }, []);
+  useDialogAutoOpen(ref);
   const { data, loading, error, reload } = useApi<OrderDetail>(`/api/orders/${id}${shopId ? `?shop_id=${encodeURIComponent(shopId)}` : ""}`);
   return <dialog className="order-dialog" ref={ref} onClose={close} aria-labelledby="order-dialog-title">
     <div className="order-dialog-head"><h2 id="order-dialog-title">{t("open")}{data ? ` · ${data.external_order_id}` : ""}</h2><button className="btn" onClick={() => ref.current?.close()}>{t("close")}</button></div>

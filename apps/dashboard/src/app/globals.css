@@ -319,8 +319,11 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .evidence-final{background:var(--good-soft);color:var(--good)}
 .evidence-estimate,.evidence-preliminary,.evidence-unavailable,.evidence-not_calculated{background:var(--warn-soft);color:var(--warn)}
 .order-pagination{display:flex;align-items:center;justify-content:flex-end;gap:14px;margin:16px 0;font-size:12px}
-.order-dialog{box-sizing:border-box;width:min(920px,calc(100vw - 32px));max-height:calc(100dvh - 32px);border:1px solid var(--line);border-radius:16px;padding:0;color:var(--ink);background:var(--surface);margin:auto;overflow:auto}
-.order-dialog::backdrop{background:rgba(20,24,35,.55)}
+.order-dialog,.video-dialog{box-sizing:border-box;max-height:calc(100dvh - 32px);border:1px solid var(--line);border-radius:16px;padding:0;color:var(--ink);background:var(--surface);margin:auto;overflow:auto}
+.order-dialog::backdrop,.video-dialog::backdrop{background:rgba(20,24,35,.55)}
+.order-dialog{width:min(920px,calc(100vw - 32px))}
+.video-dialog{width:min(360px,calc(100vw - 32px))}
+.video-dialog iframe{display:block;width:100%;height:min(640px,70dvh);border:0}
 .order-dialog-head{padding:18px 24px;display:flex;gap:16px;align-items:flex-start;justify-content:space-between;border-bottom:1px solid var(--line)}
 .order-dialog-head h2{font-size:18px;line-height:1.4;margin:0;overflow-wrap:anywhere;min-width:0}
 .order-dialog-head .btn{flex-shrink:0}

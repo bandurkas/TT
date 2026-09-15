@@ -306,15 +306,16 @@ def creative_bridge(session: Any, shop_id: int, start: date, end: date) -> dict[
                          **_verdict(ZERO_D, spend, 0)}
 
     vids = {}
-    for vid, ext_v, caption, views, clicks, orders, gmv in session.execute(
-            select(Video.id, Video.external_video_id, Video.caption,
+    for vid, ext_v, caption, ref, views, clicks, orders, gmv in session.execute(
+            select(Video.id, Video.external_video_id, Video.caption, Video.video_reference,
                    func.sum(VideoMetric.views), func.sum(VideoMetric.product_clicks),
                    func.sum(VideoMetric.orders), func.sum(VideoMetric.gmv))
             .join(VideoMetric, VideoMetric.video_id == Video.id)
             .where(VideoMetric.metric_date >= start, VideoMetric.metric_date <= end)
-            .group_by(Video.id, Video.external_video_id, Video.caption)).all():
+            .group_by(Video.id, Video.external_video_id, Video.caption, Video.video_reference)).all():
         views, gmv = int(views or 0), Decimal(str(gmv or 0))
         vids[vid] = {"video_id": vid, "external_video_id": ext_v, "caption": caption,
+                     "video_reference": ref,
                      "views": views, "clicks": int(clicks or 0), "orders": int(orders or 0),
                      "gmv": gmv,
                      # GMV per 1000 views: how well the creative turns attention into money,

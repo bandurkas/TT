@@ -355,15 +355,19 @@ export interface LotIn { scope: "all" | "product" | "sku"; product_id?: number |
 export interface LotPatch { received_on?: string; unit_cost?: string; quantity?: number; note?: string | null; active?: boolean }
 export interface CostWriteOut { lot_id?: number; default_cogs_per_unit?: Dec | null; versions: number; skus_with_lots: number; recomputed: { orders: number; inserted: number } }
 
+// Matches _verdict()'s return in src/domain/dashboard/loaders.py exactly; keep in sync.
+export type BridgeVerdict = "scale" | "hold" | "cut" | "no_orders" | "no_data";
+
 export interface BridgeProduct {
   product_id: number; external_product_id: string | null; title: string | null;
   orders: number; units: number; revenue: Dec; cogs: Dec; contribution: Dec;
   ad_cost: Dec; profit: Dec; break_even_cpo: Dec | null; cpo: Dec | null;
-  headroom: Dec | null; verdict: string;
+  headroom: Dec | null; verdict: BridgeVerdict;
 }
 
 export interface BridgeVideo {
   video_id: number; external_video_id: string | null; caption: string | null;
+  video_reference: string | null;
   views: number; clicks: number; orders: number; gmv: Dec; gpm: Dec | null; products: number[];
 }
 

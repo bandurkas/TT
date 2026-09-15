@@ -291,3 +291,21 @@ def test_every_bridge_product_carries_a_verdict_even_with_no_sales():
     row = out["products"][0]
     assert row["verdict"] == "no_orders" and row["headroom"] is None
     assert row["profit"] == Decimal("-13368")
+
+
+def test_bridge_video_carries_its_reference_for_a_watch_link():
+    """video_reference (the poster's handle) has to reach the dashboard, or a video can't be
+    linked back to the real TikTok post."""
+    from src.domain.dashboard import loaders as L
+
+    session = MagicMock()
+    session.execute.return_value.all.side_effect = [
+        [],                                                          # spend by product
+        [],                                                          # product daily rows
+        [(9, "7685303303969852673", "Shop deals now", "user556272867", 500, 10, 2, Decimal("50000"))],
+        [],                                                          # video-product links
+    ]
+    out = L.creative_bridge(session, 1, date(2026, 9, 2), date(2026, 9, 9))
+    v = out["videos"][0]
+    assert v["video_reference"] == "user556272867" and v["external_video_id"] == "7685303303969852673"
+    assert v["gpm"] == Decimal("100000")
