@@ -4,7 +4,7 @@ import { EnHint, useLang, useT } from "@/lib/i18n";
 import { dayMon, idr, int, num, pct, shortId } from "@/lib/format";
 import type { VideoProducts as VP } from "@/lib/types";
 import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
-import { ProductPill, VideoPill } from "./Explorer";
+import { VideoPill } from "./Explorer";
 import { VideoTrigger } from "./VideoPreview";
 import History from "./History";
 
@@ -50,8 +50,6 @@ const lagLabel = (l: number, t: (k: string) => string) => (l === 0 ? t("same day
 
 export default function VideoProducts({ vp, loading, error, reload }: { vp: VP | null; loading: boolean; error: string | null; reload: () => void }) {
   const lang = useLang(), t = useT(), ru = lang === "ru";
-  const [openP, setOpenP] = useState<Set<number>>(new Set());
-  const toggle = (id: number) => setOpenP((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const sp = vp?.shop_split;
   return (
     <section className="zone">
@@ -85,45 +83,9 @@ export default function VideoProducts({ vp, loading, error, reload }: { vp: VP |
               <div className="tiny" style={{ marginTop: 10 }}>{vp.dependency.note}<EnHint lang={lang} /></div>
             </div>
           </div>
-          <div className="two">
-            <div className="card">
-              <div className="k lbl" style={{ padding: "12px 12px 0" }}>{t("Products ← videos feeding them")}</div>
-              <div className="scroll"><table className="tbl">
-                <thead><tr><th></th><th>{t("Product")}</th><th className="r">{t("GMV")}</th><th className="r">{t("Video GMV")}</th><th className="r">{t("Video GMV share")} <span className="tiny">({t("derived")})</span></th><th className="r">{t("Video units")}</th><th>{t("Status")}</th></tr></thead>
-                <tbody>
-                  {vp.products.length === 0 && <tr><td colSpan={7} className="empty">{t("No products in this period.")}</td></tr>}
-                  {vp.products.map((p) => {
-                    const open = openP.has(p.product_id);
-                    return [
-                      <tr key={p.product_id} style={{ cursor: p.videos.length ? "pointer" : "default" }} onClick={() => p.videos.length && toggle(p.product_id)} {...(p.videos.length ? { tabIndex: 0, role: "button", "aria-expanded": open, "aria-label": `${t("Expand")}: ${p.title}`, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(p.product_id); } } } : {})}>
-                        <td className="muted">{p.videos.length ? (open ? "▾" : "▸") : ""}</td>
-                        <td style={{ whiteSpace: "normal", minWidth: 180 }}>{p.title}<br /><span className="tiny">{p.videos.length ? `${p.videos.length} ${t("Videos").toLowerCase()} · ${int(p.video_impressions, lang)} ${t("Impressions").toLowerCase()} · ${int(p.video_clicks, lang)} ${t("Clicks").toLowerCase()}` : t("no video traffic measured")}</span></td>
-                        <td className="r">{idr(p.gmv, lang)}</td>
-                        <td className="r">{idr(p.video_gmv, lang)}</td>
-                        <td className="r">{pct(p.video_share, lang)}</td>
-                        <td className="r">{int(p.video_units, lang)}</td>
-                        <td><ProductPill s={p.status} /></td>
-                      </tr>,
-                      open && p.videos.map((v) => (
-                        <tr key={`${p.product_id}-${v.video_id}`} style={{ background: "var(--surface2)" }}>
-                          <td></td>
-                          <td style={{ whiteSpace: "normal" }}><span className="muted">↳</span> {t("Video")}{" "}
-                            <VideoTrigger v={{ video_id: v.video_id, external_video_id: v.external_video_id, caption: v.caption, video_reference: null }} ru={ru}>
-                              {shortId(v.external_video_id ?? v.video_id)}
-                            </VideoTrigger>
-                            <br /><span className="tiny">{v.caption ?? ""} · {int(v.impressions, lang)} {t("Impressions").toLowerCase()} · {int(v.clicks, lang)} {t("Clicks").toLowerCase()} · CTR {pct(v.ctr, lang)} · {int(v.customers, lang)} {t("customers")}</span></td>
-                          <td className="r muted">—</td>
-                          <td className="r">{idr(v.gmv, lang)}</td>
-                          <td className="r muted" title={t("share of product GMV")}>{pct(num(p.gmv) ? (num(v.gmv) ?? 0) / (num(p.gmv) ?? 1) : null, lang)} <span className="tiny">{t("derived")}</span></td>
-                          <td className="r">{int(v.units_sold, lang)}</td>
-                          <td></td>
-                        </tr>
-                      )),
-                    ];
-                  })}
-                </tbody>
-              </table></div>
-            </div>
+          <div className="stack">
+            {/* "Products <- videos feeding them" hidden 2026-09-15 — repeated "Videos -> products
+            they sell" below from the other direction; owner may want it back later, see git log. */}
             <div className="card">
               <div className="k lbl" style={{ padding: "12px 12px 0" }}>{t("Videos → products they sell")}</div>
               <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>

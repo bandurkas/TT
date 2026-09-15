@@ -31,7 +31,6 @@ export default function Orders({ query, shopId, tick }: { query: string; shopId?
   const changed = () => { setOffset(0); setSelected(null); };
   return <section className="zone order-zone" id="order-journal">
     <ZoneHeader id="zorders" eyebrow={t("journal")} title={t("title")} />
-    <p className="note">{t("basis")} {t("profitNote")}</p>
     <form className="order-filters" onSubmit={e => { e.preventDefault(); setSearch(draft.trim()); changed(); }}>
       <label className="order-search">{t("search")}<input maxLength={100} value={draft} onChange={e => setDraft(e.target.value)} placeholder={t("search")} /></label>
       <button className="btn" type="submit">{t("find")}</button>
@@ -56,12 +55,19 @@ function JournalPage({ path, tick, setOffset, open }: { path: string; tick: numb
     {d.demo && <div className="banner warn">{t("demo")}</div>}
     <div className="order-results" aria-live="polite"><b>{t("found")}: {d.total}</b><span>{d.period.start} — {d.period.end} · {d.shop.timezone}</span></div>
     <AdvertisingSource data={d.advertising} currency={currency} />
-    {summary && <p className="small muted">{lang === "ru" ? (summary.basis === "calendar" ? "Общий итог: реклама по дате расхода, включая дни без заказов. Сумма прибыли строк может отличаться на нераспределённый расход." : "Включены фильтры: ниже только оценка выбранных заказов. Расход всего магазина показан отдельно выше.") : (summary.basis === "calendar" ? "Calendar total includes advertising on days without orders; row profits exclude unallocated cost." : "Filtered cohort: estimated allocation only; full shop Cost is shown above.")}</p>}
     {d.mixed_currencies && <p className="banner warn">{t("mixed")}</p>}
-    {summary?.basis === "calendar" && summary.unallocated_ad_cost != null && <p className="small muted">{lang === "ru" ? "Реклама без подходящих заказов в тот же день:" : "Advertising without eligible same-day orders:"} <b>{orderMoney(summary.unallocated_ad_cost, lang, currency)}</b>. {lang === "ru" ? "Уже вычтена в общем итоге; не приписывается отдельным заказам." : "Already deducted from the calendar total; not assigned to individual orders."}</p>}
+    {/* Calendar-basis caveat dropped 2026-09-15 (owner: repeats AdvertisingSource's own disclosure
+    of the same days-without-orders/unallocated-cost estimate). The filtered-cohort caveat below
+    is unique to this view, so it stays. */}
+    {summary && summary.basis !== "calendar" && (
+      <p className="small muted">{lang === "ru" ? "Включены фильтры: ниже только оценка выбранных заказов. Расход всего магазина показан отдельно выше." : "Filtered cohort: estimated allocation only; full shop Cost is shown above."}</p>
+    )}
     {summary && <>
-      <p className="small muted">{t("totals")}. {t("included")}: {summary.calculated_orders} · {t("missing")}: {summary.missing_orders}</p>
       {summary.uncertain_orders > 0 && <p className="banner warn">{t("uncertain")}: {summary.uncertain_orders}</p>}
+      {summary.missing_orders > 0 && <p className="banner warn">{t("missing")}: {summary.missing_orders} ({t("included")}: {summary.calculated_orders})</p>}
+      {summary.basis === "calendar" && summary.unallocated_ad_cost != null && Number(summary.unallocated_ad_cost) > 0 && (
+        <p className="small muted">{lang === "ru" ? "Реклама без подходящих заказов в тот же день:" : "Advertising without eligible same-day orders:"} <b>{orderMoney(summary.unallocated_ad_cost, lang, currency)}</b>. {lang === "ru" ? "Уже вычтена в общем итоге; не приписывается отдельным заказам." : "Already deducted from the calendar total; not assigned to individual orders."}</p>
+      )}
       <div className="order-totals">
         {([['revenue', 'revenue_base'], ['other_effect', 'other_effect'], ['fees', 'fees'], ['costs', 'costs'], ['ads', 'ad_cost'], ['profit', 'net_profit']] as const).map(([label, field]) => <div className="card" key={field}>
           <span className="small muted">{field === "ad_cost" && summary.basis === "calendar" ? (lang === "ru" ? "Расход рекламы · Cost" : "Reported advertising Cost") : t(label)}</span><strong>{orderMoney(summary.calculated_orders || summary.basis === "calendar" ? summary[field] : null, lang, currency)}</strong>

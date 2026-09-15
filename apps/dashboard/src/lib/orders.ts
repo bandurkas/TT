@@ -54,7 +54,7 @@ const LABELS: Record<string, [string, string]> = {
   ads: ["Реклама · оценка", "Ads · estimate"], profit: ["Прибыль · оценка", "Profit · estimate"],
   open: ["Разбор заказа", "Order breakdown"], close: ["Закрыть", "Close"], loading: ["Загрузка заказов…", "Loading orders…"],
   empty: ["Заказов по этим условиям нет.", "No orders match these filters."], previous: ["Назад", "Previous"], next: ["Дальше", "Next"],
-  found: ["Найдено заказов", "Orders found"], totals: ["Итоги по всем найденным заказам, не только на этой странице", "Totals for all matching orders, not just this page"],
+  found: ["Найдено заказов", "Orders found"],
   included: ["Рассчитано", "Calculated"], missing: ["Без расчёта (не включены в суммы)", "Uncalculated (excluded from totals)"],
   uncertain: ["Предварительные комиссии или неполная себестоимость", "Preliminary fees or incomplete product costs"],
   other_effect: ["Возвраты, компенсации, корректировки", "Refunds, subsidies, adjustments"],
