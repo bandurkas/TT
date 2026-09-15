@@ -48,6 +48,8 @@ export const RU: Record<string, string> = {
   "video": "видео", "product card": "карточка товара", "live": "эфир", "latest day": "последний день",
   "4 · Performance explorer": "4 · Разбор эффективности", "Campaigns · Products · Videos · Creators": "Кампании · Товары · Видео · Креаторы",
   "Sorted by net profit": "Сортировка по чистой прибыли", "Product": "Товар", "Units": "Шт", "Fees": "Комиссии",
+  "Search products…": "Поиск товаров…", "Sort by": "Сортировка",
+  "No products match your search.": "Ничего не найдено по запросу.", "Not computed yet": "Ещё не рассчитано",
   "Ads (est.)": "Реклама (оц.)", "Status": "Статус", "Investigate": "Разобраться", "Reduce": "Сократить",
   "Small sample": "Мало данных", "Scale": "Масштабировать", "Healthy": "Здоров", "Watch": "Наблюдать",
   "Promising": "Перспективно", "Low attention": "Слабый хук", "Traffic, no sales": "Трафик без продаж",

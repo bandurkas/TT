@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { useT } from "@/lib/i18n";
-import type { Dec, Status } from "@/lib/types";
+import type { Dec, ProductStatus, Status, VideoClass } from "@/lib/types";
 import { num } from "@/lib/format";
 
 // Opens a <dialog> ref on mount and locks body scroll for as long as it's up; shared so every
@@ -21,6 +21,28 @@ export const Pill = ({ tone, children }: { tone: "good" | "bad" | "warn" | "info
 
 export const statusTone = (s: Status): "good" | "bad" | "warn" | "gray" =>
   s === "good" ? "good" : s === "bad" ? "bad" : s === "warn" ? "warn" : "gray";
+
+// Lives here (not Explorer.tsx) so ProductsSplit can use it without a circular import.
+export const PSTATUS: Record<ProductStatus | "NO_SALES", { label: string; tone: "good" | "bad" | "warn" | "info" | "gray" }> = {
+  SCALE: { label: "Scale", tone: "good" }, HEALTHY: { label: "Healthy", tone: "good" }, WATCH: { label: "Watch", tone: "info" },
+  INVESTIGATE: { label: "Investigate", tone: "warn" }, REDUCE: { label: "Reduce", tone: "bad" }, SMALL_SAMPLE: { label: "Small sample", tone: "gray" },
+  NO_SALES: { label: "Small sample", tone: "gray" },
+};
+export const VCLASS: Record<VideoClass, { label: string; tone: "good" | "bad" | "warn" | "info" | "gray" }> = {
+  WINNER: { label: "Winner", tone: "good" }, PROMISING: { label: "Promising", tone: "info" }, TRAFFIC_NO_SALES: { label: "Traffic, no sales", tone: "bad" },
+  LOW_ATTENTION: { label: "Low attention", tone: "warn" }, LOSER: { label: "Loser", tone: "bad" }, FATIGUING: { label: "Fatiguing", tone: "warn" },
+  NEUTRAL: { label: "Neutral", tone: "gray" }, WATCH: { label: "Watch", tone: "warn" }, INSUFFICIENT_DATA: { label: "Insufficient data", tone: "gray" },
+};
+export const ProductPill = ({ s }: { s: string }) => {
+  const t = useT();
+  const m = PSTATUS[s as ProductStatus] ?? PSTATUS.NO_SALES;
+  return <Pill tone={m.tone}>{t(s) === s ? t(m.label) : t(s)}</Pill>;
+};
+export const VideoPill = ({ c }: { c: VideoClass | null | undefined }) => {
+  const t = useT();
+  const m = c ? VCLASS[c] : null;
+  return m && c ? <Pill tone={m.tone}>{t(c) === c ? t(m.label) : t(c)}</Pill> : <Pill tone="gray">—</Pill>;
+};
 
 export const Conf = ({ c }: { c: "HIGH" | "MEDIUM" | "LOW" | string }) => {
   const t = useT();

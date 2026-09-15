@@ -1,35 +1,16 @@
 "use client";
 import { useLang, useT } from "@/lib/i18n";
-import { dayMon, idr, int, num, pct, ratio, shortId } from "@/lib/format";
-import type { Campaigns, CreativeBridge, Creators, ProductStatus, Products, VideoClass, Videos } from "@/lib/types";
+import { dayMon, idr, int, neg, pct, ratio, shortId } from "@/lib/format";
+import type { Campaigns, CreativeBridge, Creators, Products, Videos } from "@/lib/types";
 import type { Loaded } from "@/lib/api";
-import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
+import { ErrorNote, Pill, Skeleton, VideoPill, ZoneHeader } from "./ui";
 import AdvertisingSource from "./AdvertisingSource";
 import Bridge from "./Bridge";
+import ProductsSplit from "./ProductsSplit";
 import { VideoTrigger } from "./VideoPreview";
 
-export const PSTATUS: Record<ProductStatus | "NO_SALES", { label: string; tone: "good" | "bad" | "warn" | "info" | "gray" }> = {
-  SCALE: { label: "Scale", tone: "good" }, HEALTHY: { label: "Healthy", tone: "good" }, WATCH: { label: "Watch", tone: "info" },
-  INVESTIGATE: { label: "Investigate", tone: "warn" }, REDUCE: { label: "Reduce", tone: "bad" }, SMALL_SAMPLE: { label: "Small sample", tone: "gray" },
-  NO_SALES: { label: "Small sample", tone: "gray" },
-};
-export const VCLASS: Record<VideoClass, { label: string; tone: "good" | "bad" | "warn" | "info" | "gray" }> = {
-  WINNER: { label: "Winner", tone: "good" }, PROMISING: { label: "Promising", tone: "info" }, TRAFFIC_NO_SALES: { label: "Traffic, no sales", tone: "bad" },
-  LOW_ATTENTION: { label: "Low attention", tone: "warn" }, LOSER: { label: "Loser", tone: "bad" }, FATIGUING: { label: "Fatiguing", tone: "warn" },
-  NEUTRAL: { label: "Neutral", tone: "gray" }, WATCH: { label: "Watch", tone: "warn" }, INSUFFICIENT_DATA: { label: "Insufficient data", tone: "gray" },
-};
-export const ProductPill = ({ s }: { s: string }) => {
-  const t = useT();
-  const m = PSTATUS[s as ProductStatus] ?? PSTATUS.NO_SALES;
-  return <Pill tone={m.tone}>{t(s) === s ? t(m.label) : t(s)}</Pill>;
-};
-export const VideoPill = ({ c }: { c: VideoClass | null | undefined }) => {
-  const t = useT();
-  const m = c ? VCLASS[c] : null;
-  return m && c ? <Pill tone={m.tone}>{t(c) === c ? t(m.label) : t(c)}</Pill> : <Pill tone="gray">—</Pill>;
-};
-
-const neg = (v: string | null, lang: "en" | "ru") => v === null ? "—" : idr(-(num(v) ?? 0), lang);
+// Re-exported for Performers.tsx/VideoProducts.tsx, which import these from here.
+export { PSTATUS, ProductPill, VCLASS, VideoPill } from "./ui";
 
 interface Props {
   tab: string; setTab: (t: string) => void; apiDown?: boolean;
@@ -50,32 +31,7 @@ export default function Explorer({ tab, setTab, apiDown, products, videos, campa
         {L.error && !apiDown && <div style={{ padding: 12 }}><ErrorNote error={L.error} onRetry={L.reload} /></div>}
         {L.loading && !L.data ? <div style={{ padding: 12 }}><Skeleton h={120} /></div> : (
           <>
-            {cur === "products" && products.data && (
-              <div className="scroll" id="panel-products" role="tabpanel" aria-labelledby="tab-products"><table className="tbl">
-                <thead><tr><th>{t("Product")}</th><th className="r">{t("Units")}</th><th className="r">{t("Orders")}</th><th className="r">{t("GMV")}</th><th className="r">{t("Net revenue")}</th><th className="r">{t("Fees")}</th><th className="r">{t("COGS")}</th><th className="r">{t("Ads (est.)")}</th><th className="r">{t("Net profit")}</th><th className="r">{t("Margin")}</th><th className="r">CVR</th><th>{t("Status")}</th></tr></thead>
-                <tbody>
-                  {products.data.rows.length === 0 && <tr><td colSpan={12} className="empty">{t("No products in this period.")}</td></tr>}
-                  {products.data.rows.map((r) => {
-                    const np = num(r.net_profit) ?? 0;
-                    return (
-                      <tr key={r.product_id} title={r.status_reason}>
-                        <td style={{ whiteSpace: "normal", minWidth: 220 }}>{r.title}</td>
-                        <td className="r">{int(r.units, lang)}</td><td className="r">{int(r.orders, lang)}</td>
-                        <td className="r">{idr(r.gmv, lang)}</td><td className="r">{idr(r.net_seller_revenue, lang)}</td>
-                        <td className="r">{neg(r.fees, lang)}</td><td className="r">{neg(r.cogs, lang)}</td>
-                        <td className="r" title={products.data?.ad_cost_note}>{neg(r.ad_cost, lang)} <span className="tiny">{t("est.")}</span></td>
-                        <td className={`r ${np < 0 ? "dn" : "up"}`}>{idr(r.net_profit, lang)}</td>
-                        <td className={`r ${(num(r.net_margin) ?? 0) < 0 ? "dn" : ""}`}>{pct(r.net_margin, lang)}</td>
-                        <td className="r" title={products.data?.cvr_note}>{pct(r.cvr, lang)}</td>
-                        <td><ProductPill s={r.status} /></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <div className="tiny" style={{ padding: "8px 12px" }}>{t("Ads (est.)")}: {t("BLENDED estimate · LOW confidence")} — {products.data.ad_cost_note}. CVR: {products.data.cvr_note}.</div>
-              </div>
-            )}
+            {cur === "products" && products.data && <ProductsSplit products={products} />}
             {cur === "videos" && videos.data && (
               <>
                 {videos.data.cards.length === 0 && <div className="empty muted" style={{ padding: 26, textAlign: "center" }}>{t("No videos with metrics in this period.")}</div>}

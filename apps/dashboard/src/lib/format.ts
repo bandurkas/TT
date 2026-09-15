@@ -25,6 +25,10 @@ export const idr = (v: Dec | number | null | undefined, lang: Lang = "en", opts:
   return opts.sign && n > 0 ? "+" + body : body;
 };
 
+/** A cost stored as a positive magnitude, displayed as a negative (deduction) amount. */
+export const neg = (v: Dec | number | null | undefined, lang: Lang = "en"): string =>
+  num(v) === null ? "—" : idr(-(num(v) ?? 0), lang);
+
 export const pct = (v: Dec | number | null | undefined, lang: Lang = "en", opts: { sign?: boolean; frac?: number } = {}): string => {
   const n = num(v);
   if (n === null) return "—";
