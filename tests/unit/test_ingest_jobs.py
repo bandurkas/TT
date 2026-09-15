@@ -237,6 +237,41 @@ def test_sync_metrics_nothing_to_do_keeps_cursor(up):
     assert ctx.today_local() == date(2026, 8, 30)
 
 
+def test_sync_metrics_merges_list_valued_fields_without_crashing(monkeypatch):
+    # regression: a per-day dict can carry a list field ("errors") alongside int counts;
+    # the merge must not do 0 + [...] and must not wedge the cursor on it.
+    ctx = make_ctx(cursor="2026-08-27", resource="video_product_metrics")
+
+    def fake(ctx, day):
+        return {"videos": 1, "video_product_metrics": 1, "errors": [f"{day}: dead video"]}
+
+    monkeypatch.setitem(jobs._METRIC_JOBS, "video_product_metrics", fake)
+    out = jobs.sync_metrics(ctx, days=60, resources=("video_product_metrics",))
+    res = out["video_product_metrics"]
+    assert res["videos"] == 5 and res["video_product_metrics"] == 5 and len(res["errors"]) == 5
+    assert ctx.state.get(jobs.INTEGRATION, "video_product_metrics", "1").cursor == "2026-08-29"
+
+
+def test_sync_metrics_error_cap_keeps_most_recent(monkeypatch):
+    # a day with 20+ errors must not permanently crowd out later days' errors (they're what's
+    # currently failing); the cap keeps the newest 20, not the first 20 ever seen.
+    ctx = make_ctx(cursor="2026-08-27", resource="video_product_metrics")
+    calls = {"n": 0}
+
+    def fake(ctx, day):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return {"errors": [f"day1-v{i}" for i in range(20)]}
+        return {"errors": [f"{day}: dead"]}
+
+    monkeypatch.setitem(jobs._METRIC_JOBS, "video_product_metrics", fake)
+    out = jobs.sync_metrics(ctx, days=60, resources=("video_product_metrics",))
+    errs = out["video_product_metrics"]["errors"]
+    assert len(errs) == 20
+    assert "day1-v0" not in errs  # oldest entries evicted first (FIFO), not newest
+    assert errs[-1].startswith("2026-08-29")  # last day's error survives
+
+
 # --- DbRawSink ---------------------------------------------------------------------
 def test_db_raw_sink_last_id_and_count():
     session = MagicMock()
@@ -289,7 +324,7 @@ def test_sync_video_product_metrics_isolates_per_video_errors(monkeypatch):
     ctx = NS(session=session, shop_id=1, now=datetime(2026, 8, 31, tzinfo=UTC),
              client=NS(get_video_performance_detail=detail))
     out = J.sync_video_product_metrics(ctx, date(2026, 8, 30))
-    assert out["videos"] == 1 and out["video_product_metrics"] == 1 and out["video_errors"][0].startswith("v2")
+    assert out["videos"] == 1 and out["video_product_metrics"] == 1 and out["errors"][0].startswith("v2")
     assert calls == [("VideoProductMetric", 1)]
     # overall update only carries product_clicks (never impressions/ctr, never None)
     upd = [c for c in session.execute.call_args_list if c.args and hasattr(c.args[0], "compile")]

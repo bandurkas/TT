@@ -341,7 +341,7 @@ def sync_video_product_metrics(ctx: IngestContext, day: date) -> dict[str, Any]:
         raise RuntimeError(f"video detail failed for all {len(targets)} videos: {errors[0]}")
     out: dict[str, Any] = {"videos": n_videos, "video_product_metrics": n_rows}
     if errors:
-        out["video_errors"] = errors[:20]
+        out["errors"] = errors[:20]  # key "errors" so _collect_errors (scheduler.py) surfaces it
     return out
 
 
@@ -451,11 +451,14 @@ def sync_metrics(ctx: IngestContext, days: int = 60, resources: tuple[str, ...] 
         fn = _METRIC_JOBS[res]
 
         def go(cursor, fn=fn):
-            total: dict[str, int] = {}
+            total: dict[str, Any] = {}
             days_ = days_to_sync(cursor, today_local=ctx.today_local(), default_days=days)
             for d in days_:
                 for k, v in fn(ctx, d).items():
-                    total[k] = total.get(k, 0) + v
+                    if isinstance(v, list):
+                        total[k] = (total.get(k, []) + v)[-20:]  # most recent, not first-seen
+                    else:
+                        total[k] = total.get(k, 0) + v
                 ctx.session.commit()
             new_cursor = days_[-1].isoformat() if days_ else cursor
             return new_cursor, {**total, "days": len(days_)}
