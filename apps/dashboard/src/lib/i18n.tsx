@@ -86,7 +86,7 @@ export const RU: Record<string, string> = {
   "GMV: video vs product card": "GMV: видео vs карточка товара", "Video views": "Просмотры видео", "Product card GMV": "GMV карточек товара", "Video GMV": "GMV из видео",
   "video share of GMV": "доля видео в GMV", "Dependency: views → product-card sales": "Зависимость: просмотры → продажи карточек", "same day": "тот же день", "+1 day": "+1 день", "+2 days": "+2 дня",
   "weak": "слабая", "moderate": "умеренная", "strong": "сильная", "n/a": "н/д", "day": "день", "days": "дней", "best lag": "лучший лаг", "correlation ≠ causation": "корреляция ≠ причинность",
-  "Products ← videos feeding them": "Товары ← видео, которые их продают", "Videos → products they sell": "Видео → товары, которые они продают",
+  "Videos → products they sell": "Видео → товары, которые они продают",
   "Impressions": "Показы", "Video units": "Шт из видео", "Video GMV share": "Доля GMV из видео", "no video traffic measured": "видео-трафик не измерен",
   "measured by TikTok video analytics": "измерено аналитикой видео TikTok", "customers": "покупателей",
   "History · videos → product over time": "История · влияние видео на товар по дням", "non-video GMV": "GMV без видео", "video publish": "публикация видео",
