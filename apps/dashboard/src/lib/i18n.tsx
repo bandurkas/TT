@@ -6,6 +6,7 @@ export type Lang = "en" | "ru";
 // EN is the key; RU map reuses the approved mock strings plus dashboard-specific additions.
 export const RU: Record<string, string> = {
   "Views": "Просмотры", "Executive": "Руководство", "Performance marketing": "Перформанс-маркетинг",
+  "Menu": "Меню", "Sales trend": "Тренд продаж",
   "Creative / video": "Креатив / видео", "Product / commerce": "Товары / магазин", "Finance": "Финансы",
   "Explore": "Данные", "Campaigns": "Кампании", "Products": "Товары", "Videos": "Видео", "Creators": "Креаторы",
   "Work": "Работа", "Recommendations": "Рекомендации", "Team board": "Доска команды", "Reconciliation": "Сверка",
@@ -30,6 +31,12 @@ export const RU: Record<string, string> = {
   "COGS": "Себестоимость", "Contribution before ads": "Контрибуция до рекламы",
   "Ad cost per unit (blended)": "Реклама на единицу (смешанно)", "Net per unit": "Итог на единицу",
   "2 · Diagnosis": "2 · Диагноз", "Why": "Почему", "Deterministic rules · no LLM": "Детерминированные правила · без LLM",
+  "2 · Needs attention": "2 · Требует внимания", "What needs attention": "Что требует внимания", "Needs action": "Требует действия",
+  "3b · Best / worst": "3b · Лучшие / худшие", "Best & worst performers": "Лучшие и худшие",
+  "Same status/classification as the tables below — this is the headline, not a new score":
+    "Тот же статус/классификация, что и в таблицах ниже — это заголовок, а не новая оценка",
+  "Best products": "Лучшие товары", "Worst products": "Худшие товары",
+  "Best videos": "Лучшие видео", "Worst videos": "Худшие видео",
   "confidence shown per finding": "уверенность у каждого вывода", "Impact": "Эффект", "Confidence": "Уверенность",
   "Source": "Источник", "measured": "измерено", "estimate": "оценка", "Create task": "Создать задачу",
   "Open products": "Открыть товары", "Open videos": "Открыть видео", "Open campaigns": "Открыть кампании", "Open funnel": "Открыть воронку",

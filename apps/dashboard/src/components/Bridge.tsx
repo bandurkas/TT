@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import { useLang, useT } from "@/lib/i18n";
 import { idr, int, num, ratio, shortId } from "@/lib/format";
-import { videoSignal, videoWatchUrl } from "@/lib/bridge";
-import type { BridgeVerdict, BridgeVideo, CreativeBridge } from "@/lib/types";
-import { Pill, useDialogAutoOpen } from "./ui";
+import { videoSignal } from "@/lib/bridge";
+import type { BridgeVerdict, CreativeBridge } from "@/lib/types";
+import { Pill } from "./ui";
+import { VideoTrigger } from "./VideoPreview";
 
 const TONE: Record<BridgeVerdict, "good" | "warn" | "bad" | "gray"> =
   { scale: "good", hold: "warn", cut: "bad", no_orders: "bad", no_data: "gray" };
@@ -17,38 +17,11 @@ function verdictLabel(v: BridgeVerdict, ru: boolean) {
   return ru ? "нет данных" : "no data";
 }
 
-function VideoDialog({ v, close, ru }: { v: BridgeVideo; close: () => void; ru: boolean }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useDialogAutoOpen(ref);
-  // The trigger only opens this for a row with an id (see the table cell below); falling back to
-  // "" rather than interpolating null keeps a freak call inert instead of requesting .../null.
-  const id = v.external_video_id ?? "";
-  return (
-    <dialog className="video-dialog" ref={ref} onClose={close} aria-labelledby="video-dialog-title">
-      <div className="order-dialog-head">
-        <h2 id="video-dialog-title">{v.caption || shortId(id)}</h2>
-        <button className="btn" onClick={() => ref.current?.close()}>{ru ? "Закрыть" : "Close"}</button>
-      </div>
-      <iframe src={`https://www.tiktok.com/embed/v2/${id}`} allow="encrypted-media;" allowFullScreen />
-      <div style={{ padding: "12px 24px" }}>
-        <a href={videoWatchUrl(v)} target="_blank" rel="noopener noreferrer">{ru ? "Открыть в TikTok ↗" : "Open on TikTok ↗"}</a>
-      </div>
-    </dialog>
-  );
-}
-
 export default function Bridge({ data }: { data: CreativeBridge }) {
   const lang = useLang(), t = useT(), ru = lang === "ru";
   // Videos with no views in the period say nothing; an empty row is not a weak result.
   const videos = data.videos.filter((v) => v.views > 0);
   const byProduct = new Map(data.products.map((p) => [p.product_id, p]));
-  const [openVideo, setOpenVideo] = useState<number | null>(null);
-  const openVideoRow = openVideo === null ? null : videos.find((v) => v.video_id === openVideo) ?? null;
-  // A refresh can drop the open video from the period's data (e.g. its views fall to 0); when
-  // that happens the dialog would otherwise vanish with openVideo still pointing at a dead row.
-  useEffect(() => {
-    if (openVideo !== null && !openVideoRow) setOpenVideo(null);
-  }, [openVideo, openVideoRow]);
 
   return (
     <div className="scroll" id="panel-bridge" role="tabpanel" aria-labelledby="tab-bridge">
@@ -114,12 +87,11 @@ export default function Bridge({ data }: { data: CreativeBridge }) {
             return (
               <tr key={v.video_id}>
                 <td>
-                  {v.external_video_id ? (
-                    <button type="button" className="order-link" onClick={() => setOpenVideo(v.video_id)}
-                            title={ru ? "Открыть креатив" : "Open the creative"}>
-                      {Array.from(v.caption || shortId(v.external_video_id)).slice(0, 40).join("")}
-                    </button>
-                  ) : shortId(String(v.video_id))}
+                  <VideoTrigger v={v} ru={ru}>
+                    {v.external_video_id
+                      ? Array.from(v.caption || shortId(v.external_video_id)).slice(0, 40).join("")
+                      : shortId(String(v.video_id))}
+                  </VideoTrigger>
                 </td>
                 <td className="r">{int(v.views, lang)}</td>
                 <td className={`r ${v.orders === 0 ? "dn" : ""}`}>{int(v.orders, lang)}</td>
@@ -145,7 +117,6 @@ export default function Bridge({ data }: { data: CreativeBridge }) {
                  : "GMV Max leaves 96% of orders in an unattributed bucket, so ad spend per video does not exist as a measurable quantity. A video is judged on GPM — money per thousand views — and on the products it carries, coloured by whether each earns its advertising. \"Signal\" is the same read as one label: whether real orders happened and whether the products this video carries earn their ad money."}</span>
       </div>
 
-      {openVideoRow && <VideoDialog v={openVideoRow} close={() => setOpenVideo(null)} ru={ru} />}
     </div>
   );
 }

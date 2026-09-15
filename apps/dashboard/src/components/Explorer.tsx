@@ -6,6 +6,7 @@ import type { Loaded } from "@/lib/api";
 import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
 import AdvertisingSource from "./AdvertisingSource";
 import Bridge from "./Bridge";
+import { VideoTrigger } from "./VideoPreview";
 
 export const PSTATUS: Record<ProductStatus | "NO_SALES", { label: string; tone: "good" | "bad" | "warn" | "info" | "gray" }> = {
   SCALE: { label: "Scale", tone: "good" }, HEALTHY: { label: "Healthy", tone: "good" }, WATCH: { label: "Watch", tone: "info" },
@@ -37,7 +38,7 @@ interface Props {
 }
 
 export default function Explorer({ tab, setTab, apiDown, products, videos, campaigns, bridge, creators }: Props) {
-  const lang = useLang(), t = useT();
+  const lang = useLang(), t = useT(), ru = lang === "ru";
   const TABS = [["products", "Products"], ["videos", "Videos"], ["campaigns", "Campaigns"], ["bridge", "Video → product → cost"], ["creators", "Creators"]] as const;
   const cur = TABS.some(([k]) => k === tab) ? tab : "products";
   const L = cur === "products" ? products : cur === "videos" ? videos : cur === "campaigns" ? campaigns : cur === "bridge" ? bridge : creators;
@@ -81,7 +82,11 @@ export default function Explorer({ tab, setTab, apiDown, products, videos, campa
                 <div className="gallery" id="panel-videos" role="tabpanel" aria-labelledby="tab-videos">
                   {videos.data.cards.map((v) => (
                     <div className="vcard" key={v.video_id}>
-                      <div className="thumb"><VideoPill c={v.classification} />{v.duration_seconds ? `${v.duration_seconds} s` : ""}{v.caption ? ` · ${v.caption}` : ""}</div>
+                      <div className="thumb">
+                        <VideoTrigger v={v} ru={ru} className="thumb-trigger">
+                          <VideoPill c={v.classification} />{v.duration_seconds ? `${v.duration_seconds} s` : ""}{v.caption ? ` · ${v.caption}` : ""}
+                        </VideoTrigger>
+                      </div>
                       <div className="vb">
                         <span className="id">{t("Video")} {shortId(v.external_video_id ?? v.video_id)}</span>
                         <span className="k">{t("Views count")}</span><span className="v">{int(v.views, lang)}</span>

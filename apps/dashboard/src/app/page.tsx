@@ -7,12 +7,12 @@ import type { Campaigns, CreativeBridge, Creators, Finding, Funnel as FunnelT, I
 import { Header, Rail } from "@/components/Shell";
 import Health from "@/components/Health";
 import Orders from "@/components/Orders";
-import Diagnosis from "@/components/Diagnosis";
+import Attention from "@/components/Attention";
 import Trend from "@/components/Trend";
+import Performers from "@/components/Performers";
 import Explorer from "@/components/Explorer";
 import VideoProducts from "@/components/VideoProducts";
 import Funnel from "@/components/Funnel";
-import Opps from "@/components/Opps";
 import Board, { draftFromFinding } from "@/components/Board";
 import { scrollTo } from "@/components/ui";
 
@@ -45,20 +45,20 @@ function Dashboard() {
   return (
     <LangContext.Provider value={lang}>
       <div className="app">
-        <Rail shop={ov.data?.shop.name} counts={counts} />
+        <Rail shop={ov.data?.shop.name} counts={counts} setTab={(tab) => update({ tab })} />
         <div className="main">
           <Header lang={lang} setLang={setLang} period={state} onPeriod={(p) => update(p)} overview={ov.data} onRefresh={refreshAll} refreshing={refreshing} />
           <div className="wrap">
             {apiDown && <div className="banner bad" role="alert"><b>{tr(lang, "API unreachable")}</b> <span className="mono small">{ov.error}</span><button className="btn sm" onClick={() => setTick((x) => x + 1)}>{tr(lang, "Retry")}</button></div>}
             <Health ov={ov.data} loading={ov.loading} error={apiDown ? null : ov.error} reload={ov.reload} query={q} tick={tick}
               onCostApplied={refreshAll} />
+            <Attention ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
             <Orders key={q} query={q} shopId={state.shopId} tick={tick} />
-            <Diagnosis ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} onOpenTab={onOpenTab} />
             <Trend tr={trd.data} ov={ov.data} loading={trd.loading} error={apiDown ? null : trd.error} reload={trd.reload} />
+            <Performers apiDown={apiDown} products={prods} videos={vids} />
             <Explorer tab={state.tab} setTab={(tab) => update({ tab })} apiDown={apiDown} products={prods} videos={vids} campaigns={camps} bridge={bridge} creators={crs} />
             <VideoProducts vp={vp.data} loading={vp.loading} error={apiDown ? null : vp.error} reload={vp.reload} />
             <Funnel fn={fn.data} loading={fn.loading} error={apiDown ? null : fn.error} reload={fn.reload} />
-            <Opps ins={ins.data} loading={ins.loading} error={apiDown ? null : ins.error} reload={ins.reload} onCreateTask={onCreateTask} />
             <Board tasks={tasks.data} loading={tasks.loading} error={apiDown ? null : tasks.error} reload={tasks.reload} draft={draft} clearDraft={() => setDraft(null)} shopId={state.shopId} />
           </div>
         </div>

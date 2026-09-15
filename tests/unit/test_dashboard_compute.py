@@ -128,13 +128,14 @@ def test_video_cards_classification_and_sorting():
              2: [vm(date(2026, 8, 20), 5000, 40, 0, 0, 5000)],
              3: [vm(date(2026, 8, 20), 100, 1, 0, 0, 120)],
              4: [vm(date(2026, 7, 1), 9000, 90, 1, 80000, 9000)]}
-    meta = {i: NS(external_video_id=f"v{i}", caption="c", published_at=datetime(2026, 8, 10, tzinfo=UTC),
-                  duration_seconds=15) for i in daily}
+    meta = {i: NS(external_video_id=f"v{i}", caption="c", video_reference=f"user{i}",
+                  published_at=datetime(2026, 8, 10, tzinfo=UTC), duration_seconds=15) for i in daily}
     cards = C.video_cards(daily, meta, AUG, date(2026, 8, 31), ScoringConfig(minimum_sample_impressions=1000))
     ids = [c["video_id"] for c in cards]
     assert 4 not in ids and ids[0] == 1
     by = {c["video_id"]: c for c in cards}
     assert by[1]["classification"] in ("WINNER", "PROMISING", "NEUTRAL") and by[1]["gpm"] == D(80000)
+    assert by[1]["video_reference"] == "user1"
     assert by[3]["classification"] == "INSUFFICIENT_DATA"
     assert by[1]["ad_spend"] is None and "NOT_AVAILABLE" in by[1]["ad_spend_note"]
     assert by[1]["age_days"] == 21

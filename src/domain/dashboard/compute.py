@@ -432,7 +432,8 @@ def video_cards(video_daily: Mapping[int, Sequence[Any]], video_meta: Mapping[in
         res = classify_video(VideoMetrics(video_id=str(vid), impressions=a["impressions"], clicks=a["clicks"],
                                           orders=a["orders"], gmv=a["gmv"], age_days=age), base, cfg)
         out.append({"video_id": vid, "external_video_id": getattr(meta, "external_video_id", None),
-                    "caption": getattr(meta, "caption", None), "published_at": pub,
+                    "caption": getattr(meta, "caption", None), "video_reference": getattr(meta, "video_reference", None),
+                    "published_at": pub,
                     "duration_seconds": getattr(meta, "duration_seconds", None), "age_days": age,
                     "views": a["views"], "impressions": a["impressions"], "clicks": a["clicks"],
                     "orders": a["orders"], "gmv": a["gmv"],

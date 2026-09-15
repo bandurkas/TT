@@ -149,6 +149,7 @@ export interface VideoCard {
   video_id: number;
   external_video_id: string | null;
   caption: string | null;
+  video_reference: string | null;
   published_at: string | null;
   duration_seconds: number | null;
   age_days: number;

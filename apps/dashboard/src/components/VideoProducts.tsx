@@ -5,6 +5,7 @@ import { dayMon, idr, int, num, pct, shortId } from "@/lib/format";
 import type { VideoProducts as VP } from "@/lib/types";
 import { ErrorNote, Pill, Skeleton, ZoneHeader } from "./ui";
 import { ProductPill, VideoPill } from "./Explorer";
+import { VideoTrigger } from "./VideoPreview";
 import History from "./History";
 
 const fmtAxis = (v: number) => (Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}m` : Math.abs(v) >= 1e3 ? `${Math.round(v / 1e3)}k` : String(v));
@@ -48,7 +49,7 @@ const strength = (r: number | null) => (r === null ? "n/a" : Math.abs(r) >= 0.5 
 const lagLabel = (l: number, t: (k: string) => string) => (l === 0 ? t("same day") : `+${l} ${t(l === 1 ? "day" : "days")}`);
 
 export default function VideoProducts({ vp, loading, error, reload }: { vp: VP | null; loading: boolean; error: string | null; reload: () => void }) {
-  const lang = useLang(), t = useT();
+  const lang = useLang(), t = useT(), ru = lang === "ru";
   const [openP, setOpenP] = useState<Set<number>>(new Set());
   const toggle = (id: number) => setOpenP((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const sp = vp?.shop_split;
@@ -106,7 +107,11 @@ export default function VideoProducts({ vp, loading, error, reload }: { vp: VP |
                       open && p.videos.map((v) => (
                         <tr key={`${p.product_id}-${v.video_id}`} style={{ background: "var(--surface2)" }}>
                           <td></td>
-                          <td style={{ whiteSpace: "normal" }}><span className="muted">↳</span> {t("Video")} {shortId(v.external_video_id ?? v.video_id)}<br /><span className="tiny">{v.caption ?? ""} · {int(v.impressions, lang)} {t("Impressions").toLowerCase()} · {int(v.clicks, lang)} {t("Clicks").toLowerCase()} · CTR {pct(v.ctr, lang)} · {int(v.customers, lang)} {t("customers")}</span></td>
+                          <td style={{ whiteSpace: "normal" }}><span className="muted">↳</span> {t("Video")}{" "}
+                            <VideoTrigger v={{ video_id: v.video_id, external_video_id: v.external_video_id, caption: v.caption, video_reference: null }} ru={ru}>
+                              {shortId(v.external_video_id ?? v.video_id)}
+                            </VideoTrigger>
+                            <br /><span className="tiny">{v.caption ?? ""} · {int(v.impressions, lang)} {t("Impressions").toLowerCase()} · {int(v.clicks, lang)} {t("Clicks").toLowerCase()} · CTR {pct(v.ctr, lang)} · {int(v.customers, lang)} {t("customers")}</span></td>
                           <td className="r muted">—</td>
                           <td className="r">{idr(v.gmv, lang)}</td>
                           <td className="r muted" title={t("share of product GMV")}>{pct(num(p.gmv) ? (num(v.gmv) ?? 0) / (num(p.gmv) ?? 1) : null, lang)} <span className="tiny">{t("derived")}</span></td>
@@ -126,7 +131,11 @@ export default function VideoProducts({ vp, loading, error, reload }: { vp: VP |
                 {vp.videos.map((v) => (
                   <div className="card" key={v.video_id} style={{ padding: "10px 12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <span><b>{t("Video")} {shortId(v.external_video_id ?? v.video_id)}</b> <span className="tiny">{v.caption ?? ""}</span></span>
+                      <span><b>{t("Video")}{" "}
+                        <VideoTrigger v={{ video_id: v.video_id, external_video_id: v.external_video_id, caption: v.caption, video_reference: null }} ru={ru}>
+                          {shortId(v.external_video_id ?? v.video_id)}
+                        </VideoTrigger>
+                      </b> <span className="tiny">{v.caption ?? ""}</span></span>
                       <span className="small">{int(v.views, lang)} {t("Views count").toLowerCase()} <VideoPill c={v.classification} /></span>
                     </div>
                     <div className="scroll" style={{ marginTop: 6 }}><table className="tbl">
