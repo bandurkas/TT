@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from src.db.models import AdAccount, AdMetric, Campaign, RawApiResponse
 from src.db.models_reports import ShopAdDay
@@ -92,6 +92,18 @@ def _stored(session: Any, shop_id: int, day: date) -> ShopAdDay | None:
                                                   ShopAdDay.metric_date == day))
 
 
+def _absent_spend(session: Any, shop_id: int, day: date, present: set[str]) -> Decimal:
+    """Last known spend of campaigns on file for `day` that the report no longer returns."""
+    q = (select(func.sum(AdMetric.spend))
+         .join(Campaign, Campaign.id == AdMetric.entity_id)
+         .join(AdAccount, AdAccount.id == Campaign.ad_account_id)
+         .where(AdAccount.shop_id == shop_id, AdMetric.entity_type == "campaign",
+                AdMetric.metric_date == day, AdMetric.metric_hour.is_(None)))
+    if present:
+        q = q.where(Campaign.external_campaign_id.notin_(present))
+    return Decimal(str(session.scalar(q) or 0))
+
+
 def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, Any],
            now: datetime | None = None) -> dict[str, Any]:
     """Store raw, then write every day the report covered. Commits per day."""
@@ -113,7 +125,11 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
     rejections: list[str] = []
 
     for day, per_campaign in sorted(days.items()):
-        total = sum((c["cost"] for c in per_campaign.values()), ZERO)
+        # A deleted campaign vanishes from the report, past days included. Its money was still
+        # spent: absence is not zero. Found 2026-09-19, after three deletions rewrote closed days
+        # down by 638,574 (13 Sept read 224 against a real 449,689).
+        absent = _absent_spend(session, shop.id, day, set(per_campaign))
+        total = sum((c["cost"] for c in per_campaign.values()), ZERO) + absent
         final = day < today
         before = _stored(session, shop.id, day)
         # A figure that has not moved is not rewritten: at a 15-minute cadence that would insert a
@@ -130,7 +146,8 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
             try:
                 record_ad_day(session, shop.id, day, total, None, None, fetched_at, tz,
                               final=final,
-                              note=f"TikTok Ads GMV Max API, {len(per_campaign)} campaign(s)",
+                              note=(f"TikTok Ads GMV Max API, {len(per_campaign)} campaign(s)"
+                                    + (f"; +{absent} kept from campaigns since deleted" if absent else "")),
                               entered_by="tiktok_ads", scope=TIKTOK_SCOPE, label="tiktok-gmv-max")
                 written += 1
             except ValueError as e:

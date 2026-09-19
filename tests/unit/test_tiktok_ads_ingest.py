@@ -66,6 +66,7 @@ def _capture(monkeypatch):
 
     monkeypatch.setattr(T, "record_ad_day", fake_record)
     monkeypatch.setattr(T, "_stored", lambda *a: None)
+    monkeypatch.setattr(T, "_absent_spend", lambda *a: Decimal(0))
     monkeypatch.setattr(T, "_account", lambda *a: NS(id=9))
     monkeypatch.setattr(T, "_campaign", lambda *a: NS(id=99))
     monkeypatch.setattr(T, "_metric", lambda *a, **k: None)
@@ -309,3 +310,28 @@ def test_bridge_video_carries_its_reference_for_a_watch_link():
     v = out["videos"][0]
     assert v["video_reference"] == "user556272867" and v["external_video_id"] == "7685303303969852673"
     assert v["gpm"] == Decimal("100000")
+
+
+# --- deleted campaigns ---------------------------------------------------------------------------
+def test_a_deleted_campaign_keeps_its_spend_in_the_day_total(monkeypatch):
+    """TikTok drops a deleted campaign from the report, past days included. On 13 Sept 2026 that
+    rewrote a closed day from 449,689 down to 224; the money was spent all the same."""
+    calls = _capture(monkeypatch)
+    seen = {}
+
+    def absent(session, shop_id, day, present):
+        seen["present"] = present
+        return Decimal("449465")
+
+    monkeypatch.setattr(T, "_absent_spend", absent)
+    out = T.ingest(_session(), SHOP, [_row("2026-09-08", "LIVE", 224)], {}, now=NOW)
+    assert calls[0]["cost"] == "449689" and out["written"] == 1
+    assert seen["present"] == {"LIVE"}          # only campaigns missing from the report are added
+
+
+def test_a_day_held_only_by_the_deleted_part_is_not_rewritten_every_run(monkeypatch):
+    calls = _capture(monkeypatch)
+    monkeypatch.setattr(T, "_absent_spend", lambda *a: Decimal("449465"))
+    monkeypatch.setattr(T, "_stored", lambda *a: NS(cost=Decimal("449689"), partial=False, manual=False))
+    out = T.ingest(_session(), SHOP, [_row("2026-09-08", "LIVE", 224)], {}, now=NOW)
+    assert out["unchanged"] == 1 and calls == []
