@@ -209,28 +209,54 @@ def campaign_spend(session: Any, shop_id: int, start: date, end: date) -> list[d
         select(Campaign.external_campaign_id, Campaign.name,
                func.sum(AdMetric.spend), func.sum(AdMetric.attributed_orders),
                func.sum(AdMetric.attributed_gmv), func.max(AdMetric.fetched_at),
-               func.bool_and(AdMetric.is_final))
+               func.bool_and(AdMetric.is_final), Campaign.campaign_type)
         .join(AdMetric, (AdMetric.entity_type == "campaign") & (AdMetric.entity_id == Campaign.id))
         .join(AdAccount, AdAccount.id == Campaign.ad_account_id)
         .where(AdAccount.shop_id == shop_id, AdMetric.metric_date >= start,
                AdMetric.metric_date <= end, AdMetric.metric_hour.is_(None))
-        .group_by(Campaign.external_campaign_id, Campaign.name)).all()
+        .group_by(Campaign.external_campaign_id, Campaign.name, Campaign.campaign_type)).all()
 
     out = []
-    for ext_id, name, spend, orders, gmv, fetched, final in rows:
+    for ext_id, name, spend, orders, gmv, fetched, final, ctype in rows:
         spend = Decimal(str(spend or 0))
         orders = int(orders or 0)
         gmv = Decimal(str(gmv or 0))
         if not spend and not orders:
             continue   # a campaign that did nothing in this period is noise, not a zero worth showing
-        out.append({"campaign_id": ext_id, "name": name or ext_id, "spend": spend,
-                    "attributed_orders": orders, "attributed_revenue": gmv,
-                    # Cost per order and ROI as the platform reports them; both are undefined
-                    # without orders, and a zero would read as "free", so they stay null.
-                    "cost_per_order": (spend / orders).quantize(Decimal(1)) if orders else None,
-                    "reported_roi": (gmv / spend).quantize(Decimal("0.01")) if spend else None,
-                    "final": bool(final), "fetched_at": fetched})
+        out.append({"campaign_id": ext_id, "name": name or ext_id, "kind": campaign_kind(ctype, name),
+                    "spend": spend, "attributed_orders": orders, "attributed_revenue": gmv,
+                    **_cpo_roi(spend, orders, gmv), "final": bool(final), "fetched_at": fetched})
     out.sort(key=lambda r: -r["spend"])
+    return out
+
+
+def _cpo_roi(spend: Decimal, orders: int, gmv: Decimal) -> dict[str, Any]:
+    # Cost per order and ROI as the platform reports them; both are undefined without orders or
+    # spend, and a zero would read as "free", so they stay null.
+    return {"cost_per_order": (spend / orders).quantize(Decimal(1)) if orders else None,
+            "reported_roi": (gmv / spend).quantize(Decimal("0.01")) if spend else None}
+
+
+def campaign_kind(campaign_type: str | None, name: str | None) -> str:
+    """"live" or "product". The type comes from the Ads API; campaigns deleted before it was stored
+    are only told apart by TikTok's default LIVE name."""
+    if campaign_type == "LIVE_GMV_MAX":
+        return "live"
+    if campaign_type == "PRODUCT_GMV_MAX":
+        return "product"
+    return "live" if (name or "").startswith("LIVE GMV Max") else "product"
+
+
+def campaign_totals(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Product GMV Max and LIVE GMV Max summed apart, so one cannot hide inside the other."""
+    out: dict[str, dict[str, Any]] = {}
+    for kind in ("product", "live"):
+        sel = [r for r in rows if r["kind"] == kind]
+        spend = sum((r["spend"] for r in sel), Decimal(0))
+        orders = sum(r["attributed_orders"] for r in sel)
+        gmv = sum((r["attributed_revenue"] for r in sel), Decimal(0))
+        out[kind] = {"campaigns": len(sel), "spend": spend, "attributed_orders": orders,
+                     "attributed_revenue": gmv, **_cpo_roi(spend, orders, gmv)}
     return out
 
 

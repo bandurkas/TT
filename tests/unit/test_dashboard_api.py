@@ -77,6 +77,7 @@ def test_overview_shape_and_period():
     assert cards["reported_roas"]["value"] is None
     assert body["health"]["components"]["data_quality"] == body["data_quality"]["score"]
     assert any("BLENDED" in n for n in body["notes"]) and body["shop"]["currency"] == "IDR"
+    assert set(body["ad_by_kind"]) == {"product", "live"}
 
 
 @with_patches
@@ -98,6 +99,7 @@ def test_other_endpoints():
     assert out["/api/analytics/videos"]["cards"] == [] and "NOT_AVAILABLE" in out["/api/analytics/videos"]["ad_spend_note"]
     camp = out["/api/analytics/campaigns"]
     assert camp["available"] is False and camp["shop_level_ad_cost"] == "100000" and camp["advertising"]["gmv_pay"] == "20000"
+    assert camp["by_kind"]["live"]["spend"] == "0" and camp["by_kind"]["product"]["campaigns"] == 0
     assert out["/api/analytics/creators"]["rows"][0]["creator"].startswith("Affiliate")
     f = out["/api/dashboard/funnel"]
     assert f["stages"][0]["count"] == 1000 and f["waterfall"]["orders"] == 0
@@ -105,6 +107,26 @@ def test_other_endpoints():
     assert vp["shop_split"]["gmv_total"] == "0" and vp["dependency"]["best_lag"] is None and vp["products"] == []
     ins = out["/api/dashboard/insights"]
     assert isinstance(ins["findings"], list) and "opportunities" in ins and "risks" in ins
+
+
+@with_patches
+def _split():
+    live = {"campaign_id": "L", "name": "Gacoooor", "kind": "live", "spend": D(180095), "attributed_orders": 2,
+            "attributed_revenue": D(68843), "cost_per_order": D(90048), "reported_roi": D("0.38"),
+            "final": True, "fetched_at": None}
+    with patch.object(A.L, "campaign_spend", lambda s, sid, a, b: [live]):
+        c, _ = client()
+        return (c.get("/api/dashboard/overview?from=2026-08-01&to=2026-08-31").json(),
+                c.get("/api/analytics/campaigns").json())
+
+
+def test_live_is_reported_apart_from_product():
+    ov, camp = _split()
+    assert ov["ad_by_kind"]["live"] == {"campaigns": 1, "spend": "180095", "attributed_orders": 2,
+                                        "attributed_revenue": "68843", "cost_per_order": "90048",
+                                        "reported_roi": "0.38"}
+    assert ov["ad_by_kind"]["product"]["spend"] == "0" and ov["ad_by_kind"]["product"]["cost_per_order"] is None
+    assert camp["by_kind"] == ov["ad_by_kind"] and camp["rows"][0]["kind"] == "live"
 
 
 def test_tasks_create_patch_list():

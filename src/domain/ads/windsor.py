@@ -78,7 +78,7 @@ def _campaign(session: Any, acc: AdAccount, ext_id: str, name: str | None) -> Ca
     if c is None:
         c = Campaign(ad_account_id=acc.id, external_campaign_id=ext_id)
         session.add(c)
-    c.name, c.campaign_type = name or c.name, "GMV_MAX"
+    c.name, c.campaign_type = name or c.name, c.campaign_type or "GMV_MAX"
     session.flush()
     return c
 

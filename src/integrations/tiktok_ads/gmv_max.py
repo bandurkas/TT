@@ -14,6 +14,7 @@ Two things this module exists to get right:
 """
 from __future__ import annotations
 
+import logging
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -23,6 +24,7 @@ from src.integrations.tiktok_ads.client import TikTokAdsClient
 METRICS = ["cost", "orders", "gross_revenue"]
 DIMENSIONS = ["campaign_id", "stat_time_day"]
 RESOURCE = "gmv_max_daily"
+log = logging.getLogger("tt.ads.gmv_max")
 
 
 class GmvMaxError(RuntimeError):
@@ -34,17 +36,27 @@ def _day(v: Any) -> date:
     return date.fromisoformat(str(v)[:10])
 
 
-def campaign_names(client: TikTokAdsClient, advertiser_id: str, store_ids: list[str]) -> dict[str, str]:
-    """Names are absent from the report and only useful for display, so a failure here is not fatal."""
-    try:
-        rows = client.paginate("/gmv_max/campaign/get/", {
-            "advertiser_id": advertiser_id,
-            "filtering": {"store_ids": store_ids,
-                          "gmv_max_promotion_types": ["PRODUCT_GMV_MAX", "LIVE_GMV_MAX"]}},
-            "gmv_max_campaigns", page_size=50)
-        return {str(c["campaign_id"]): c.get("campaign_name") or "" for c in rows if c.get("campaign_id")}
-    except Exception:  # noqa: BLE001 — display-only
-        return {}
+PROMOTION_TYPES = ("PRODUCT_GMV_MAX", "LIVE_GMV_MAX")
+
+
+def campaign_info(client: TikTokAdsClient, advertiser_id: str, store_ids: list[str]
+                  ) -> dict[str, dict[str, str]]:
+    """id -> {name, type}. The campaign row carries no promotion type (probed 2026-10-02), so each
+    type is listed on its own: the filter is the only verified way to tell LIVE from Product.
+    A failed listing is logged, not fatal: Cost comes from the report, and a stored type holds."""
+    out: dict[str, dict[str, str]] = {}
+    for ptype in PROMOTION_TYPES:
+        try:
+            rows = client.paginate("/gmv_max/campaign/get/", {
+                "advertiser_id": advertiser_id,
+                "filtering": {"store_ids": store_ids, "gmv_max_promotion_types": [ptype]}},
+                "gmv_max_campaigns", page_size=50)
+            for c in rows:
+                if c.get("campaign_id"):
+                    out[str(c["campaign_id"])] = {"name": c.get("campaign_name") or "", "type": ptype}
+        except Exception as e:  # noqa: BLE001
+            log.warning("gmv_max campaign list %s failed for %s: %s", ptype, advertiser_id, e)
+    return out
 
 
 def stores(client: TikTokAdsClient, advertiser_id: str) -> list[str]:
@@ -70,7 +82,7 @@ def fetch(client: TikTokAdsClient, advertiser_ids: list[str], start: date, end: 
         seen[adv] = store_ids
         if not store_ids:
             continue
-        names = campaign_names(client, adv, store_ids)
+        info = campaign_info(client, adv, store_ids)
         try:
             report = list(client.iter_gmv_max_report(
                 adv, store_ids, DIMENSIONS, METRICS, str(start), str(end), page_size=200))
@@ -83,7 +95,9 @@ def fetch(client: TikTokAdsClient, advertiser_ids: list[str], start: date, end: 
                 # A row we cannot place is not a zero; skip it and let the day stand on the rest.
                 continue
             rows.append({"date": _day(d["stat_time_day"]), "advertiser_id": str(adv),
-                         "campaign_id": str(cid), "campaign": names.get(str(cid)),
+                         "campaign_id": str(cid),
+                         "campaign": info.get(str(cid), {}).get("name"),
+                         "type": info.get(str(cid), {}).get("type"),
                          "cost": Decimal(str(m["cost"])),
                          "ad_orders": int(float(m.get("orders") or 0)),
                          "ad_revenue": Decimal(str(m.get("gross_revenue") or 0))})

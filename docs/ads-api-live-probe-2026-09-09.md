@@ -28,6 +28,10 @@ Business Center `7658353879616848917`. Store у обоих один: `7494756467
 
 - `/gmv_max/campaign/get/` — требует `filtering.gmv_max_promotion_types`; допустимые значения
   **`LIVE_GMV_MAX`, `PRODUCT_GMV_MAX`** (получено из текста ошибки API)
+  — 02.10.2026: в строке кампании поля типа **нет** (ключи: advertiser_id, campaign_id, campaign_name,
+  create_time, modify_time, objective_type, operation_status, roi_protection_compensation_status,
+  secondary_status); фильтр с **одним** типом работает вживую и является единственным способом отличить
+  LIVE от Product (`gmv_max.campaign_info`)
 - `/gmv_max/report/get/` — требует `store_ids`
 - `/store/list/` — ключ ответа **`stores`**, не `list`
 - `/report/integrated/get/` — обычные кампании; у этого магазина расход по ним нулевой

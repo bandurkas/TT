@@ -8,6 +8,7 @@ import AdvertisingSource from "./AdvertisingSource";
 import Bridge from "./Bridge";
 import ProductsSplit from "./ProductsSplit";
 import { VideoTrigger } from "./VideoPreview";
+import { Fragment } from "react";
 
 // Re-exported for Performers.tsx/VideoProducts.tsx, which import these from here.
 export { PSTATUS, ProductPill, VCLASS, VideoPill } from "./ui";
@@ -65,17 +66,35 @@ export default function Explorer({ tab, setTab, apiDown, products, videos, campa
               <div className="scroll" id="panel-campaigns" role="tabpanel" aria-labelledby="tab-campaigns"><table className="tbl">
                 <thead><tr><th>{t("Campaign")}</th><th className="r">{t("Spend")}</th><th className="r">{lang === "ru" ? "Заказы TikTok" : "TikTok orders"}</th><th className="r">{lang === "ru" ? "Выручка TikTok" : "TikTok revenue"}</th><th className="r">{lang === "ru" ? "Цена заказа" : "Cost per order"}</th><th className="r">ROI</th><th>{t("Status")}</th></tr></thead>
                 <tbody>
-                  {campaigns.data.rows.map((r) => (
-                    <tr key={r.campaign_id}>
-                      <td>{r.name}<br /><span className="tiny mono">{r.campaign_id}</span></td>
-                      <td className="r">{idr(r.spend, lang)}</td>
-                      <td className={`r ${r.attributed_orders === 0 ? "dn" : ""}`}>{int(r.attributed_orders, lang)}</td>
-                      <td className="r">{idr(r.attributed_revenue, lang)}</td>
-                      <td className="r">{r.cost_per_order === null ? "—" : idr(r.cost_per_order, lang)}</td>
-                      <td className="r">{r.reported_roi === null ? "—" : ratio(r.reported_roi, lang)}</td>
-                      <td>{r.final ? <Pill tone="gray">{lang === "ru" ? "закрыт" : "settled"}</Pill> : <Pill tone="warn">{lang === "ru" ? "день идёт" : "day open"}</Pill>}</td>
-                    </tr>
-                  ))}
+                  {(["product", "live"] as const).map((k) => {
+                    const rows = campaigns.data!.rows.filter((r) => (r.kind ?? "product") === k);
+                    const tot = campaigns.data!.by_kind?.[k];
+                    if (!rows.length) return null;
+                    return (
+                      <Fragment key={k}>
+                        {tot && <tr style={{ background: "var(--surface2)" }}>
+                          <td><b>{k === "live" ? "LIVE GMV Max" : "Product GMV Max"}</b> <span className="tiny">· {lang === "ru" ? "итого" : "total"}</span></td>
+                          <td className="r"><b>{idr(tot.spend, lang)}</b></td>
+                          <td className={`r ${tot.attributed_orders === 0 ? "dn" : ""}`}><b>{int(tot.attributed_orders, lang)}</b></td>
+                          <td className="r"><b>{idr(tot.attributed_revenue, lang)}</b></td>
+                          <td className="r"><b>{tot.cost_per_order === null ? "—" : idr(tot.cost_per_order, lang)}</b></td>
+                          <td className="r"><b>{tot.reported_roi === null ? "—" : ratio(tot.reported_roi, lang)}</b></td>
+                          <td />
+                        </tr>}
+                        {rows.map((r) => (
+                          <tr key={r.campaign_id}>
+                            <td>{r.name}<br /><span className="tiny mono">{r.campaign_id}</span></td>
+                            <td className="r">{idr(r.spend, lang)}</td>
+                            <td className={`r ${r.attributed_orders === 0 ? "dn" : ""}`}>{int(r.attributed_orders, lang)}</td>
+                            <td className="r">{idr(r.attributed_revenue, lang)}</td>
+                            <td className="r">{r.cost_per_order === null ? "—" : idr(r.cost_per_order, lang)}</td>
+                            <td className="r">{r.reported_roi === null ? "—" : ratio(r.reported_roi, lang)}</td>
+                            <td>{r.final ? <Pill tone="gray">{lang === "ru" ? "закрыт" : "settled"}</Pill> : <Pill tone="warn">{lang === "ru" ? "день идёт" : "day open"}</Pill>}</td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    );
+                  })}
                   {!campaigns.data.rows.length && <tr><td colSpan={7} className="empty">{campaigns.data.reason}</td></tr>}
                   <tr><td colSpan={7} className="empty">
                     <AdvertisingSource data={campaigns.data.advertising} currency={campaigns.data.shop.currency} />

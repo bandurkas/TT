@@ -71,6 +71,7 @@ export interface Overview extends Meta {
   unit_economics: UnitEconomics | null;
   data_quality: DataQuality;
   advertising?: Advertising;
+  ad_by_kind?: Record<CampaignKind, KindTotals>;
   totals: Record<string, Dec | number | null>;
   notes: string[];
 }
@@ -182,8 +183,15 @@ export interface Deduction {
   [k: string]: unknown;
 }
 
+export type CampaignKind = "product" | "live";
+
+export interface KindTotals {
+  campaigns: number; spend: Dec; attributed_orders: number; attributed_revenue: Dec;
+  cost_per_order: Dec | null; reported_roi: Dec | null;
+}
+
 export interface CampaignRow {
-  campaign_id: string; name: string; spend: Dec; attributed_orders: number;
+  campaign_id: string; name: string; kind?: CampaignKind; spend: Dec; attributed_orders: number;
   attributed_revenue: Dec; cost_per_order: Dec | null; reported_roi: Dec | null;
   final: boolean; fetched_at: string | null;
 }
@@ -194,6 +202,7 @@ export interface Campaigns extends Meta {
   shop_level_ad_cost: Dec | null;
   deductions: Deduction[];
   rows: CampaignRow[];
+  by_kind?: Record<CampaignKind, KindTotals>;
   attribution_note?: string;
   advertising?: Advertising;
 }

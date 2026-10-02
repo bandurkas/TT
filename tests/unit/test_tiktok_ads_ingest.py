@@ -142,7 +142,9 @@ class FakeClient:
         raise AssertionError(path)
 
     def paginate(self, path, params, resource="", page_size=100):
-        return iter(self._names.get(params["advertiser_id"], []))
+        want = params["filtering"]["gmv_max_promotion_types"]
+        return iter(c for c in self._names.get(params["advertiser_id"], [])
+                    if c.get("_type", "PRODUCT_GMV_MAX") in want)
 
     def iter_gmv_max_report(self, adv, stores, dims, metrics, start, end, page_size=200):
         return iter(self._report.get(adv, []))
@@ -192,6 +194,63 @@ def test_fetch_names_campaigns_when_the_list_is_available():
     assert rows[0]["campaign"] == "majority black"
 
 
+def test_fetch_tells_live_from_product_by_the_list_filter():
+    """The campaign row carries no promotion type; the filter that returned it is the type."""
+    c = FakeClient({"1": ["S"]},
+                   {"1": [_rep("2026-09-08", "A", 1), _rep("2026-09-08", "L", 2), _rep("2026-09-08", "X", 3)]},
+                   names={"1": [{"campaign_id": "A", "campaign_name": "black one"},
+                                {"campaign_id": "L", "campaign_name": "Gacoooor", "_type": "LIVE_GMV_MAX"}]})
+    rows, _ = gmv_max.fetch(c, ["1"], date(2026, 9, 8), date(2026, 9, 8))
+    types = {r["campaign_id"]: r["type"] for r in rows}
+    # X was deleted: still in the report, gone from the list, so its type is unknown, not guessed
+    assert types == {"A": "PRODUCT_GMV_MAX", "L": "LIVE_GMV_MAX", "X": None}
+
+
+def test_one_failing_type_listing_does_not_lose_the_other():
+    class Half(FakeClient):
+        def paginate(self, path, params, resource="", page_size=100):
+            if params["filtering"]["gmv_max_promotion_types"] == ["LIVE_GMV_MAX"]:
+                raise RuntimeError("boom")
+            return super().paginate(path, params, resource, page_size)
+
+    c = Half({"1": ["S"]}, {}, names={"1": [{"campaign_id": "A", "campaign_name": "black one"}]})
+    assert gmv_max.campaign_info(c, "1", ["S"]) == {"A": {"name": "black one", "type": "PRODUCT_GMV_MAX"}}
+
+
+def test_ingest_hands_the_type_to_the_campaign(monkeypatch):
+    _capture(monkeypatch)
+    seen = []
+    monkeypatch.setattr(T, "_campaign", lambda s, a, cid, name, ctype=None: seen.append((cid, ctype)) or NS(id=99))
+    T.ingest(_session(), SHOP, [{**_row("2026-09-08", "L", 5), "type": "LIVE_GMV_MAX"},
+                                {**_row("2026-09-08", "A", 7), "type": "PRODUCT_GMV_MAX"}], {}, now=NOW)
+    assert sorted(seen) == [("A", "PRODUCT_GMV_MAX"), ("L", "LIVE_GMV_MAX")]
+
+
+def test_windsor_does_not_reset_a_known_type():
+    from src.domain.ads import windsor as W
+
+    s = MagicMock()
+    s.scalar.return_value = NS(name="Gacoooor", campaign_type="LIVE_GMV_MAX", id=7)
+    assert W._campaign(s, NS(id=1), "L", None).campaign_type == "LIVE_GMV_MAX"
+
+
+def test_by_day_carries_the_campaign_type():
+    rows = [{**_row("2026-09-08", "L", 5), "type": None}, {**_row("2026-09-08", "L", 5), "type": "LIVE_GMV_MAX"}]
+    assert T.by_day(rows)[date(2026, 9, 8)]["L"]["type"] == "LIVE_GMV_MAX"
+
+
+def test_a_known_campaign_type_survives_a_run_that_does_not_know_it():
+    """A deleted campaign leaves the list but stays in the report; its stored type must hold."""
+    stored = NS(name="Gacoooor", campaign_type="LIVE_GMV_MAX", id=7)
+    s = MagicMock()
+    s.scalar.return_value = stored
+    assert T._campaign(s, NS(id=1), "L", None, None).campaign_type == "LIVE_GMV_MAX"
+    assert T._campaign(s, NS(id=1), "L", None, "PRODUCT_GMV_MAX").campaign_type == "PRODUCT_GMV_MAX"
+    fresh = NS(name=None, campaign_type=None, id=8)
+    s.scalar.return_value = fresh
+    assert T._campaign(s, NS(id=1), "N", "new", None).campaign_type == "GMV_MAX"
+
+
 # --- the two sources must not fight over the same rows ------------------------------------------
 def test_windsor_stands_down_once_the_ads_api_is_authorised(monkeypatch):
     """Both write the same ShopAdDay rows; left running they restate each other every hour."""
@@ -236,14 +295,41 @@ def test_campaign_spend_leaves_cpo_and_roi_undefined_without_orders():
 
     session = MagicMock()
     session.execute.return_value.all.return_value = [
-        ("1872852148459778", "majority black", Decimal("1281169"), 35, Decimal("2292746"), NOW, True),
-        ("1875228349709633", "LIVE GMV Max", Decimal("228549"), 0, Decimal("0"), NOW, False),
+        ("1872852148459778", "majority black", Decimal("1281169"), 35, Decimal("2292746"), NOW, True, "GMV_MAX"),
+        ("1875228349709633", "LIVE GMV Max", Decimal("228549"), 0, Decimal("0"), NOW, False, "GMV_MAX"),
     ]
     rows = L.campaign_spend(session, 1, date(2026, 9, 2), date(2026, 9, 9))
     assert [r["name"] for r in rows] == ["majority black", "LIVE GMV Max"]   # sorted by spend
     assert rows[0]["cost_per_order"] == Decimal("36605") and rows[0]["reported_roi"] == Decimal("1.79")
     assert rows[1]["cost_per_order"] is None and rows[1]["reported_roi"] == Decimal("0")
     assert rows[1]["final"] is False
+    # legacy rows stored before the type was read: only TikTok's default LIVE name tells them apart
+    assert [r["kind"] for r in rows] == ["product", "live"]
+
+
+def test_the_stored_type_beats_the_name():
+    from src.domain.dashboard import loaders as L
+
+    assert L.campaign_kind("LIVE_GMV_MAX", "renamed by the owner") == "live"
+    assert L.campaign_kind("PRODUCT_GMV_MAX", "LIVE GMV Max looking name") == "product"
+    assert L.campaign_kind(None, None) == "product"
+
+
+def test_live_and_product_are_totalled_apart():
+    """One blended line hid that LIVE alone was losing: 1.01m for 12 orders against a working Product side."""
+    from src.domain.dashboard import loaders as L
+
+    rows = [{"kind": "product", "spend": Decimal("506000"), "attributed_orders": 17, "attributed_revenue": Decimal("979000")},
+            {"kind": "product", "spend": Decimal("570000"), "attributed_orders": 18, "attributed_revenue": Decimal("1600000")},
+            {"kind": "live", "spend": Decimal("180000"), "attributed_orders": 0, "attributed_revenue": Decimal("0")}]
+    t = L.campaign_totals(rows)
+    assert t["product"]["spend"] == Decimal("1076000") and t["product"]["campaigns"] == 2
+    assert t["product"]["cost_per_order"] == Decimal("30743") and t["product"]["reported_roi"] == Decimal("2.40")
+    assert t["live"]["spend"] == Decimal("180000") and t["live"]["cost_per_order"] is None
+    assert t["live"]["reported_roi"] == Decimal("0")
+    empty = L.campaign_totals([])
+    assert empty["live"] == {"campaigns": 0, "spend": Decimal(0), "attributed_orders": 0,
+                             "attributed_revenue": Decimal(0), "cost_per_order": None, "reported_roi": None}
 
 
 def test_campaign_spend_hides_a_campaign_that_did_nothing_in_the_period():
@@ -251,8 +337,8 @@ def test_campaign_spend_hides_a_campaign_that_did_nothing_in_the_period():
 
     session = MagicMock()
     session.execute.return_value.all.return_value = [
-        ("A", "ran", Decimal("100"), 1, Decimal("300"), NOW, True),
-        ("B", "idle", Decimal("0"), 0, Decimal("0"), NOW, True),
+        ("A", "ran", Decimal("100"), 1, Decimal("300"), NOW, True, "PRODUCT_GMV_MAX"),
+        ("B", "idle", Decimal("0"), 0, Decimal("0"), NOW, True, "PRODUCT_GMV_MAX"),
     ]
     assert [r["campaign_id"] for r in L.campaign_spend(session, 1, date(2026, 9, 2), date(2026, 9, 9))] == ["A"]
 

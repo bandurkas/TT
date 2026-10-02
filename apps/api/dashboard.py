@@ -119,7 +119,8 @@ def _overview(c: Ctx) -> dict[str, Any]:
     missing, unmapped = L.cogs_gaps(c.session, c.shop.id, c.period.start, c.period.end, c.tz)
     dq = C.data_quality(fresh, cur, missing, unmapped)
     zone1 = C.business_health(cur, prev, rows, c.period, c.floor, dq)
-    return {**c.meta(), **zone1, "advertising": c.advertising(c.period), "data_quality": {"score": dq.score, "state": dq.state.value,
+    by_kind = L.campaign_totals(L.campaign_spend(c.session, c.shop.id, c.period.start, c.period.end))
+    return {**c.meta(), **zone1, "advertising": c.advertising(c.period), "ad_by_kind": by_kind, "data_quality": {"score": dq.score, "state": dq.state.value,
                                                    "reasons": list(dq.reasons), "last_sync": sync_at,
                                                    "freshness_minutes": fresh},
             "totals": {k: (None if (k == "ad_cost" and not cur.ad_cost_known) or (k == "net_profit" and not cur.profit_known) else getattr(cur, k)) for k in C.DAILY_FIELDS} | {"refunded_orders": cur.refunded_orders},
@@ -236,6 +237,7 @@ def campaigns(c: Ctx = Depends(ctx_dep)) -> dict[str, Any]:
     return _n({**c.meta(), "available": bool(rows),
                "reason": "" if rows else "No campaign rows for this period",
                "advertising": ad, "shop_level_ad_cost": ad["cost"], "deductions": ded, "rows": rows,
+               "by_kind": L.campaign_totals(rows),
                "attribution_note": "orders/revenue are TikTok's own attribution for the campaign, "
                                    "not the shop's booked figures (SPEC §7)"})
 

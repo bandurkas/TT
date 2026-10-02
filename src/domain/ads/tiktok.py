@@ -42,11 +42,12 @@ def by_day(rows: list[dict[str, Any]]) -> dict[date, dict[str, dict[str, Any]]]:
         day, cid = r["date"], str(r["campaign_id"])
         acc = out[day].setdefault(cid, {"campaign_id": cid, "campaign": r.get("campaign"),
                                         "advertiser_id": r.get("advertiser_id"), "cost": ZERO,
-                                        "ad_orders": 0, "ad_revenue": ZERO})
+                                        "ad_orders": 0, "ad_revenue": ZERO, "type": r.get("type")})
         acc["cost"] += r["cost"]
         acc["ad_orders"] += int(r.get("ad_orders") or 0)
         acc["ad_revenue"] += r.get("ad_revenue") or ZERO
         acc["campaign"] = acc["campaign"] or r.get("campaign")
+        acc["type"] = acc["type"] or r.get("type")
     return out
 
 
@@ -60,13 +61,15 @@ def _account(session: Any, shop: Any, ext: str) -> AdAccount:
     return acc
 
 
-def _campaign(session: Any, acc: AdAccount, ext_id: str, name: str | None) -> Campaign:
+def _campaign(session: Any, acc: AdAccount, ext_id: str, name: str | None,
+              ctype: str | None = None) -> Campaign:
     c = session.scalar(select(Campaign).where(Campaign.ad_account_id == acc.id,
                                               Campaign.external_campaign_id == ext_id))
     if c is None:
         c = Campaign(ad_account_id=acc.id, external_campaign_id=ext_id)
         session.add(c)
-    c.name, c.campaign_type = name or c.name, "GMV_MAX"
+    # A deleted campaign leaves the list but not the report: a known type is never overwritten.
+    c.name, c.campaign_type = name or c.name, ctype or c.campaign_type or "GMV_MAX"
     session.flush()
     return c
 
@@ -164,7 +167,7 @@ def ingest(session: Any, shop: Any, rows: list[dict[str, Any]], meta: dict[str, 
             acc = accounts.get(adv)
             if acc is None:
                 continue
-            camp = _campaign(session, acc, cid, row.get("campaign"))
+            camp = _campaign(session, acc, cid, row.get("campaign"), row.get("type"))
             _metric(session, camp.id, day, row, shop.currency, fetched_at, final)
             campaigns.add(cid)
         session.commit()

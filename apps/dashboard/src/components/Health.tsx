@@ -65,6 +65,9 @@ function KpiCard({ c, ov, whatIf }: { c: Card; ov: Overview; whatIf?: number | n
       </div>}
       {!na && c.prev !== null && wi === null && <div className="kpi-previous">{t("Previously")}: {fmt(c.prev)}</div>}
       {wi === null && <div className="d">{na ? <Pill tone="gray">{t("Per campaign only")}</Pill> : <Note c={c} ov={ov} />}</div>}
+      {wi === null && c.key === "ad_spend" && ov.ad_by_kind && (num(ov.ad_by_kind.live.spend) ?? 0) > 0 && (
+        <div className="kpi-previous">{lang === "ru" ? "По кампаниям" : "By campaign"}: Product <b>{idr(ov.ad_by_kind.product.spend, lang)}</b> · LIVE <b className={ov.ad_by_kind.live.attributed_orders === 0 ? "dn" : ""}>{idr(ov.ad_by_kind.live.spend, lang)}</b></div>
+      )}
       {wi === null && c.sparkline.length > 1 && <Sparkline values={c.sparkline} tone={tone === "bad" ? "bad" : tone === "good" ? "good" : "accent"} />}
       {explanation && <details className="kpi-help">
         <summary aria-label={`${t("How to read this")}: ${t(LABEL[c.key] ?? c.key)}`}>{t("How to read this")}</summary>
