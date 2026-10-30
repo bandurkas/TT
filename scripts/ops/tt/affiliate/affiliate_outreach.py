@@ -155,8 +155,18 @@ for oid, x in pool.items():
     if vg == 0 and lg == 0 and g == 0 and vv < 1000: s -= 30
     rows.append([s, oid, x, vg, lg, vv, fo])
 rows.sort(key=lambda r_: -r_[0])
-short = rows[:ENRICH_N]
-say("ranked", len(rows), "shortlist", len(short))
+# shortlist balanced by level quota: do not fill it with level 7-8 when their weekly quota is (almost) gone
+big_cap = cap.get(7, -1)
+big_max = ENRICH_N if big_cap == -1 else min(ENRICH_N, big_cap + 40)
+short, nbig = [], 0
+for r_ in rows:
+    lv = (r_[2].get("creator_profile") or {}).get("creator_level") or 0
+    if lv >= 7:
+        if nbig >= big_max: continue
+        nbig += 1
+    short.append(r_)
+    if len(short) >= ENRICH_N: break
+say("ranked", len(rows), "shortlist", len(short), "of which level 7-8:", nbig, "(cap", big_max, ")")
 
 # ---- 6. enrich + eligibility ----
 cand = []
@@ -207,8 +217,10 @@ for x in ok:
     if cap.get(lv, -1) != -1 and used[lv] >= cap.get(lv, 0): continue
     used[lv] += 1; pick.append(x)
     if len(pick) >= PER_RUN + 10: break
-conf = go("POST", "202605/target_collaborations/conflicts/check", b={"creator_open_id_list": [x["open_id"] for x in pick], "product_id_list": [SET8, BLACK5]}) if pick else None
-bad = {z["creator_open_id"] for z in (conf or {}).get("conflict_items", [])}
+bad = set()
+for j in range(0, len(pick), 50):   # API accepts at most 50 creators per conflict check
+    conf = go("POST", "202605/target_collaborations/conflicts/check", b={"creator_open_id_list": [x["open_id"] for x in pick[j:j + 50]], "product_id_list": [SET8, BLACK5]})
+    bad |= {z["creator_open_id"] for z in (conf or {}).get("conflict_items", [])}
 pick = [x for x in pick if x["open_id"] not in bad][:PER_RUN]
 say("picked", len(pick), "levels", dict(collections.Counter(x["level"] for x in pick)), "conflicts dropped", len(bad))
 log["picked"] = pick
