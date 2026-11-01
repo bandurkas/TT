@@ -11,4 +11,10 @@ for i in $(seq 1 35); do
   [ "$rc" -ne 3 ] && break
   sleep 1800
 done
-echo "### END rc=$rc $(date -u '+%d.%m %H:%M UTC')"
+echo "### boost C rc=$rc $(date -u '+%d.%m %H:%M UTC')"
+if [ "$rc" -ne 3 ]; then
+  echo "### linkshare big (cap 40) $(date -u '+%d.%m %H:%M UTC')"
+  docker compose exec -T worker python -I - --big-only --cap 40 --need-reset < /root/tt-ops/aff_linkshare.py 2>&1 | grep -E 'quota|saved big|to send|CREATE|READBACK|test account|ERR|DONE'
+  echo "### linkshare rc=${PIPESTATUS[0]}"
+fi
+echo "### END $(date -u '+%d.%m %H:%M UTC')"
