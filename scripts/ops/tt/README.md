@@ -26,3 +26,4 @@
 
 ## affiliate/ (30.10.2026, рассылка целевых приглашений)
 `aff_read.py` — чтение: открытые/целевые сотрудничества, заявки на образцы, переписки (нет записи). `aff_enrich.py` — метрики продаж по шорт-листу (`/tmp/shortlist_ids.json`) + проверка пригодности. `rank_creators.py`, `build_batches.py` — отбор на Mac из скачанных пулов. `aff_create.py` — создание целевых приглашений по `/tmp/batches.json` (**пишет**; `dry_run` обязателен первым). Текст — `invite_text_v2.txt`. Итог и правила API — `docs/affiliate/outreach_2026-10-30.md`.
+`aff_boost.py` — целевой план 15 % для креаторов, уже продающих по открытому плану (dry по умолчанию, **`--create` пишет**; `--users`, `--big N`, `--only-big`, `--need-reset`, `--tag`); `boost_driver.sh` — волны с делением групп при ошибке «test account»; `boost_c.sh` — отложенная волна после сброса квоты (screen на VPS3). `affiliate_outreach.py` — cron-рассылка по 100 раз в 3 дня (см. ниже в HANDOFF §6а).
