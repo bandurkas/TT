@@ -228,6 +228,10 @@ say("picked", len(pick), "levels", dict(collections.Counter(x["level"] for x in 
 log["picked"] = pick
 for x in pick[:PER_RUN]:
     print(f"   {x['score']:6.1f} L{x['level']} units={x['units']} fit={x['fit']} vshare={x['vshare']} vids={x['vids']} video$={x['video_gmv']} fol={x['followers']} {x['username']}")
+MSG_S = MSG.replace("Sampel gratis untuk kreator terpilih yang serius promosi, chat kami ya.", "Sampel GRATIS tersedia untuk Kakak: ajukan lewat undangan ini (kami setujui manual untuk kreator yang serius bikin konten).")
+strong = [x for x in pick if (x["level"] or 0) >= SAMPLE_LEVEL]; weak = [x for x in pick if (x["level"] or 0) < SAMPLE_LEVEL]
+parts = [("S", strong[j:j + PER_COLLAB], SAMPLE_YES, MSG_S) for j in range(0, len(strong), PER_COLLAB)] + [("N", weak[j:j + PER_COLLAB], SAMPLE, MSG) for j in range(0, len(weak), PER_COLLAB)]
+say("sample-eligible (level >=", SAMPLE_LEVEL, "):", len(strong), "| no sample:", len(weak))
 if len(pick) < 10:
     finish("too few candidates, nothing sent"); sys.exit(0)
 if DRY:
@@ -237,10 +241,6 @@ if DRY:
 END = str(int((dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=END_DAYS)).timestamp()))
 tag = NOW.strftime("%d%b")
 created = []
-MSG_S = MSG.replace("Sampel gratis untuk kreator terpilih yang serius promosi, chat kami ya.", "Sampel GRATIS tersedia untuk Kakak: ajukan lewat undangan ini (kami setujui manual untuk kreator yang serius bikin konten).")
-strong = [x for x in pick if (x["level"] or 0) >= SAMPLE_LEVEL]; weak = [x for x in pick if (x["level"] or 0) < SAMPLE_LEVEL]
-parts = [("S", strong[j:j + PER_COLLAB], SAMPLE_YES, MSG_S) for j in range(0, len(strong), PER_COLLAB)] + [("N", weak[j:j + PER_COLLAB], SAMPLE, MSG) for j in range(0, len(weak), PER_COLLAB)]
-say("sample-eligible (level >=", SAMPLE_LEVEL, "):", len(strong), "| no sample:", len(weak))
 for i, (kind, part, rule, msg) in enumerate(parts):
     name = f"Lomira Komisi 25 {tag} {kind}{i + 1}"[:30]
     body = {"name": name, "message": msg, "end_time": END, "products": PRODUCTS, "creator_user_open_ids": [x["open_id"] for x in part],
