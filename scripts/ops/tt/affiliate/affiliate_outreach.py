@@ -14,11 +14,13 @@ FORCE = "--force" in sys.argv
 MIN_DAYS = 3
 PER_RUN, PER_COLLAB = 100, 50
 MIN_SCORE = 110.0
-ENRICH_N = 220
 SET8, BLACK5 = "1737926532373578823", "1736665360313713735"
 PRODUCTS = [{"id": SET8, "target_commission_rate": 2500}, {"id": BLACK5, "target_commission_rate": 2000}]
 CONTACT = {"whatsapp": "(+62) 85888014696"}
 SAMPLE = {"has_free_sample": False, "is_sample_approval_exempt": False}
+SAMPLE_YES = {"has_free_sample": True, "is_sample_approval_exempt": False}   # 10.11 owner: free sample for strong creators, every request approved by hand
+SAMPLE_LEVEL = 5
+ENRICH_N = int(os.environ.get("ENRICH_N", "220"))
 END_DAYS = 90
 DATA = "/app/data/affiliate"
 os.makedirs(f"{DATA}/logs", exist_ok=True)
@@ -235,17 +237,21 @@ if DRY:
 END = str(int((dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=END_DAYS)).timestamp()))
 tag = NOW.strftime("%d%b")
 created = []
-for i, part in enumerate([pick[j:j + PER_COLLAB] for j in range(0, len(pick), PER_COLLAB)]):
-    name = f"Lomira Komisi 25 {tag} {chr(65 + i)}"[:30]
-    body = {"name": name, "message": MSG, "end_time": END, "products": PRODUCTS, "creator_user_open_ids": [x["open_id"] for x in part],
-            "seller_contact_info": CONTACT, "free_sample_rule": SAMPLE, "preferred_content_type": "VIDEO"}
+MSG_S = MSG.replace("Sampel gratis untuk kreator terpilih yang serius promosi, chat kami ya.", "Sampel GRATIS tersedia untuk Kakak: ajukan lewat undangan ini (kami setujui manual untuk kreator yang serius bikin konten).")
+strong = [x for x in pick if (x["level"] or 0) >= SAMPLE_LEVEL]; weak = [x for x in pick if (x["level"] or 0) < SAMPLE_LEVEL]
+parts = [("S", strong[j:j + PER_COLLAB], SAMPLE_YES, MSG_S) for j in range(0, len(strong), PER_COLLAB)] + [("N", weak[j:j + PER_COLLAB], SAMPLE, MSG) for j in range(0, len(weak), PER_COLLAB)]
+say("sample-eligible (level >=", SAMPLE_LEVEL, "):", len(strong), "| no sample:", len(weak))
+for i, (kind, part, rule, msg) in enumerate(parts):
+    name = f"Lomira Komisi 25 {tag} {kind}{i + 1}"[:30]
+    body = {"name": name, "message": msg, "end_time": END, "products": PRODUCTS, "creator_user_open_ids": [x["open_id"] for x in part],
+            "seller_contact_info": CONTACT, "free_sample_rule": rule, "preferred_content_type": "VIDEO"}
     r = go("POST", "202508/target_collaborations", b=body)
     cid = ((r or {}).get("target_collaboration") or {}).get("id")
     say("create", name, "->", cid, "invalid", (r or {}).get("invalid_open_id_list"), "conflicts", (r or {}).get("target_collaboration_conflicts"))
     if not cid: continue
     d = go("GET", "202508/target_collaborations/" + cid)
     tc = (d or {}).get("target_collaboration", {})
-    say("readback", cid, "invited", tc.get("creator_invited_count"), "rates", [(p["id"][-6:], p["commission"].get("rate")) for p in tc.get("products", [])])
+    say("readback", cid, "invited", tc.get("creator_invited_count"), "rates", [(p["id"][-6:], p["commission"].get("rate")) for p in tc.get("products", [])], "sample", tc.get("free_sample_rule"))
     created.append({"name": name, "id": cid, "n": len(part)})
     stamp = NOW.isoformat()
     for x in part:
