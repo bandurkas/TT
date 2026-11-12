@@ -363,3 +363,17 @@ def test_ad_credit_logged_not_netted(caplog):
         out = jobs.ad_deductions_by_day(sets, TZ)
     assert out == {date(2026, 8, 23): D(100000)}
     assert "CREDIT statement cr" in caplog.text and "ad deduction counted: ad" in caplog.text
+
+
+def test_cancelled_paid_order_has_no_cogs():
+    """Paid then cancelled before shipment: settlement refunds the revenue, the goods never left the warehouse."""
+    res = compute_from_inputs(inputs([ctx(order(status="CANCELLED"), rec=record(), skus=[sku_record()])]), NOW)
+    assert len(res) == 1
+    p = res[0].profit
+    assert p.costs.cogs == 0 and p.contribution_profit_before_ads == p.net_seller_revenue
+    assert any("cogs=0 (not shipped)" in w for w in p.warnings)
+    assert res[0].snapshot["cogs_missing"] is False
+
+
+def test_cancelled_unpaid_order_still_skipped():
+    assert compute_from_inputs(inputs([ctx(order(status="CANCELLED"))]), NOW) == []

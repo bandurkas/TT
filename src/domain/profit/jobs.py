@@ -427,6 +427,10 @@ def compute_from_inputs(inp: ProfitInputs, now: datetime | None = None,
             _skip(ctx, e, errors)
             continue
         versions, cw = cost_versions_with_fallback(inp.cost_versions, items, d, cur, inp.default_cogs)
+        if status in SKIP_ORDER_STATUSES:   # paid then cancelled before shipment: revenue refunded, goods never left -> no COGS
+            versions = [CostVersion(sku_id=it.sku_id, effective_from=NO_COGS_VERSION_FROM, effective_to=None,
+                                    cogs_per_unit=ZERO, currency=cur) for it in {it.sku_id: it for it in items}.values()]
+            cw = [w for w in cw if not w.startswith("COGS missing")] + [f"order {status}: cogs=0 (not shipped)"]
         prepared.append((ctx, d, items, txns, versions, warns + cw, est, source))
 
     advertising = {r.metric_date: r for r in inp.advertising if r.currency == cur}
